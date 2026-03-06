@@ -33,6 +33,15 @@ export default tseslint.config(
     },
   },
   {
+    // node:test's describe/it/test return promises handled by the runner
+    files: ["**/*.test.ts", "**/*.test.js"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/require-await": "off",
+      "require-yield": "off",
+    },
+  },
+  {
     ignores: ["dist/", "coverage/", "*.config.*"],
   },
 );

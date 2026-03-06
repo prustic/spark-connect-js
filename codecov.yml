@@ -1,0 +1,30 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        target: 80%
+
+flags:
+  spark-core:
+    paths:
+      - packages/spark-core/
+    carryforward: true
+  spark-node:
+    paths:
+      - packages/spark-node/
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,components"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "packages/spark-connect/**"
+  - "examples/**"
+  - "tooling/**"
+  - "**/*.test.js"
