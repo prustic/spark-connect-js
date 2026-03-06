@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+  - "tooling/*"
+  - "examples/*"
+
+catalog:
+  typescript: ^5.7.0
+  prettier: ^3.4.0
+  eslint: ^9.17.0

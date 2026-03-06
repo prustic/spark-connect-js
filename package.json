@@ -1,0 +1,27 @@
+{
+  "name": "spark-js",
+  "version": "0.0.0",
+  "private": true,
+  "description": "High-performance, multi-target JavaScript Spark Connect client monorepo",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint -- --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "turbo run test",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@spark-js/prettier-config": "workspace:*",
+    "prettier": "catalog:",
+    "turbo": "^2.4.0",
+    "typescript": "catalog:"
+  },
+  "prettier": "@spark-js/prettier-config"
+}

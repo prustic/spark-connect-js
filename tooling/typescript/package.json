@@ -1,0 +1,17 @@
+{
+  "name": "@spark-js/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./base": "./base.json"
+  },
+  "files": [
+    "base.json"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    /* ──────────────────────────────────────────────────────────────────────────
+     * spark-js  —  Shared TypeScript Configuration
+     *
+     * Every package in this monorepo extends this base config.
+     *
+     * Target: ES2023 — Node 22's V8 natively supports every ES2023 feature.
+     * Downleveling to ES2020 would be wasteful: tsc would rewrite class
+     * fields, lose Error.cause, polyfill Array.at(), and forbid top-level
+     * await — all features Node 22+ runs natively.
+     *
+     * Module: NodeNext — the "living" module resolution that tracks Node's
+     * latest ESM behavior.  Requires explicit .js extensions in imports
+     * because Node's ESM loader does not auto-resolve extensions.
+     *
+     * strict: true is non-negotiable.  Spark Connect payloads arrive as
+     * untyped protobuf objects — the type boundary between wire data and
+     * our DataFrame model must be airtight.
+     * ──────────────────────────────────────────────────────────────────────── */
+
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    "incremental": true,
+    "composite": true
+  },
+  "exclude": ["node_modules", "dist", "coverage"]
+}

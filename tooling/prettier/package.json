@@ -1,0 +1,16 @@
+{
+  "name": "@spark-js/prettier-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs"
+  ],
+  "dependencies": {
+    "prettier": "catalog:"
+  }
+}
