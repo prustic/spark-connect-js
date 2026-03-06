@@ -30,10 +30,11 @@
  */
 
 import type { SparkSession } from "./spark-session.js";
-import type { LogicalPlan } from "./plan/logical-plan.js";
+import type { LogicalPlan, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
+import { DataFrameWriter } from "./data-frame-writer.js";
 
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
@@ -125,6 +126,176 @@ export class DataFrame {
     });
   }
 
+  /**
+   * Sort by one or more columns. Each argument can be:
+   *   - A string column name (ascending by default)
+   *   - A Column object (ascending by default)
+   *
+   * For descending sort, use DataFrame.sort() with SortOrder objects
+   * or call .orderBy() with a helper.
+   *
+   * Maps to Catalyst's `Sort(order, global=true, child)`.
+   */
+  sort(...columns: Array<Column | string>): DataFrame {
+    const order: SortOrder[] = columns.map((c) => {
+      const expr = typeof c === "string" ? col(c)._expr : c._expr;
+      if (typeof c !== "string" && expr.type === "sortOrder") {
+        return {
+          expression: expr.inner,
+          direction: expr.direction,
+          nullOrdering: expr.nullOrdering,
+        };
+      }
+      return {
+        expression: expr,
+        direction: "ascending" as const,
+        nullOrdering: "nulls_last" as const,
+      };
+    });
+    return DataFrame._fromPlan(this._session, {
+      type: "sort",
+      child: this._plan,
+      order,
+      isGlobal: true,
+    });
+  }
+
+  /** Alias for sort(). */
+  orderBy(...columns: Array<Column | string>): DataFrame {
+    return this.sort(...columns);
+  }
+
+  /**
+   * Join with another DataFrame.
+   *
+   * @param other - The right side DataFrame
+   * @param condition - Join condition (a boolean Column expression)
+   * @param joinType - Type of join (default: "inner")
+   *
+   * Maps to Catalyst's `Join(left, right, joinType, condition)`.
+   */
+  join(
+    other: DataFrame,
+    condition?: Column,
+    joinType:
+      | "inner"
+      | "full_outer"
+      | "left_outer"
+      | "right_outer"
+      | "left_semi"
+      | "left_anti"
+      | "cross" = "inner",
+  ): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "join",
+      left: this._plan,
+      right: other._plan,
+      condition: condition?._expr,
+      joinType,
+    });
+  }
+
+  /** Alias for join with joinType="cross". */
+  crossJoin(other: DataFrame): DataFrame {
+    return this.join(other, undefined, "cross");
+  }
+
+  /**
+   * Drop one or more columns by name.
+   *
+   * Maps to Spark Connect's `Relation.Drop`.
+   */
+  drop(...columnNames: string[]): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "drop",
+      child: this._plan,
+      columnNames,
+    });
+  }
+
+  /**
+   * Add or replace a column.
+   *
+   * @example df.withColumn("doubled", col("value").multiply(lit(2)))
+   *
+   * Maps to Spark Connect's `Relation.WithColumns`.
+   */
+  withColumn(name: string, expression: Column): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "withColumns",
+      child: this._plan,
+      aliases: [{ name, expression: expression._expr }],
+    });
+  }
+
+  /**
+   * Add or replace multiple columns at once.
+   */
+  withColumns(colMap: Record<string, Column>): DataFrame {
+    const aliases = Object.entries(colMap).map(([name, c]) => ({
+      name,
+      expression: c._expr,
+    }));
+    return DataFrame._fromPlan(this._session, {
+      type: "withColumns",
+      child: this._plan,
+      aliases,
+    });
+  }
+
+  /**
+   * Remove duplicate rows, optionally considering only a subset of columns.
+   *
+   * Maps to Spark Connect's `Relation.Deduplicate`.
+   */
+  dropDuplicates(...columnNames: string[]): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "deduplicate",
+      child: this._plan,
+      columnNames: columnNames.length > 0 ? columnNames : undefined,
+      allColumnsAsKeys: columnNames.length === 0,
+    });
+  }
+
+  /** Alias for dropDuplicates() with no arguments. */
+  distinct(): DataFrame {
+    return this.dropDuplicates();
+  }
+
+  /**
+   * Skip the first N rows.
+   *
+   * Maps to Spark Connect's `Relation.Offset`.
+   */
+  offset(n: number): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "offset",
+      child: this._plan,
+      offset: n,
+    });
+  }
+
+  // ── Writer ─────────────────────────────────────────────────────────────────
+
+  /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
+  get write(): DataFrameWriter {
+    return new DataFrameWriter(this);
+  }
+
+  /**
+   * Register this DataFrame as a temporary view with the given name.
+   * The view is session-scoped and will be dropped when the session ends.
+   */
+  async createOrReplaceTempView(viewName: string): Promise<void> {
+    await this._session._executeCommand({
+      type: "createDataframeView",
+      plan: this._plan,
+      name: viewName,
+      isGlobal: false,
+      replace: true,
+    });
+  }
+
   // ── Actions (eager — trigger plan execution) ──────────────────────────────
 
   /**
@@ -166,6 +337,44 @@ export class DataFrame {
     // Simplified: in production this would build a proper aggregate plan.
     const rows = await this.collect();
     return rows.length;
+  }
+
+  /**
+   * Return the schema of the DataFrame as a plain object.
+   * Uses the AnalyzePlan.Schema RPC to resolve column names and types
+   * without executing the query.
+   */
+  async schema(): Promise<Record<string, unknown>> {
+    const result = await this._session._analyzePlan({
+      type: "schema",
+      plan: this._plan,
+    });
+    return (result.schema as Record<string, unknown>) ?? {};
+  }
+
+  /**
+   * Return the query execution plan as a string.
+   *
+   * @param mode - Explain mode: "simple", "extended", "codegen", "cost", "formatted"
+   */
+  async explain(
+    mode: "simple" | "extended" | "codegen" | "cost" | "formatted" = "simple",
+  ): Promise<string> {
+    const result = await this._session._analyzePlan({
+      type: "explain",
+      plan: this._plan,
+      mode,
+    });
+    return (result.explainString as string) ?? "";
+  }
+
+  /**
+   * Print the schema to the console in a tree format.
+   * Convenience method that calls schema() and formats the output.
+   */
+  async printSchema(): Promise<void> {
+    const plan = await this.explain("formatted");
+    console.log(plan);
   }
 
   /**

@@ -49,6 +49,33 @@ export interface Transport {
    * this type automatically.
    */
   executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array>;
+
+  /**
+   * Execute a command (write, createView, etc.) on the server.
+   * Commands don't return Arrow data — they run side effects.
+   */
+  executeCommand?(sessionId: string, command: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Send an analyze plan request (schema, explain, etc.) and return
+   * the raw response as a plain object.
+   */
+  analyzePlan?(
+    sessionId: string,
+    request: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
+
+  /**
+   * Release the server-side session, freeing temp views, cached data, etc.
+   * Optional — transports that don't support it simply skip the RPC.
+   */
+  releaseSession?(sessionId: string): Promise<void>;
+
+  /**
+   * Close the underlying connection (e.g. gRPC channel).
+   * Optional — some transports may not have persistent connections.
+   */
+  close?(): void;
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -137,6 +164,39 @@ export class SparkSession {
   /** @internal — used by DataFrame to send plans via the injected transport */
   _executePlan(plan: LogicalPlan): AsyncIterable<Uint8Array> {
     return this.transport.executePlan(this.sessionId, plan);
+  }
+
+  /** @internal — used by DataFrameWriter to send commands via the injected transport */
+  async _executeCommand(command: Record<string, unknown>): Promise<void> {
+    if (!this.transport.executeCommand) {
+      throw new Error("Transport does not support command execution.");
+    }
+    await this.transport.executeCommand(this.sessionId, command);
+  }
+
+  /** @internal — used by DataFrame.schema()/explain() via the injected transport */
+  async _analyzePlan(request: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!this.transport.analyzePlan) {
+      throw new Error("Transport does not support analyzePlan.");
+    }
+    return this.transport.analyzePlan(this.sessionId, request);
+  }
+
+  /**
+   * Stop the SparkSession: releases the server-side session and closes
+   * the underlying transport connection.
+   *
+   * After calling stop(), the session should not be used again.
+   *
+   * @see Spark source: SparkSession.stop() in sql/core/.../SparkSession.scala
+   */
+  async stop(): Promise<void> {
+    if (this.transport.releaseSession) {
+      await this.transport.releaseSession(this.sessionId);
+    }
+    if (this.transport.close) {
+      this.transport.close();
+    }
   }
 }
 

@@ -28,6 +28,23 @@ export {
   ConfigRequestSchema,
   type ConfigResponse,
   ConfigResponseSchema,
+  type InterruptRequest,
+  InterruptRequestSchema,
+  type InterruptResponse,
+  InterruptResponseSchema,
+  type ReleaseSessionRequest,
+  ReleaseSessionRequestSchema,
+  type ReleaseSessionResponse,
+  ReleaseSessionResponseSchema,
+  type FetchErrorDetailsRequest,
+  FetchErrorDetailsRequestSchema,
+  type FetchErrorDetailsResponse,
+  FetchErrorDetailsResponseSchema,
+  AnalyzePlanRequest_Explain_ExplainModeSchema,
+  type AnalyzePlanRequest_Schema,
+  AnalyzePlanRequest_SchemaSchema,
+  type AnalyzePlanRequest_Explain,
+  AnalyzePlanRequest_ExplainSchema,
 } from "./gen/spark/connect/base_pb.js";
 
 // ─── Relation (logical plan) messages ───────────────────────────────────────
@@ -73,6 +90,9 @@ export {
   type Read_NamedTable,
   Read_NamedTableSchema,
   Aggregate_GroupType,
+  type Offset,
+  OffsetSchema,
+  Join_JoinType,
 } from "./gen/spark/connect/relations_pb.js";
 
 // ─── Expression messages ────────────────────────────────────────────────────
@@ -89,7 +109,23 @@ export {
   Expression_AliasSchema,
   type Expression_SortOrder,
   Expression_SortOrderSchema,
+  Expression_SortOrder_SortDirection,
+  Expression_SortOrder_NullOrdering,
 } from "./gen/spark/connect/expressions_pb.js";
 
 // ─── Type messages ──────────────────────────────────────────────────────────
 export { type DataType, DataTypeSchema } from "./gen/spark/connect/types_pb.js";
+
+// ─── Command messages (for write operations) ────────────────────────────────
+export {
+  type Command,
+  CommandSchema,
+  type WriteOperation,
+  WriteOperationSchema,
+  WriteOperation_SaveMode,
+  type WriteOperation_SaveTable,
+  WriteOperation_SaveTableSchema,
+  WriteOperation_SaveTable_TableSaveMethod,
+  type CreateDataFrameViewCommand,
+  CreateDataFrameViewCommandSchema,
+} from "./gen/spark/connect/commands_pb.js";

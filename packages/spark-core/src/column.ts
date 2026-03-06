@@ -94,6 +94,28 @@ export class Column {
   as(name: string): Column {
     return this.alias(name);
   }
+
+  // ── Sort ordering ──────────────────────────────────────────────────────────
+
+  /** Mark this column as ascending sort order. */
+  asc(): Column {
+    return new Column({
+      type: "sortOrder",
+      inner: this._expr,
+      direction: "ascending",
+      nullOrdering: "nulls_last",
+    });
+  }
+
+  /** Mark this column as descending sort order. */
+  desc(): Column {
+    return new Column({
+      type: "sortOrder",
+      inner: this._expr,
+      direction: "descending",
+      nullOrdering: "nulls_last",
+    });
+  }
 }
 
 // ─── Convenience factories ──────────────────────────────────────────────────

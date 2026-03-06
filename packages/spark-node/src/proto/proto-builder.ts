@@ -13,7 +13,11 @@
  */
 
 import { create } from "@bufbuild/protobuf";
-import type { LogicalPlan, Expression as CoreExpression } from "@spark-js/core";
+import type {
+  LogicalPlan,
+  Expression as CoreExpression,
+  SortOrder as CoreSortOrder,
+} from "@spark-js/core";
 import {
   type Relation,
   RelationSchema,
@@ -25,12 +29,22 @@ import {
   AggregateSchema,
   Aggregate_GroupType,
   LimitSchema,
+  SortSchema,
+  JoinSchema,
+  Join_JoinType,
+  DropSchema,
+  WithColumnsSchema,
+  DeduplicateSchema,
+  OffsetSchema,
   type Expression,
   ExpressionSchema,
   Expression_LiteralSchema,
   Expression_UnresolvedAttributeSchema,
   Expression_UnresolvedFunctionSchema,
   Expression_AliasSchema,
+  Expression_SortOrderSchema,
+  Expression_SortOrder_SortDirection,
+  Expression_SortOrder_NullOrdering,
 } from "@spark-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -125,7 +139,109 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    case "sort":
+      return create(RelationSchema, {
+        relType: {
+          case: "sort",
+          value: create(SortSchema, {
+            input: buildRelation(plan.child),
+            order: plan.order.map(buildSortOrder),
+            isGlobal: plan.isGlobal,
+          }),
+        },
+      });
+
+    case "join": {
+      const joinTypeMap: Record<string, Join_JoinType> = {
+        inner: Join_JoinType.INNER,
+        full_outer: Join_JoinType.FULL_OUTER,
+        left_outer: Join_JoinType.LEFT_OUTER,
+        right_outer: Join_JoinType.RIGHT_OUTER,
+        left_semi: Join_JoinType.LEFT_SEMI,
+        left_anti: Join_JoinType.LEFT_ANTI,
+        cross: Join_JoinType.CROSS,
+      };
+      return create(RelationSchema, {
+        relType: {
+          case: "join",
+          value: create(JoinSchema, {
+            left: buildRelation(plan.left),
+            right: buildRelation(plan.right),
+            joinCondition: plan.condition ? buildExpression(plan.condition) : undefined,
+            joinType: joinTypeMap[plan.joinType] ?? Join_JoinType.INNER,
+          }),
+        },
+      });
+    }
+
+    case "drop":
+      return create(RelationSchema, {
+        relType: {
+          case: "drop",
+          value: create(DropSchema, {
+            input: buildRelation(plan.child),
+            columnNames: plan.columnNames,
+          }),
+        },
+      });
+
+    case "withColumns":
+      return create(RelationSchema, {
+        relType: {
+          case: "withColumns",
+          value: create(WithColumnsSchema, {
+            input: buildRelation(plan.child),
+            aliases: plan.aliases.map((a) =>
+              create(Expression_AliasSchema, {
+                expr: buildExpression(a.expression),
+                name: [a.name],
+              }),
+            ),
+          }),
+        },
+      });
+
+    case "deduplicate":
+      return create(RelationSchema, {
+        relType: {
+          case: "deduplicate",
+          value: create(DeduplicateSchema, {
+            input: buildRelation(plan.child),
+            columnNames: plan.columnNames ?? [],
+            allColumnsAsKeys: plan.allColumnsAsKeys,
+          }),
+        },
+      });
+
+    case "offset":
+      return create(RelationSchema, {
+        relType: {
+          case: "offset",
+          value: create(OffsetSchema, {
+            input: buildRelation(plan.child),
+            offset: plan.offset,
+          }),
+        },
+      });
   }
+}
+
+/**
+ * Convert a spark-core SortOrder to a Spark Connect Expression.SortOrder.
+ */
+function buildSortOrder(order: CoreSortOrder) {
+  return create(Expression_SortOrderSchema, {
+    child: buildExpression(order.expression),
+    direction:
+      order.direction === "ascending"
+        ? Expression_SortOrder_SortDirection.ASCENDING
+        : Expression_SortOrder_SortDirection.DESCENDING,
+    nullOrdering:
+      order.nullOrdering === "nulls_first"
+        ? Expression_SortOrder_NullOrdering.SORT_NULLS_FIRST
+        : Expression_SortOrder_NullOrdering.SORT_NULLS_LAST,
+  });
 }
 
 /**
@@ -252,6 +368,10 @@ export function buildExpression(expr: CoreExpression): Expression {
           }),
         },
       });
+
+    case "sortOrder":
+      // sortOrder is a wrapper — build the inner expression
+      return buildExpression(expr.inner);
 
     default: {
       const _exhaustive: never = expr;

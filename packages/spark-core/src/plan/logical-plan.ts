@@ -55,12 +55,31 @@ export type Expression =
   | { type: "multiply"; left: Expression; right: Expression }
   | { type: "divide"; left: Expression; right: Expression }
   // Aggregate functions (sum, avg, count, min, max, etc.)
-  | { type: "aggregateFunction"; name: string; arguments: Expression[] };
+  | { type: "aggregateFunction"; name: string; arguments: Expression[] }
+  // Sort ordering marker (wraps an expression with direction)
+  | {
+      type: "sortOrder";
+      inner: Expression;
+      direction: "ascending" | "descending";
+      nullOrdering: "nulls_first" | "nulls_last";
+    };
 
 // ─── Plan node types ────────────────────────────────────────────────────────
 // Each type maps to a Spark Connect `Relation` protobuf variant.
 
-export type LogicalPlan = ReadPlan | SqlPlan | FilterPlan | ProjectPlan | AggregatePlan | LimitPlan;
+export type LogicalPlan =
+  | ReadPlan
+  | SqlPlan
+  | FilterPlan
+  | ProjectPlan
+  | AggregatePlan
+  | LimitPlan
+  | SortPlan
+  | JoinPlan
+  | DropPlan
+  | WithColumnsPlan
+  | DeduplicatePlan
+  | OffsetPlan;
 
 /**
  * Read from a data source.
@@ -125,4 +144,85 @@ export interface LimitPlan {
   type: "limit";
   child: LogicalPlan;
   limit: number;
+}
+
+/**
+ * Sort rows by one or more expressions.
+ * → Spark Connect: Relation.Sort { child, order }
+ * → Catalyst: Sort(order: Seq[SortOrder], global: Boolean, child)
+ */
+export interface SortPlan {
+  type: "sort";
+  child: LogicalPlan;
+  order: SortOrder[];
+  isGlobal: boolean;
+}
+
+export interface SortOrder {
+  expression: Expression;
+  direction: "ascending" | "descending";
+  nullOrdering: "nulls_first" | "nulls_last";
+}
+
+/**
+ * Join two DataFrames.
+ * → Spark Connect: Relation.Join { left, right, join_condition, join_type }
+ * → Catalyst: Join(left, right, joinType, condition, hint)
+ */
+export interface JoinPlan {
+  type: "join";
+  left: LogicalPlan;
+  right: LogicalPlan;
+  condition?: Expression;
+  joinType:
+    | "inner"
+    | "full_outer"
+    | "left_outer"
+    | "right_outer"
+    | "left_semi"
+    | "left_anti"
+    | "cross";
+}
+
+/**
+ * Drop columns by name.
+ * → Spark Connect: Relation.Drop { child, columns }
+ * → Catalyst: Project with filtered columns
+ */
+export interface DropPlan {
+  type: "drop";
+  child: LogicalPlan;
+  columnNames: string[];
+}
+
+/**
+ * Add or replace columns.
+ * → Spark Connect: Relation.WithColumns { child, aliases }
+ * → Catalyst: Project with new named expressions
+ */
+export interface WithColumnsPlan {
+  type: "withColumns";
+  child: LogicalPlan;
+  aliases: { name: string; expression: Expression }[];
+}
+
+/**
+ * Remove duplicate rows.
+ * → Spark Connect: Relation.Deduplicate { child, column_names, all_columns_as_keys }
+ */
+export interface DeduplicatePlan {
+  type: "deduplicate";
+  child: LogicalPlan;
+  columnNames?: string[];
+  allColumnsAsKeys: boolean;
+}
+
+/**
+ * Skip the first N rows.
+ * → Spark Connect: Relation.Offset { child, offset }
+ */
+export interface OffsetPlan {
+  type: "offset";
+  child: LogicalPlan;
+  offset: number;
 }

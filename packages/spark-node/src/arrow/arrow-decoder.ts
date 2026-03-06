@@ -97,9 +97,7 @@ export class ArrowDecoder {
             const field = schema.fields[colIdx];
             const vector = batch.getChildAt(colIdx);
             const val: unknown = vector?.get(rowIdx) ?? null;
-            // Arrow decodes Int64/LongType as BigInt.  Convert to Number
-            // when the value fits safely, for easier downstream usage.
-            row[field.name] = typeof val === "bigint" ? Number(val) : val;
+            row[field.name] = coerceValue(val);
           }
           rows.push(row);
         }
@@ -108,4 +106,37 @@ export class ArrowDecoder {
 
     return rows;
   }
+}
+
+/**
+ * Coerce Arrow-native values to JS-friendly types.
+ *
+ * - BigInt → Number (when value fits in safe integer range)
+ * - Arrow Struct/Map → plain object (toJSON if available)
+ * - Everything else passes through unchanged (string, number, boolean, null,
+ *   Date objects from Timestamp columns, Uint8Array from Binary columns).
+ */
+function coerceValue(val: unknown): unknown {
+  if (val === null || val === undefined) return null;
+
+  if (typeof val === "bigint") {
+    // Arrow decodes Int64/LongType as BigInt.  Convert to Number when the
+    // value fits, for easier downstream usage with JSON/logging.
+    if (val >= Number.MIN_SAFE_INTEGER && val <= Number.MAX_SAFE_INTEGER) {
+      return Number(val);
+    }
+    return val; // keep as BigInt for large values to avoid precision loss
+  }
+
+  // Arrow Struct vectors return Map-like objects with a toJSON method
+  if (
+    typeof val === "object" &&
+    val !== null &&
+    "toJSON" in val &&
+    typeof (val as { toJSON: unknown }).toJSON === "function"
+  ) {
+    return (val as { toJSON(): unknown }).toJSON();
+  }
+
+  return val;
 }

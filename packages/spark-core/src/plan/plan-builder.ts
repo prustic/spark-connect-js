@@ -87,6 +87,65 @@ export class PlanBuilder {
             limit: plan.limit,
           },
         };
+
+      case "sort":
+        return {
+          sort: {
+            input: PlanBuilder.toRelation(plan.child),
+            order: plan.order.map((o) => ({
+              child: PlanBuilder.toExpression(o.expression),
+              direction: o.direction,
+              nullOrdering: o.nullOrdering,
+            })),
+            isGlobal: plan.isGlobal,
+          },
+        };
+
+      case "join":
+        return {
+          join: {
+            left: PlanBuilder.toRelation(plan.left),
+            right: PlanBuilder.toRelation(plan.right),
+            joinCondition: plan.condition ? PlanBuilder.toExpression(plan.condition) : undefined,
+            joinType: plan.joinType,
+          },
+        };
+
+      case "drop":
+        return {
+          drop: {
+            input: PlanBuilder.toRelation(plan.child),
+            columnNames: plan.columnNames,
+          },
+        };
+
+      case "withColumns":
+        return {
+          withColumns: {
+            input: PlanBuilder.toRelation(plan.child),
+            aliases: plan.aliases.map((a) => ({
+              expr: PlanBuilder.toExpression(a.expression),
+              name: [a.name],
+            })),
+          },
+        };
+
+      case "deduplicate":
+        return {
+          deduplicate: {
+            input: PlanBuilder.toRelation(plan.child),
+            columnNames: plan.columnNames ?? [],
+            allColumnsAsKeys: plan.allColumnsAsKeys,
+          },
+        };
+
+      case "offset":
+        return {
+          offset: {
+            input: PlanBuilder.toRelation(plan.child),
+            offset: plan.offset,
+          },
+        };
     }
   }
 
@@ -148,6 +207,9 @@ export class PlanBuilder {
           },
         };
       }
+
+      case "sortOrder":
+        return PlanBuilder.toExpression(expr.inner);
     }
   }
 }

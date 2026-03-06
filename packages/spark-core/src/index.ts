@@ -55,8 +55,10 @@ export { SparkSession } from "./spark-session.js";
 export { DataFrame } from "./data-frame.js";
 export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
+export { DataFrameWriter } from "./data-frame-writer.js";
+export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
-export type { LogicalPlan, Expression } from "./plan/logical-plan.js";
+export type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 export { PlanBuilder } from "./plan/plan-builder.js";
 
 // Re-export type-only interfaces for consumers that need them without pulling
@@ -64,3 +66,5 @@ export { PlanBuilder } from "./plan/plan-builder.js";
 export type { Row } from "./types/row.js";
 export type { Schema, FieldDescriptor } from "./types/schema.js";
 export type { SparkSessionConfig, Transport, ArrowDecoderFn } from "./spark-session.js";
+export { SparkConnectError, GrpcStatusCode } from "./errors.js";
+export type { GrpcStatusCode as GrpcStatusCodeType } from "./errors.js";

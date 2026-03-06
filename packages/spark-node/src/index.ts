@@ -93,9 +93,19 @@ export {
   GroupedData,
   DataType,
   PlanBuilder,
+  SparkConnectError,
+  GrpcStatusCode,
+  DataFrameWriter,
 } from "@spark-js/core";
 
-export type { Row, Schema, FieldDescriptor, Transport, ArrowDecoderFn } from "@spark-js/core";
+export type {
+  Row,
+  Schema,
+  FieldDescriptor,
+  Transport,
+  ArrowDecoderFn,
+  SaveMode,
+} from "@spark-js/core";
 
 // ─── Convenience: fully-wired session factory ───────────────────────────────
 
