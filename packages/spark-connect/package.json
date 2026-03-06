@@ -1,0 +1,42 @@
+{
+  "name": "@spark-js/connect",
+  "version": "0.1.0",
+  "description": "Generated TypeScript types and service stubs from Spark Connect protobuf definitions",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./gen/*": {
+      "types": "./dist/gen/*",
+      "import": "./dist/gen/*"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "buf generate",
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "lint": "eslint"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.0.0"
+  },
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^2.0.0",
+    "@spark-js/eslint-config": "workspace:*",
+    "@spark-js/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

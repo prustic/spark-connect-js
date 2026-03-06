@@ -1,0 +1,28 @@
+{
+  "name": "@spark-js/example-basic-query",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Basic example: connect to Spark Connect, run SQL, collect results",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "start": "node dist/main.js",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "lint": "eslint",
+    "spark:up": "docker compose up -d --wait",
+    "spark:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@spark-js/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@spark-js/eslint-config": "workspace:*",
+    "@spark-js/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}
