@@ -35,6 +35,7 @@ import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
+import { StructType } from "./types/struct.js";
 
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
@@ -275,6 +276,120 @@ export class DataFrame {
     });
   }
 
+  // ── Set operations ────────────────────────────────────────────────────────
+
+  /** Return a new DataFrame with rows from both this and other (duplicates kept). */
+  union(other: DataFrame): DataFrame {
+    return this._setOp(other, "union", true, false);
+  }
+
+  /** Alias for union(). */
+  unionAll(other: DataFrame): DataFrame {
+    return this.union(other);
+  }
+
+  /** Union by column name (rather than position), keeping duplicates. */
+  unionByName(other: DataFrame, allowMissingColumns = false): DataFrame {
+    return this._setOp(other, "union", true, true, allowMissingColumns);
+  }
+
+  /** Return rows present in both DataFrames (distinct). */
+  intersect(other: DataFrame): DataFrame {
+    return this._setOp(other, "intersect", false, false);
+  }
+
+  /** Return rows present in both DataFrames (duplicates kept). */
+  intersectAll(other: DataFrame): DataFrame {
+    return this._setOp(other, "intersect", true, false);
+  }
+
+  /** Return rows in this but not in other (distinct). */
+  except(other: DataFrame): DataFrame {
+    return this._setOp(other, "except", false, false);
+  }
+
+  /** Return rows in this but not in other (duplicates kept). */
+  exceptAll(other: DataFrame): DataFrame {
+    return this._setOp(other, "except", true, false);
+  }
+
+  /** @internal */
+  private _setOp(
+    other: DataFrame,
+    opType: "union" | "intersect" | "except",
+    isAll: boolean,
+    byName: boolean,
+    allowMissingColumns = false,
+  ): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "setOperation",
+      left: this._plan,
+      right: other._plan,
+      opType,
+      isAll,
+      byName,
+      allowMissingColumns,
+    });
+  }
+
+  // ── Sampling ──────────────────────────────────────────────────────────────
+
+  /** Return a random sample of rows. */
+  sample(fraction: number, withReplacement = false, seed?: number): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "sample",
+      child: this._plan,
+      lowerBound: 0.0,
+      upperBound: fraction,
+      withReplacement,
+      seed,
+    });
+  }
+
+  // ── Null handling ─────────────────────────────────────────────────────────
+
+  /** Replace null values. If cols is empty, applies to all columns. */
+  fillna(value: string | number | boolean, cols: string[] = []): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "fillNa",
+      child: this._plan,
+      cols,
+      values: [value],
+    });
+  }
+
+  /** Drop rows with null values. */
+  dropna(how: "any" | "all" = "any", cols: string[] = []): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "dropNa",
+      child: this._plan,
+      cols,
+      minNonNulls: how === "any" ? undefined : 1,
+    });
+  }
+
+  // ── Column rename ─────────────────────────────────────────────────────────
+
+  /** Return a new DataFrame with renamed columns (positional). */
+  toDF(...columnNames: string[]): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "toDF",
+      child: this._plan,
+      columnNames,
+    });
+  }
+
+  // ── Statistics ────────────────────────────────────────────────────────────
+
+  /** Compute summary statistics (count, mean, stddev, min, max) for columns. */
+  describe(...cols: string[]): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "describe",
+      child: this._plan,
+      cols,
+    });
+  }
+
   // ── Writer ─────────────────────────────────────────────────────────────────
 
   /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
@@ -373,8 +488,9 @@ export class DataFrame {
    * Convenience method that calls schema() and formats the output.
    */
   async printSchema(): Promise<void> {
-    const plan = await this.explain("formatted");
-    console.log(plan);
+    const raw = await this.schema();
+    const structType = StructType.fromProto(raw);
+    console.log(structType.treeString());
   }
 
   /**

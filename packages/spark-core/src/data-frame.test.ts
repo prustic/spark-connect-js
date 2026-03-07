@@ -215,3 +215,129 @@ describe("GroupedData", () => {
     }
   });
 });
+
+describe("DataFrame set operations", () => {
+  it("union() builds setOperation plan with union type", () => {
+    const { spark } = createSession();
+    const df1 = spark.sql("SELECT * FROM a");
+    const df2 = spark.sql("SELECT * FROM b");
+    const result = df1.union(df2);
+    assert.equal(result._plan.type, "setOperation");
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.opType, "union");
+      assert.equal(result._plan.isAll, true);
+      assert.equal(result._plan.byName, false);
+    }
+  });
+
+  it("unionByName() builds setOperation with byName=true", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM a").unionByName(spark.sql("SELECT * FROM b"), true);
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.byName, true);
+      assert.equal(result._plan.allowMissingColumns, true);
+    }
+  });
+
+  it("intersect() builds setOperation plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM a").intersect(spark.sql("SELECT * FROM b"));
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.opType, "intersect");
+      assert.equal(result._plan.isAll, false);
+    }
+  });
+
+  it("intersectAll() builds setOperation with isAll=true", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM a").intersectAll(spark.sql("SELECT * FROM b"));
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.opType, "intersect");
+      assert.equal(result._plan.isAll, true);
+    }
+  });
+
+  it("except() builds setOperation plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM a").except(spark.sql("SELECT * FROM b"));
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.opType, "except");
+      assert.equal(result._plan.isAll, false);
+    }
+  });
+
+  it("exceptAll() builds setOperation with isAll=true", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM a").exceptAll(spark.sql("SELECT * FROM b"));
+    if (result._plan.type === "setOperation") {
+      assert.equal(result._plan.opType, "except");
+      assert.equal(result._plan.isAll, true);
+    }
+  });
+});
+
+describe("DataFrame.sample()", () => {
+  it("builds sample plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").sample(0.5, false, 42);
+    assert.equal(result._plan.type, "sample");
+    if (result._plan.type === "sample") {
+      assert.equal(result._plan.upperBound, 0.5);
+      assert.equal(result._plan.withReplacement, false);
+      assert.equal(result._plan.seed, 42);
+    }
+  });
+});
+
+describe("DataFrame.fillna()", () => {
+  it("builds fillNa plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").fillna(0, ["age", "salary"]);
+    assert.equal(result._plan.type, "fillNa");
+    if (result._plan.type === "fillNa") {
+      assert.deepStrictEqual(result._plan.cols, ["age", "salary"]);
+      assert.deepStrictEqual(result._plan.values, [0]);
+    }
+  });
+});
+
+describe("DataFrame.dropna()", () => {
+  it("builds dropNa plan with how=any", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").dropna("any");
+    assert.equal(result._plan.type, "dropNa");
+    if (result._plan.type === "dropNa") {
+      assert.equal(result._plan.minNonNulls, undefined);
+    }
+  });
+
+  it("builds dropNa plan with how=all", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").dropna("all");
+    if (result._plan.type === "dropNa") {
+      assert.equal(result._plan.minNonNulls, 1);
+    }
+  });
+});
+
+describe("DataFrame.toDF()", () => {
+  it("builds toDF plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").toDF("a", "b", "c");
+    assert.equal(result._plan.type, "toDF");
+    if (result._plan.type === "toDF") {
+      assert.deepStrictEqual(result._plan.columnNames, ["a", "b", "c"]);
+    }
+  });
+});
+
+describe("DataFrame.describe()", () => {
+  it("builds describe plan", () => {
+    const { spark } = createSession();
+    const result = spark.sql("SELECT * FROM t").describe("age", "salary");
+    assert.equal(result._plan.type, "describe");
+    if (result._plan.type === "describe") {
+      assert.deepStrictEqual(result._plan.cols, ["age", "salary"]);
+    }
+  });
+});

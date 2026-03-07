@@ -58,8 +58,84 @@ export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
 export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
-export type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
+export { StructType, StructField } from "./types/struct.js";
+export { Catalog } from "./catalog.js";
+export { WindowSpec, Window } from "./window.js";
+export type {
+  LogicalPlan,
+  Expression,
+  SortOrder,
+  CatalogOperation,
+  WindowFrame,
+  FrameBoundary,
+} from "./plan/logical-plan.js";
 export { PlanBuilder } from "./plan/plan-builder.js";
+
+// ─── Functions ───────────────────────────────────────────────────────────────
+export {
+  // Conditional
+  when,
+  WhenBuilder,
+  // Cast
+  cast,
+  // String
+  upper,
+  lower,
+  trim,
+  ltrim,
+  rtrim,
+  length,
+  concat,
+  substring,
+  regexp_replace,
+  contains,
+  startswith,
+  endswith,
+  // Date/Timestamp
+  year,
+  month,
+  dayofmonth,
+  hour,
+  minute,
+  second,
+  current_date,
+  current_timestamp,
+  datediff,
+  date_add,
+  date_sub,
+  // Math
+  abs,
+  round,
+  ceil,
+  floor,
+  sqrt,
+  pow,
+  log,
+  exp,
+  // Aggregate
+  count,
+  sum,
+  avg,
+  min,
+  max,
+  countDistinct,
+  // Collection/Null
+  coalesce,
+  isnull,
+  isnan,
+  // Misc
+  struct,
+  array,
+  explode,
+  size,
+  // Window
+  row_number,
+  rank,
+  dense_rank,
+  lag,
+  lead,
+  ntile,
+} from "./functions.js";
 
 // Re-export type-only interfaces for consumers that need them without pulling
 // in implementation modules.

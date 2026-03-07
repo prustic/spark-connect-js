@@ -13,14 +13,16 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc --build",
     "dev": "tsc --build --watch",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "test": "node --test dist/**/*.test.js",
-    "test:coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude='**/*.test.js' --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test-reporter=spec --test-reporter-destination=stdout dist/**/*.test.js",
+    "test": "node --test $(find dist -name '*.test.js')",
+    "test:coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude='**/*.test.js' --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test-reporter=spec --test-reporter-destination=stdout $(find dist -name '*.test.js')",
     "lint": "eslint"
   },
   "engines": {

@@ -146,6 +146,91 @@ export class PlanBuilder {
             offset: plan.offset,
           },
         };
+
+      case "catalog": {
+        const op = plan.operation;
+        switch (op.op) {
+          case "listDatabases":
+            return { catalog: { listDatabases: { pattern: op.pattern } } };
+          case "listTables":
+            return { catalog: { listTables: { dbName: op.dbName, pattern: op.pattern } } };
+          case "listColumns":
+            return { catalog: { listColumns: { tableName: op.tableName, dbName: op.dbName } } };
+          case "tableExists":
+            return { catalog: { tableExists: { tableName: op.tableName, dbName: op.dbName } } };
+          case "databaseExists":
+            return { catalog: { databaseExists: { dbName: op.dbName } } };
+          case "currentDatabase":
+            return { catalog: { currentDatabase: {} } };
+          case "setCurrentDatabase":
+            return { catalog: { setCurrentDatabase: { dbName: op.dbName } } };
+        }
+        break;
+      }
+
+      case "setOperation": {
+        const opMap = { union: "UNION", intersect: "INTERSECT", except: "EXCEPT" };
+        return {
+          setOp: {
+            leftInput: PlanBuilder.toRelation(plan.left),
+            rightInput: PlanBuilder.toRelation(plan.right),
+            setOpType: opMap[plan.opType],
+            isAll: plan.isAll,
+            byName: plan.byName,
+            allowMissingColumns: plan.allowMissingColumns,
+          },
+        };
+      }
+
+      case "sample":
+        return {
+          sample: {
+            input: PlanBuilder.toRelation(plan.child),
+            lowerBound: plan.lowerBound,
+            upperBound: plan.upperBound,
+            withReplacement: plan.withReplacement,
+            seed: plan.seed,
+          },
+        };
+
+      case "fillNa":
+        return {
+          fillNa: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+            // Spark NAFill only accepts double, string, or boolean literals
+            values: plan.values.map((v) => {
+              if (typeof v === "number") return { literal: { double: v } };
+              if (typeof v === "string") return { literal: { string: v } };
+              return { literal: { boolean: v } };
+            }),
+          },
+        };
+
+      case "dropNa":
+        return {
+          dropNa: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+            minNonNulls: plan.minNonNulls,
+          },
+        };
+
+      case "toDF":
+        return {
+          toDf: {
+            input: PlanBuilder.toRelation(plan.child),
+            columnNames: plan.columnNames,
+          },
+        };
+
+      case "describe":
+        return {
+          describe: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+          },
+        };
     }
   }
 
@@ -210,6 +295,48 @@ export class PlanBuilder {
 
       case "sortOrder":
         return PlanBuilder.toExpression(expr.inner);
+
+      case "unresolvedFunction":
+        return {
+          unresolvedFunction: {
+            functionName: expr.name,
+            arguments: expr.arguments.map((e) => PlanBuilder.toExpression(e)),
+            isDistinct: expr.isDistinct ?? false,
+          },
+        };
+
+      case "cast":
+        return {
+          cast: {
+            expr: PlanBuilder.toExpression(expr.inner),
+            typeStr: expr.targetType,
+          },
+        };
+
+      case "window": {
+        const w: Record<string, unknown> = {
+          windowFunction: PlanBuilder.toExpression(expr.windowFunction),
+          partitionSpec: expr.partitionSpec.map((e) => PlanBuilder.toExpression(e)),
+          orderSpec: expr.orderSpec.map((o) => ({
+            child: PlanBuilder.toExpression(o.expression),
+            direction: o.direction,
+            nullOrdering: o.nullOrdering,
+          })),
+        };
+        if (expr.frameSpec) {
+          const toBound = (b: import("./logical-plan.js").FrameBoundary) => {
+            if (b.type === "currentRow") return { currentRow: true };
+            if (b.type === "unbounded") return { unbounded: true };
+            return { value: PlanBuilder.toExpression(b.value) };
+          };
+          w.frameSpec = {
+            frameType: expr.frameSpec.frameType === "row" ? "ROW" : "RANGE",
+            lower: toBound(expr.frameSpec.lower),
+            upper: toBound(expr.frameSpec.upper),
+          };
+        }
+        return { window: w };
+      }
     }
   }
 }

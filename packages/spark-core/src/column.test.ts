@@ -133,3 +133,101 @@ describe("Column immutability", () => {
     assert.equal(filtered._expr.type, "gt");
   });
 });
+
+describe("Column.isNull() / isNotNull()", () => {
+  it("isNull() produces unresolvedFunction isnull", () => {
+    const expr = col("x").isNull()._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "isnull");
+      assert.equal(expr.arguments.length, 1);
+    }
+  });
+
+  it("isNotNull() produces unresolvedFunction isnotnull", () => {
+    const expr = col("x").isNotNull()._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "isnotnull");
+    }
+  });
+});
+
+describe("Column.isin()", () => {
+  it("produces unresolvedFunction in with literal values", () => {
+    const expr = col("status").isin("active", "pending")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "in");
+      // first arg is the column, then the two literals
+      assert.equal(expr.arguments.length, 3);
+      assert.equal(expr.arguments[0].type, "unresolvedAttribute");
+      assert.deepStrictEqual(expr.arguments[1], { type: "literal", value: "active" });
+      assert.deepStrictEqual(expr.arguments[2], { type: "literal", value: "pending" });
+    }
+  });
+});
+
+describe("Column.between()", () => {
+  it("composes gte + lte + and", () => {
+    const expr = col("age").between(lit(18), lit(65))._expr;
+    assert.equal(expr.type, "and");
+  });
+});
+
+describe("Column string matching", () => {
+  it("like()", () => {
+    const expr = col("name").like("%John%")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "like");
+      assert.equal(expr.arguments.length, 2);
+    }
+  });
+
+  it("rlike()", () => {
+    const expr = col("name").rlike("^J.*n$")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "rlike");
+    }
+  });
+
+  it("startsWith()", () => {
+    const expr = col("name").startsWith("Jo")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "startswith");
+    }
+  });
+
+  it("endsWith()", () => {
+    const expr = col("name").endsWith("hn")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "endswith");
+    }
+  });
+
+  it("contains()", () => {
+    const expr = col("name").contains("oh")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "contains");
+    }
+  });
+});
+
+describe("Column.over()", () => {
+  it("produces window expression with partition and order specs", async () => {
+    // Dynamic import to avoid circular dep issues
+    const { WindowSpec } = await import("./window.js");
+    const spec = new WindowSpec().partitionBy("dept").orderBy("salary");
+    const expr = col("salary").over(spec)._expr;
+    assert.equal(expr.type, "window");
+    if (expr.type === "window") {
+      assert.equal(expr.partitionSpec.length, 1);
+      assert.equal(expr.orderSpec.length, 1);
+    }
+  });
+});

@@ -93,6 +93,19 @@ export {
   type Offset,
   OffsetSchema,
   Join_JoinType,
+  SetOperation_SetOpType,
+  type NAFill,
+  NAFillSchema,
+  type NADrop,
+  NADropSchema,
+  type NAReplace,
+  NAReplaceSchema,
+  type ToDF,
+  ToDFSchema,
+  type StatDescribe,
+  StatDescribeSchema,
+  type StatSummary,
+  StatSummarySchema,
 } from "./gen/spark/connect/relations_pb.js";
 
 // ─── Expression messages ────────────────────────────────────────────────────
@@ -113,8 +126,54 @@ export {
   Expression_SortOrder_NullOrdering,
 } from "./gen/spark/connect/expressions_pb.js";
 
+// ─── Window expression messages ─────────────────────────────────────────────
+export {
+  type Expression_Window,
+  Expression_WindowSchema,
+  type Expression_Window_WindowFrame,
+  Expression_Window_WindowFrameSchema,
+  Expression_Window_WindowFrame_FrameType,
+  type Expression_Window_WindowFrame_FrameBoundary,
+  Expression_Window_WindowFrame_FrameBoundarySchema,
+} from "./gen/spark/connect/expressions_pb.js";
+
 // ─── Type messages ──────────────────────────────────────────────────────────
 export { type DataType, DataTypeSchema } from "./gen/spark/connect/types_pb.js";
+
+// ─── Catalog messages ───────────────────────────────────────────────────────
+export {
+  type Catalog,
+  CatalogSchema,
+  type CurrentDatabase,
+  CurrentDatabaseSchema,
+  type SetCurrentDatabase,
+  SetCurrentDatabaseSchema,
+  type ListDatabases,
+  ListDatabasesSchema,
+  type ListTables,
+  ListTablesSchema,
+  type ListFunctions,
+  ListFunctionsSchema,
+  type ListColumns,
+  ListColumnsSchema,
+  type GetDatabase,
+  GetDatabaseSchema,
+  type GetTable,
+  GetTableSchema,
+  type TableExists,
+  TableExistsSchema,
+  type DatabaseExists,
+  DatabaseExistsSchema,
+  type FunctionExists,
+  FunctionExistsSchema,
+} from "./gen/spark/connect/catalog_pb.js";
+
+// ─── Expression.Cast messages ───────────────────────────────────────────────
+export {
+  type Expression_Cast,
+  Expression_CastSchema,
+  Expression_Cast_EvalMode,
+} from "./gen/spark/connect/expressions_pb.js";
 
 // ─── Command messages (for write operations) ────────────────────────────────
 export {

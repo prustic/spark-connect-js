@@ -25,6 +25,7 @@
  */
 
 import { DataFrame } from "./data-frame.js";
+import { Catalog } from "./catalog.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 
@@ -136,6 +137,13 @@ export class SparkSession {
   }
 
   // ── DataFrame entry points ────────────────────────────────────────────────
+
+  /**
+   * Access the session catalog for inspecting databases, tables, and columns.
+   *
+   * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/catalog/Catalog.scala
+   */
+  readonly catalog: Catalog = new Catalog(this);
 
   /**
    * Read a data source.  Returns a DataFrameReader which builds the

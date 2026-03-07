@@ -32,6 +32,7 @@ import {
   WriteOperation_SaveTableSchema,
   WriteOperation_SaveTable_TableSaveMethod,
   CreateDataFrameViewCommandSchema,
+  type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
   type ReleaseSessionRequest,
@@ -328,13 +329,13 @@ function buildCommandProto(command: Record<string, unknown>): Command {
     const mode =
       SAVE_MODE_MAP[(command.mode as string) ?? "error"] ?? WriteOperation_SaveMode.ERROR_IF_EXISTS;
 
-    let saveTypeProto: InstanceType<typeof Object>;
+    let saveTypeProto: WriteOperation["saveType"];
     if (saveType.case === "path") {
-      saveTypeProto = { case: "path" as const, value: saveType.value as string };
+      saveTypeProto = { case: "path", value: saveType.value as string };
     } else if (saveType.case === "table") {
       const tableInfo = saveType.value as { tableName: string; saveMethod: string };
       saveTypeProto = {
-        case: "table" as const,
+        case: "table",
         value: create(WriteOperation_SaveTableSchema, {
           tableName: tableInfo.tableName,
           saveMethod:
@@ -354,8 +355,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
           input: relation,
           source: command.source as string,
           mode,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          saveType: saveTypeProto as any,
+          saveType: saveTypeProto,
           options: (command.options as Record<string, string>) ?? {},
           partitioningColumns: (command.partitioningColumns as string[]) ?? [],
           sortColumnNames: (command.sortColumnNames as string[]) ?? [],

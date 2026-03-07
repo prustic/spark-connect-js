@@ -18,6 +18,7 @@
  */
 
 import type { Expression } from "./plan/logical-plan.js";
+import type { WindowSpec } from "./window.js";
 
 export class Column {
   /** @internal — the raw expression tree node */
@@ -95,6 +96,13 @@ export class Column {
     return this.alias(name);
   }
 
+  // ── Cast ──────────────────────────────────────────────────────────────────
+
+  /** Cast this column to the given type string (e.g. "string", "int", "double"). */
+  cast(targetType: string): Column {
+    return new Column({ type: "cast", inner: this._expr, targetType });
+  }
+
   // ── Sort ordering ──────────────────────────────────────────────────────────
 
   /** Mark this column as ascending sort order. */
@@ -114,6 +122,94 @@ export class Column {
       inner: this._expr,
       direction: "descending",
       nullOrdering: "nulls_last",
+    });
+  }
+
+  // ── Null checks ───────────────────────────────────────────────────────────
+
+  /** Test whether this column is null. */
+  isNull(): Column {
+    return new Column({ type: "unresolvedFunction", name: "isnull", arguments: [this._expr] });
+  }
+
+  /** Test whether this column is not null. */
+  isNotNull(): Column {
+    return new Column({ type: "unresolvedFunction", name: "isnotnull", arguments: [this._expr] });
+  }
+
+  // ── Membership / range ────────────────────────────────────────────────────
+
+  /** Test whether this column's value is in the given list. */
+  isin(...values: Array<string | number | boolean | bigint | null>): Column {
+    const args: Expression[] = [
+      this._expr,
+      ...values.map((v): Expression => ({ type: "literal", value: v })),
+    ];
+    return new Column({ type: "unresolvedFunction", name: "in", arguments: args });
+  }
+
+  /** Test whether this column's value is between lower and upper (inclusive). */
+  between(lower: Column, upper: Column): Column {
+    return this.gte(lower).and(this.lte(upper));
+  }
+
+  // ── String matching ───────────────────────────────────────────────────────
+
+  /** SQL LIKE pattern match. */
+  like(pattern: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "like",
+      arguments: [this._expr, { type: "literal", value: pattern }],
+    });
+  }
+
+  /** SQL RLIKE (regex) pattern match. */
+  rlike(pattern: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "rlike",
+      arguments: [this._expr, { type: "literal", value: pattern }],
+    });
+  }
+
+  /** Test whether this string column starts with the given prefix. */
+  startsWith(prefix: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "startswith",
+      arguments: [this._expr, { type: "literal", value: prefix }],
+    });
+  }
+
+  /** Test whether this string column ends with the given suffix. */
+  endsWith(suffix: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "endswith",
+      arguments: [this._expr, { type: "literal", value: suffix }],
+    });
+  }
+
+  /** Test whether this string column contains the given substring. */
+  contains(substr: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "contains",
+      arguments: [this._expr, { type: "literal", value: substr }],
+    });
+  }
+
+  // ── Window ────────────────────────────────────────────────────────────────
+
+  /** Apply a window specification to this (window function) column. */
+  over(windowSpec: WindowSpec): Column {
+    return new Column({
+      type: "window",
+      windowFunction: this._expr,
+      partitionSpec: windowSpec._partitionSpec,
+      orderSpec: windowSpec._orderSpec,
+      frameSpec: windowSpec._frameSpec,
     });
   }
 }

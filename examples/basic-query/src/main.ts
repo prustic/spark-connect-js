@@ -8,7 +8,23 @@
  *   pnpm build && node dist/main.js
  */
 
-import { connect, col, lit } from "@spark-js/node";
+import {
+  connect,
+  col,
+  lit,
+  when,
+  cast,
+  upper,
+  round,
+  count,
+  sum,
+  avg,
+  row_number,
+  rank,
+  dense_rank,
+  lag,
+  Window,
+} from "@spark-js/node";
 
 const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 
@@ -107,6 +123,116 @@ async function main(): Promise<void> {
   const rows = await filtered.collect();
   console.log(`Collected ${String(rows.length)} rows:`);
   console.log(JSON.stringify(rows, null, 2));
+
+  // ── 13. Expression Functions: when / otherwise ────────────────────────
+  console.log("\n=== 13. When / Otherwise ===");
+  const withTier = employees.withColumn(
+    "tier",
+    when(col("salary").gte(lit(90000)), lit("senior"))
+      .when(col("salary").gte(lit(80000)), lit("mid"))
+      .otherwise(lit("junior")),
+  );
+  await withTier.select("name", "salary", "tier").show();
+
+  // ── 14. Cast + String Functions ───────────────────────────────────────
+  console.log("\n=== 14. Cast + Upper ===");
+  const casted = employees
+    .withColumn("salary_str", cast(col("salary"), "string"))
+    .withColumn("upper_name", upper(col("name")));
+  await casted.select("upper_name", "salary_str").show();
+
+  // ── 15. Math Functions ────────────────────────────────────────────────
+  console.log("\n=== 15. Round / Aggregates ===");
+  const deptStats = employees
+    .groupBy("department")
+    .agg(
+      count(col("name")).as("headcount"),
+      round(avg(col("salary")), 0).as("avg_salary"),
+      sum(col("salary")).as("total_salary"),
+    );
+  await deptStats.show();
+
+  // ── 16. Schema Inspection ─────────────────────────────────────────────
+  console.log("\n=== 16. Schema ===");
+  await employees.printSchema();
+
+  // ── 17. Catalog API ───────────────────────────────────────────────────
+  console.log("\n=== 17. Catalog ===");
+  const currentDb = await spark.catalog.currentDatabase();
+  console.log(`Current database: ${currentDb}`);
+
+  const tables = spark.catalog.listTables();
+  console.log("Tables:");
+  await tables.show();
+
+  const empExists = await spark.catalog.tableExists("emp");
+  console.log(`Table 'emp' exists: ${String(empExists)}`);
+
+  // ── 18. Union / Intersect / Except ─────────────────────────────────────
+  console.log("\n=== 18. Union / Intersect / Except ===");
+  const eng = employees.filter(col("department").eq(lit("Engineering")));
+  const mkt = employees.filter(col("department").eq(lit("Marketing")));
+  const unioned = eng.union(mkt);
+  console.log("Union of Engineering + Marketing:");
+  await unioned.show();
+
+  const intersected = employees
+    .filter(col("salary").gt(lit(80000)))
+    .intersect(employees.filter(col("department").eq(lit("Engineering"))));
+  console.log("Intersect (salary>80k ∩ Engineering):");
+  await intersected.show();
+
+  const excepted = employees.except(eng);
+  console.log("Except (all - Engineering):");
+  await excepted.show();
+
+  // ── 19. Column Methods: isNull, isin, like, between ───────────────────
+  console.log("\n=== 19. Column Methods ===");
+  const withNulls = spark.sql(`
+    SELECT * FROM VALUES
+      ('Alice', 90000),
+      ('Bob',   NULL),
+      ('Carol', 70000),
+      (NULL,    80000)
+    AS data(name, salary)
+  `);
+  console.log("isNotNull filter:");
+  await withNulls.filter(col("name").isNotNull()).show();
+
+  console.log("isin filter:");
+  await employees.filter(col("name").isin("Alice", "Eve")).show();
+
+  console.log("like filter:");
+  await employees.filter(col("name").like("%o%")).show();
+
+  console.log("between filter:");
+  await employees.filter(col("salary").between(lit(72000), lit(91000))).show();
+
+  // ── 20. Window Functions ───────────────────────────────────────────────
+  console.log("\n=== 20. Window Functions ===");
+  const w = Window.partitionBy("department").orderBy(col("salary").desc());
+  const ranked = employees
+    .withColumn("row_num", row_number().over(w))
+    .withColumn("rnk", rank().over(w))
+    .withColumn("dense_rnk", dense_rank().over(w))
+    .withColumn("prev_salary", lag("salary", 1).over(w));
+  await ranked
+    .select("name", "department", "salary", "row_num", "rnk", "dense_rnk", "prev_salary")
+    .show();
+
+  // ── 21. Describe ──────────────────────────────────────────────────────
+  console.log("\n=== 21. Describe ===");
+  const stats = employees.describe("salary");
+  await stats.show();
+
+  // ── 22. FillNA / DropNA ───────────────────────────────────────────────
+  console.log("\n=== 22. FillNA / DropNA ===");
+  console.log("Original with nulls:");
+  await withNulls.show();
+  console.log("After fillna(0):");
+  await withNulls.fillna(0).show();
+  console.log("After dropna:");
+  await withNulls.dropna().show();
 
   // ── Cleanup ────────────────────────────────────────────────────────────
   await spark.stop();

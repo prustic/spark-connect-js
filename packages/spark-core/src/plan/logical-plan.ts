@@ -62,7 +62,36 @@ export type Expression =
       inner: Expression;
       direction: "ascending" | "descending";
       nullOrdering: "nulls_first" | "nulls_last";
+    }
+  // Generic unresolved function call (maps to Spark's UnresolvedFunction)
+  | {
+      type: "unresolvedFunction";
+      name: string;
+      arguments: Expression[];
+      isDistinct?: boolean;
+    }
+  // Cast expression (maps to Spark Connect's Expression.Cast)
+  | { type: "cast"; inner: Expression; targetType: string }
+  // Window expression (maps to Spark Connect's Expression.Window)
+  | {
+      type: "window";
+      windowFunction: Expression;
+      partitionSpec: Expression[];
+      orderSpec: SortOrder[];
+      frameSpec?: WindowFrame;
     };
+
+/** Window frame specification. */
+export interface WindowFrame {
+  frameType: "row" | "range";
+  lower: FrameBoundary;
+  upper: FrameBoundary;
+}
+
+export type FrameBoundary =
+  | { type: "currentRow" }
+  | { type: "unbounded" }
+  | { type: "value"; value: Expression };
 
 // ─── Plan node types ────────────────────────────────────────────────────────
 // Each type maps to a Spark Connect `Relation` protobuf variant.
@@ -79,7 +108,14 @@ export type LogicalPlan =
   | DropPlan
   | WithColumnsPlan
   | DeduplicatePlan
-  | OffsetPlan;
+  | OffsetPlan
+  | CatalogPlan
+  | SetOperationPlan
+  | SamplePlan
+  | NAFillPlan
+  | NADropPlan
+  | ToDFPlan
+  | DescribePlan;
 
 /**
  * Read from a data source.
@@ -225,4 +261,94 @@ export interface OffsetPlan {
   type: "offset";
   child: LogicalPlan;
   offset: number;
+}
+
+/**
+ * Catalog API operations.
+ * → Spark Connect: Relation.Catalog { cat_type oneof }
+ *
+ * Catalog operations are sent as a Relation with a `catalog` variant,
+ * and the server returns the result as a DataFrame (Arrow batches).
+ */
+export type CatalogOperation =
+  | { op: "listDatabases"; pattern?: string }
+  | { op: "listTables"; dbName?: string; pattern?: string }
+  | { op: "listColumns"; tableName: string; dbName?: string }
+  | { op: "tableExists"; tableName: string; dbName?: string }
+  | { op: "databaseExists"; dbName: string }
+  | { op: "currentDatabase" }
+  | { op: "setCurrentDatabase"; dbName: string };
+
+export interface CatalogPlan {
+  type: "catalog";
+  operation: CatalogOperation;
+}
+
+/**
+ * Set operations: union, intersect, except.
+ * → Spark Connect: Relation.SetOperation
+ */
+export interface SetOperationPlan {
+  type: "setOperation";
+  left: LogicalPlan;
+  right: LogicalPlan;
+  opType: "union" | "intersect" | "except";
+  isAll: boolean;
+  byName: boolean;
+  allowMissingColumns: boolean;
+}
+
+/**
+ * Random sample of rows.
+ * → Spark Connect: Relation.Sample
+ */
+export interface SamplePlan {
+  type: "sample";
+  child: LogicalPlan;
+  lowerBound: number;
+  upperBound: number;
+  withReplacement: boolean;
+  seed?: number;
+}
+
+/**
+ * Fill null values.
+ * → Spark Connect: Relation.FillNa (NAFill)
+ */
+export interface NAFillPlan {
+  type: "fillNa";
+  child: LogicalPlan;
+  cols: string[];
+  values: Array<string | number | boolean>;
+}
+
+/**
+ * Drop rows with null values.
+ * → Spark Connect: Relation.DropNa (NADrop)
+ */
+export interface NADropPlan {
+  type: "dropNa";
+  child: LogicalPlan;
+  cols: string[];
+  minNonNulls?: number;
+}
+
+/**
+ * Rename columns (return new DataFrame with renamed columns).
+ * → Spark Connect: Relation.ToDF
+ */
+export interface ToDFPlan {
+  type: "toDF";
+  child: LogicalPlan;
+  columnNames: string[];
+}
+
+/**
+ * Compute summary statistics.
+ * → Spark Connect: Relation.Describe (StatDescribe)
+ */
+export interface DescribePlan {
+  type: "describe";
+  child: LogicalPlan;
+  cols: string[];
 }

@@ -233,4 +233,223 @@ describe("buildExpression()", () => {
       }
     }
   });
+
+  it("builds unresolvedFunction expression", () => {
+    const result = buildExpression({
+      type: "unresolvedFunction",
+      name: "upper",
+      arguments: [{ type: "unresolvedAttribute", name: "name" }],
+    });
+    assert.equal(result.exprType.case, "unresolvedFunction");
+    if (result.exprType.case === "unresolvedFunction") {
+      assert.equal(result.exprType.value.functionName, "upper");
+      assert.equal(result.exprType.value.arguments.length, 1);
+      assert.equal(result.exprType.value.isDistinct, false);
+    }
+  });
+
+  it("builds unresolvedFunction with isDistinct", () => {
+    const result = buildExpression({
+      type: "unresolvedFunction",
+      name: "count",
+      arguments: [{ type: "unresolvedAttribute", name: "x" }],
+      isDistinct: true,
+    });
+    if (result.exprType.case === "unresolvedFunction") {
+      assert.equal(result.exprType.value.isDistinct, true);
+    }
+  });
+
+  it("builds cast expression with typeStr", () => {
+    const result = buildExpression({
+      type: "cast",
+      inner: { type: "unresolvedAttribute", name: "id" },
+      targetType: "string",
+    });
+    assert.equal(result.exprType.case, "cast");
+    if (result.exprType.case === "cast") {
+      assert.equal(result.exprType.value.castToType.case, "typeStr");
+      assert.equal(result.exprType.value.castToType.value, "string");
+      assert.ok(result.exprType.value.expr);
+    }
+  });
+});
+
+describe("buildRelation() — catalog", () => {
+  it("builds a listDatabases catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "listDatabases" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a listTables catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "listTables", dbName: "default" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a tableExists catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "tableExists", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+});
+
+describe("buildRelation() — setOperation", () => {
+  it("builds a union relation", () => {
+    const plan: LogicalPlan = {
+      type: "setOperation",
+      left: { type: "sql", query: "SELECT * FROM a" },
+      right: { type: "sql", query: "SELECT * FROM b" },
+      opType: "union",
+      isAll: true,
+      byName: false,
+      allowMissingColumns: false,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "setOp");
+  });
+
+  it("builds an intersect relation", () => {
+    const plan: LogicalPlan = {
+      type: "setOperation",
+      left: { type: "sql", query: "SELECT * FROM a" },
+      right: { type: "sql", query: "SELECT * FROM b" },
+      opType: "intersect",
+      isAll: false,
+      byName: false,
+      allowMissingColumns: false,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "setOp");
+  });
+
+  it("builds an except relation", () => {
+    const plan: LogicalPlan = {
+      type: "setOperation",
+      left: { type: "sql", query: "SELECT * FROM a" },
+      right: { type: "sql", query: "SELECT * FROM b" },
+      opType: "except",
+      isAll: false,
+      byName: false,
+      allowMissingColumns: false,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "setOp");
+  });
+});
+
+describe("buildRelation() — sample", () => {
+  it("builds a sample relation", () => {
+    const plan: LogicalPlan = {
+      type: "sample",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      lowerBound: 0.0,
+      upperBound: 0.5,
+      withReplacement: false,
+      seed: 42,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "sample");
+  });
+});
+
+describe("buildRelation() — fillNa / dropNa", () => {
+  it("builds a fillNa relation", () => {
+    const plan: LogicalPlan = {
+      type: "fillNa",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["age"],
+      values: [0],
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "fillNa");
+  });
+
+  it("builds a dropNa relation", () => {
+    const plan: LogicalPlan = {
+      type: "dropNa",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: [],
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "dropNa");
+  });
+});
+
+describe("buildRelation() — toDF / describe", () => {
+  it("builds a toDF relation", () => {
+    const plan: LogicalPlan = {
+      type: "toDF",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      columnNames: ["a", "b"],
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "toDf");
+  });
+
+  it("builds a describe (StatDescribe) relation", () => {
+    const plan: LogicalPlan = {
+      type: "describe",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["age"],
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "describe");
+  });
+});
+
+describe("buildExpression() — window", () => {
+  it("builds a window expression with partition and order", () => {
+    const result = buildExpression({
+      type: "window",
+      windowFunction: { type: "unresolvedFunction", name: "row_number", arguments: [] },
+      partitionSpec: [{ type: "unresolvedAttribute", name: "dept" }],
+      orderSpec: [
+        {
+          expression: { type: "unresolvedAttribute", name: "salary" },
+          direction: "descending",
+          nullOrdering: "nulls_last",
+        },
+      ],
+    });
+    assert.equal(result.exprType.case, "window");
+  });
+
+  it("builds a window expression with frame spec", () => {
+    const result = buildExpression({
+      type: "window",
+      windowFunction: {
+        type: "unresolvedFunction",
+        name: "sum",
+        arguments: [{ type: "unresolvedAttribute", name: "amount" }],
+      },
+      partitionSpec: [],
+      orderSpec: [
+        {
+          expression: { type: "unresolvedAttribute", name: "date" },
+          direction: "ascending",
+          nullOrdering: "nulls_last",
+        },
+      ],
+      frameSpec: {
+        frameType: "row",
+        lower: { type: "unbounded" },
+        upper: { type: "currentRow" },
+      },
+    });
+    assert.equal(result.exprType.case, "window");
+    if (result.exprType.case === "window") {
+      assert.ok(result.exprType.value.frameSpec);
+    }
+  });
 });

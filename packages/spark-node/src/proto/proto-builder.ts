@@ -17,6 +17,7 @@ import type {
   LogicalPlan,
   Expression as CoreExpression,
   SortOrder as CoreSortOrder,
+  FrameBoundary as CoreFrameBoundary,
 } from "@spark-js/core";
 import {
   type Relation,
@@ -45,6 +46,27 @@ import {
   Expression_SortOrderSchema,
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
+  Expression_CastSchema,
+  type Catalog,
+  CatalogSchema,
+  CurrentDatabaseSchema,
+  SetCurrentDatabaseSchema,
+  ListDatabasesSchema,
+  ListTablesSchema,
+  ListColumnsSchema,
+  TableExistsSchema,
+  DatabaseExistsSchema,
+  SetOperationSchema,
+  SetOperation_SetOpType,
+  SampleSchema,
+  NAFillSchema,
+  NADropSchema,
+  ToDFSchema,
+  StatDescribeSchema,
+  Expression_WindowSchema,
+  Expression_Window_WindowFrameSchema,
+  Expression_Window_WindowFrame_FrameType,
+  Expression_Window_WindowFrame_FrameBoundarySchema,
 } from "@spark-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -224,6 +246,152 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    case "catalog": {
+      const op = plan.operation;
+      let catValue: Catalog["catType"];
+      switch (op.op) {
+        case "currentDatabase":
+          catValue = { case: "currentDatabase", value: create(CurrentDatabaseSchema) };
+          break;
+        case "setCurrentDatabase":
+          catValue = {
+            case: "setCurrentDatabase",
+            value: create(SetCurrentDatabaseSchema, { dbName: op.dbName }),
+          };
+          break;
+        case "listDatabases":
+          catValue = {
+            case: "listDatabases",
+            value: create(ListDatabasesSchema, { pattern: op.pattern }),
+          };
+          break;
+        case "listTables":
+          catValue = {
+            case: "listTables",
+            value: create(ListTablesSchema, { dbName: op.dbName, pattern: op.pattern }),
+          };
+          break;
+        case "listColumns":
+          catValue = {
+            case: "listColumns",
+            value: create(ListColumnsSchema, { tableName: op.tableName, dbName: op.dbName }),
+          };
+          break;
+        case "tableExists":
+          catValue = {
+            case: "tableExists",
+            value: create(TableExistsSchema, { tableName: op.tableName, dbName: op.dbName }),
+          };
+          break;
+        case "databaseExists":
+          catValue = {
+            case: "databaseExists",
+            value: create(DatabaseExistsSchema, { dbName: op.dbName }),
+          };
+          break;
+      }
+      const catalog = create(CatalogSchema, { catType: catValue });
+      return create(RelationSchema, {
+        relType: { case: "catalog", value: catalog },
+      });
+    }
+
+    case "setOperation": {
+      const opTypeMap: Record<string, SetOperation_SetOpType> = {
+        union: SetOperation_SetOpType.UNION,
+        intersect: SetOperation_SetOpType.INTERSECT,
+        except: SetOperation_SetOpType.EXCEPT,
+      };
+      return create(RelationSchema, {
+        relType: {
+          case: "setOp",
+          value: create(SetOperationSchema, {
+            leftInput: buildRelation(plan.left),
+            rightInput: buildRelation(plan.right),
+            setOpType: opTypeMap[plan.opType] ?? SetOperation_SetOpType.UNION,
+            isAll: plan.isAll,
+            byName: plan.byName,
+            allowMissingColumns: plan.allowMissingColumns,
+          }),
+        },
+      });
+    }
+
+    case "sample":
+      return create(RelationSchema, {
+        relType: {
+          case: "sample",
+          value: create(SampleSchema, {
+            input: buildRelation(plan.child),
+            lowerBound: plan.lowerBound,
+            upperBound: plan.upperBound,
+            withReplacement: plan.withReplacement,
+            seed: plan.seed !== undefined ? BigInt(plan.seed) : undefined,
+          }),
+        },
+      });
+
+    case "fillNa":
+      return create(RelationSchema, {
+        relType: {
+          case: "fillNa",
+          value: create(NAFillSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+            // Spark NAFill only accepts double, string, or boolean literals
+            values: plan.values.map((v) => {
+              if (typeof v === "number") {
+                return create(Expression_LiteralSchema, {
+                  literalType: { case: "double", value: v },
+                });
+              }
+              if (typeof v === "string") {
+                return create(Expression_LiteralSchema, {
+                  literalType: { case: "string", value: v },
+                });
+              }
+              return create(Expression_LiteralSchema, {
+                literalType: { case: "boolean", value: v },
+              });
+            }),
+          }),
+        },
+      });
+
+    case "dropNa":
+      return create(RelationSchema, {
+        relType: {
+          case: "dropNa",
+          value: create(NADropSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+            minNonNulls: plan.minNonNulls,
+          }),
+        },
+      });
+
+    case "toDF":
+      return create(RelationSchema, {
+        relType: {
+          case: "toDf",
+          value: create(ToDFSchema, {
+            input: buildRelation(plan.child),
+            columnNames: plan.columnNames,
+          }),
+        },
+      });
+
+    case "describe":
+      return create(RelationSchema, {
+        relType: {
+          case: "describe",
+          value: create(StatDescribeSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+          }),
+        },
+      });
   }
 }
 
@@ -241,6 +409,60 @@ function buildSortOrder(order: CoreSortOrder) {
       order.nullOrdering === "nulls_first"
         ? Expression_SortOrder_NullOrdering.SORT_NULLS_FIRST
         : Expression_SortOrder_NullOrdering.SORT_NULLS_LAST,
+  });
+}
+
+/**
+ * Convert a spark-core FrameBoundary to a Spark Connect WindowFrame.FrameBoundary.
+ */
+function buildFrameBoundary(boundary: CoreFrameBoundary) {
+  switch (boundary.type) {
+    case "currentRow":
+      return create(Expression_Window_WindowFrame_FrameBoundarySchema, {
+        boundary: { case: "currentRow", value: true },
+      });
+    case "unbounded":
+      return create(Expression_Window_WindowFrame_FrameBoundarySchema, {
+        boundary: { case: "unbounded", value: true },
+      });
+    case "value":
+      return create(Expression_Window_WindowFrame_FrameBoundarySchema, {
+        boundary: { case: "value", value: buildExpression(boundary.value) },
+      });
+  }
+}
+
+/**
+ * Build a raw Expression_Literal (for fields that expect Literal, not full Expression).
+ */
+function buildLiteral(expr: CoreExpression & { type: "literal" }) {
+  if (expr.value === null) {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: undefined, value: undefined },
+    });
+  }
+  if (typeof expr.value === "string") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "string", value: expr.value },
+    });
+  }
+  if (typeof expr.value === "boolean") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "boolean", value: expr.value },
+    });
+  }
+  if (typeof expr.value === "bigint") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "long", value: expr.value },
+    });
+  }
+  if (Number.isInteger(expr.value) && Number.isSafeInteger(expr.value)) {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "integer", value: expr.value },
+    });
+  }
+  return create(Expression_LiteralSchema, {
+    literalType: { case: "double", value: expr.value },
   });
 }
 
@@ -372,6 +594,50 @@ export function buildExpression(expr: CoreExpression): Expression {
     case "sortOrder":
       // sortOrder is a wrapper — build the inner expression
       return buildExpression(expr.inner);
+
+    case "unresolvedFunction":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "unresolvedFunction",
+          value: create(Expression_UnresolvedFunctionSchema, {
+            functionName: expr.name,
+            arguments: expr.arguments.map(buildExpression),
+            isDistinct: expr.isDistinct ?? false,
+          }),
+        },
+      });
+
+    case "cast":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "cast",
+          value: create(Expression_CastSchema, {
+            expr: buildExpression(expr.inner),
+            castToType: { case: "typeStr", value: expr.targetType },
+          }),
+        },
+      });
+
+    case "window": {
+      const windowValue = create(Expression_WindowSchema, {
+        windowFunction: buildExpression(expr.windowFunction),
+        partitionSpec: expr.partitionSpec.map(buildExpression),
+        orderSpec: expr.orderSpec.map(buildSortOrder),
+      });
+      if (expr.frameSpec) {
+        windowValue.frameSpec = create(Expression_Window_WindowFrameSchema, {
+          frameType:
+            expr.frameSpec.frameType === "row"
+              ? Expression_Window_WindowFrame_FrameType.ROW
+              : Expression_Window_WindowFrame_FrameType.RANGE,
+          lower: buildFrameBoundary(expr.frameSpec.lower),
+          upper: buildFrameBoundary(expr.frameSpec.upper),
+        });
+      }
+      return create(ExpressionSchema, {
+        exprType: { case: "window", value: windowValue },
+      });
+    }
 
     default: {
       const _exhaustive: never = expr;
