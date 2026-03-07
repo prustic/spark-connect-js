@@ -24,6 +24,7 @@ import {
   dense_rank,
   lag,
   Window,
+  DataFrame,
 } from "@spark-js/node";
 
 const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
@@ -31,9 +32,9 @@ const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 async function main(): Promise<void> {
   const spark = connect(SPARK_REMOTE);
 
-  // ── 1. Simple SQL query ─────────────────────────────────────────────────
-  console.log("=== 1. SQL Query ===");
-  const range = spark.sql("SELECT id, id * 2 AS doubled FROM range(10)");
+  // ── 1. SparkSession.range() ────────────────────────────────────────────
+  console.log("=== 1. SparkSession.range() ===");
+  const range = spark.range(10).withColumn("doubled", col("id").multiply(lit(2)));
   await range.show();
 
   // ── 2. Filter + Select ──────────────────────────────────────────────────
@@ -269,6 +270,126 @@ async function main(): Promise<void> {
   // "emp" temp view was registered in section 10
   const fromTable = spark.read.table("emp");
   await fromTable.show();
+
+  // ── 27. SparkSession.range() variants ──────────────────────────────────
+  console.log("\n=== 27. SparkSession.range() variants ===");
+  console.log("range(5):");
+  await spark.range(5).show();
+  console.log("range(2, 10, 2):");
+  await spark.range(2, 10, 2).show();
+
+  // ── 28. withColumnRenamed / withColumnsRenamed ────────────────────────
+  console.log("\n=== 28. Rename Columns ===");
+  const renamed = employees
+    .withColumnRenamed("name", "employee_name")
+    .withColumnRenamed("salary", "pay");
+  await renamed.show();
+
+  const batchRenamed = employees.withColumnsRenamed({
+    name: "emp_name",
+    department: "dept",
+    salary: "compensation",
+  });
+  await batchRenamed.show();
+
+  // ── 29. selectExpr ────────────────────────────────────────────────────
+  console.log("\n=== 29. selectExpr ===");
+  const withExprs = employees.selectExpr(
+    "name",
+    "salary * 1.1 AS raised_salary",
+    "upper(department) AS dept_upper",
+  );
+  await withExprs.show();
+
+  // ── 30. transform (pipeline composition) ──────────────────────────────
+  console.log("\n=== 30. transform ===");
+  const addBonus = (df: DataFrame) => df.withColumn("bonus", col("salary").multiply(lit(0.1)));
+  const addLevel = (df: DataFrame) =>
+    df.withColumn(
+      "level",
+      when(col("salary").gte(lit(90000)), lit("senior")).otherwise(lit("junior")),
+    );
+  const pipeline = employees.transform(addBonus).transform(addLevel);
+  await pipeline.select("name", "salary", "bonus", "level").show();
+
+  // ── 31. alias + hint ──────────────────────────────────────────────────
+  console.log("\n=== 31. alias + hint ===");
+  const aliased = employees.alias("emp");
+  const aliasedPlan = await aliased.select("emp.name", "emp.salary").explain("simple");
+  console.log("Aliased plan:");
+  console.log(aliasedPlan);
+
+  const hinted = employees.hint("broadcast");
+  const hintedPlan = await hinted.explain("simple");
+  console.log("Broadcast hint plan:");
+  console.log(hintedPlan);
+
+  // ── 32. sortWithinPartitions ──────────────────────────────────────────
+  console.log("\n=== 32. sortWithinPartitions ===");
+  const partSorted = employees.sortWithinPartitions(col("salary").desc());
+  await partSorted.show();
+
+  // ── 33. tail ──────────────────────────────────────────────────────────
+  console.log("\n=== 33. tail ===");
+  const lastTwo = await employees.sort(col("salary").asc()).tail(2);
+  console.log("Last 2 by salary:", lastTwo);
+
+  // ── 34. columns / dtypes / isEmpty ────────────────────────────────────
+  console.log("\n=== 34. columns / dtypes / isEmpty ===");
+  const colNames = await employees.columns();
+  console.log("Column names:", colNames);
+
+  const colTypes = await employees.dtypes();
+  console.log("Column types:", colTypes);
+
+  const emptyCheck = await employees.filter(col("salary").lt(lit(0))).isEmpty();
+  console.log("isEmpty (salary < 0):", emptyCheck);
+
+  const notEmpty = await employees.isEmpty();
+  console.log("isEmpty (all employees):", notEmpty);
+
+  // ── 35. Column sort ordering variants ─────────────────────────────────
+  console.log("\n=== 35. Sort ordering variants ===");
+  const withNullSalaries = spark.sql(`
+    SELECT * FROM VALUES
+      ('Alice', 90000),
+      ('Bob',   NULL),
+      ('Carol', 70000),
+      ('Dave',  NULL),
+      ('Eve',   95000)
+    AS data(name, salary)
+  `);
+  console.log("asc_nulls_first:");
+  await withNullSalaries.sort(col("salary").asc_nulls_first()).show();
+  console.log("desc_nulls_last:");
+  await withNullSalaries.sort(col("salary").desc_nulls_last()).show();
+
+  // ── 36. Column ilike / substr ─────────────────────────────────────────
+  console.log("\n=== 36. ilike / substr ===");
+  console.log("ilike (case-insensitive):");
+  await employees.filter(col("name").ilike("%alice%")).show();
+
+  console.log("substr:");
+  await employees
+    .withColumn("short_name", col("name").substr(1, 3))
+    .select("name", "short_name")
+    .show();
+
+  // ── 37. Bitwise operations ────────────────────────────────────────────
+  console.log("\n=== 37. Bitwise operations ===");
+  const nums = spark.range(8);
+  await nums
+    .withColumn("and_3", col("id").bitwiseAND(lit(3)))
+    .withColumn("or_4", col("id").bitwiseOR(lit(4)))
+    .withColumn("xor_5", col("id").bitwiseXOR(lit(5)))
+    .show();
+
+  // ── 38. GroupedData min / max ─────────────────────────────────────────
+  console.log("\n=== 38. GroupedData min / max ===");
+  console.log("Min salary by department:");
+  await employees.groupBy("department").min("salary").show();
+  console.log("Max salary by department:");
+  await employees.groupBy("department").max("salary").show();
 
   // ── Cleanup ────────────────────────────────────────────────────────────
   await spark.stop();

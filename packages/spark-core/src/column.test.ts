@@ -231,3 +231,145 @@ describe("Column.over()", () => {
     }
   });
 });
+
+// ── M1: New Column methods ──────────────────────────────────────────────────
+
+describe("Column sort ordering variants", () => {
+  it("asc_nulls_first()", () => {
+    const expr = col("x").asc_nulls_first()._expr;
+    assert.equal(expr.type, "sortOrder");
+    if (expr.type === "sortOrder") {
+      assert.equal(expr.direction, "ascending");
+      assert.equal(expr.nullOrdering, "nulls_first");
+    }
+  });
+
+  it("asc_nulls_last() is same as asc()", () => {
+    const expr = col("x").asc_nulls_last()._expr;
+    assert.equal(expr.type, "sortOrder");
+    if (expr.type === "sortOrder") {
+      assert.equal(expr.direction, "ascending");
+      assert.equal(expr.nullOrdering, "nulls_last");
+    }
+  });
+
+  it("desc_nulls_first()", () => {
+    const expr = col("x").desc_nulls_first()._expr;
+    assert.equal(expr.type, "sortOrder");
+    if (expr.type === "sortOrder") {
+      assert.equal(expr.direction, "descending");
+      assert.equal(expr.nullOrdering, "nulls_first");
+    }
+  });
+
+  it("desc_nulls_last() is same as desc()", () => {
+    const expr = col("x").desc_nulls_last()._expr;
+    assert.equal(expr.type, "sortOrder");
+    if (expr.type === "sortOrder") {
+      assert.equal(expr.direction, "descending");
+      assert.equal(expr.nullOrdering, "nulls_last");
+    }
+  });
+});
+
+describe("Column.isNaN()", () => {
+  it("produces isnan function call", () => {
+    const expr = col("x").isNaN()._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "isnan");
+      assert.equal(expr.arguments.length, 1);
+    }
+  });
+});
+
+describe("Column.eqNullSafe()", () => {
+  it("produces <=> function call", () => {
+    const expr = col("x").eqNullSafe(col("y"))._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "<=>");
+      assert.equal(expr.arguments.length, 2);
+    }
+  });
+});
+
+describe("Column bitwise operators", () => {
+  it("bitwiseAND()", () => {
+    const expr = col("x").bitwiseAND(col("y"))._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") assert.equal(expr.name, "&");
+  });
+
+  it("bitwiseOR()", () => {
+    const expr = col("x").bitwiseOR(col("y"))._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") assert.equal(expr.name, "|");
+  });
+
+  it("bitwiseXOR()", () => {
+    const expr = col("x").bitwiseXOR(col("y"))._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") assert.equal(expr.name, "^");
+  });
+});
+
+describe("Column.substr()", () => {
+  it("produces substring function call", () => {
+    const expr = col("name").substr(1, 3)._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "substring");
+      assert.equal(expr.arguments.length, 3);
+    }
+  });
+});
+
+describe("Column.ilike()", () => {
+  it("produces ilike function call", () => {
+    const expr = col("name").ilike("%john%")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "ilike");
+      assert.equal(expr.arguments.length, 2);
+    }
+  });
+});
+
+describe("Column struct/map/array field access", () => {
+  it("getField()", () => {
+    const expr = col("address").getField("city")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "get_field");
+      assert.equal(expr.arguments.length, 2);
+    }
+  });
+
+  it("getItem()", () => {
+    const expr = col("items").getItem(0)._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "get");
+      assert.equal(expr.arguments.length, 2);
+    }
+  });
+
+  it("withField()", () => {
+    const expr = col("address").withField("zip", col("postal_code"))._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "with_field");
+      assert.equal(expr.arguments.length, 3);
+    }
+  });
+
+  it("dropFields()", () => {
+    const expr = col("address").dropFields("line2", "line3")._expr;
+    assert.equal(expr.type, "unresolvedFunction");
+    if (expr.type === "unresolvedFunction") {
+      assert.equal(expr.name, "drop_fields");
+      assert.equal(expr.arguments.length, 3); // self + 2 field names
+    }
+  });
+});

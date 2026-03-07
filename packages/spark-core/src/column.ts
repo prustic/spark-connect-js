@@ -125,6 +125,36 @@ export class Column {
     });
   }
 
+  /** Ascending sort, nulls first. */
+  asc_nulls_first(): Column {
+    return new Column({
+      type: "sortOrder",
+      inner: this._expr,
+      direction: "ascending",
+      nullOrdering: "nulls_first",
+    });
+  }
+
+  /** Ascending sort, nulls last. */
+  asc_nulls_last(): Column {
+    return this.asc();
+  }
+
+  /** Descending sort, nulls first. */
+  desc_nulls_first(): Column {
+    return new Column({
+      type: "sortOrder",
+      inner: this._expr,
+      direction: "descending",
+      nullOrdering: "nulls_first",
+    });
+  }
+
+  /** Descending sort, nulls last. */
+  desc_nulls_last(): Column {
+    return this.desc();
+  }
+
   // ── Null checks ───────────────────────────────────────────────────────────
 
   /** Test whether this column is null. */
@@ -135,6 +165,108 @@ export class Column {
   /** Test whether this column is not null. */
   isNotNull(): Column {
     return new Column({ type: "unresolvedFunction", name: "isnotnull", arguments: [this._expr] });
+  }
+
+  /** Test whether this column value is NaN. */
+  isNaN(): Column {
+    return new Column({ type: "unresolvedFunction", name: "isnan", arguments: [this._expr] });
+  }
+
+  // ── Null-safe equality ────────────────────────────────────────────────────
+
+  /** Null-safe equality comparison (returns true when both sides are null). */
+  eqNullSafe(other: Column): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "<=>",
+      arguments: [this._expr, other._expr],
+    });
+  }
+
+  // ── Bitwise operators ─────────────────────────────────────────────────────
+
+  /** Bitwise AND. */
+  bitwiseAND(other: Column): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "&",
+      arguments: [this._expr, other._expr],
+    });
+  }
+
+  /** Bitwise OR. */
+  bitwiseOR(other: Column): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "|",
+      arguments: [this._expr, other._expr],
+    });
+  }
+
+  /** Bitwise XOR. */
+  bitwiseXOR(other: Column): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "^",
+      arguments: [this._expr, other._expr],
+    });
+  }
+
+  // ── Substring ─────────────────────────────────────────────────────────────
+
+  /** Extract a substring (1-based position). */
+  substr(startPos: number, length: number): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "substring",
+      arguments: [
+        this._expr,
+        { type: "literal", value: startPos },
+        { type: "literal", value: length },
+      ],
+    });
+  }
+
+  // ── Struct / Map / Array field access ─────────────────────────────────────
+
+  /** Access a field in a StructType column by name. */
+  getField(fieldName: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "get_field",
+      arguments: [this._expr, { type: "literal", value: fieldName }],
+    });
+  }
+
+  /** Access an element in an ArrayType or MapType column by key/index. */
+  getItem(key: number | string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "get",
+      arguments: [this._expr, { type: "literal", value: key }],
+    });
+  }
+
+  /** Add or replace a field in a StructType column. */
+  withField(fieldName: string, col: Column): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "with_field",
+      arguments: [this._expr, { type: "literal", value: fieldName }, col._expr],
+    });
+  }
+
+  /** Drop field(s) from a StructType column. */
+  dropFields(...fieldNames: string[]): Column {
+    const args: Expression[] = [
+      this._expr,
+      ...fieldNames.map((f): Expression => ({ type: "literal", value: f })),
+    ];
+    return new Column({
+      type: "unresolvedFunction",
+      name: "drop_fields",
+      arguments: args,
+    });
   }
 
   // ── Membership / range ────────────────────────────────────────────────────
@@ -160,6 +292,15 @@ export class Column {
     return new Column({
       type: "unresolvedFunction",
       name: "like",
+      arguments: [this._expr, { type: "literal", value: pattern }],
+    });
+  }
+
+  /** Case-insensitive LIKE pattern match. */
+  ilike(pattern: string): Column {
+    return new Column({
+      type: "unresolvedFunction",
+      name: "ilike",
       arguments: [this._expr, { type: "literal", value: pattern }],
     });
   }

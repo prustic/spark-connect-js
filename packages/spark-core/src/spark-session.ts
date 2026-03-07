@@ -170,6 +170,29 @@ export class SparkSession {
   }
 
   /**
+   * Create a DataFrame with a single `id` column containing a sequence of
+   * integers from `start` (inclusive) to `end` (exclusive), incrementing by `step`.
+   *
+   * Mirrors PySpark's `spark.range(start, end, step, numPartitions)`.
+   *
+   * @example
+   *   spark.range(10)            // 0, 1, 2, ..., 9
+   *   spark.range(1, 10)         // 1, 2, 3, ..., 9
+   *   spark.range(0, 10, 2)      // 0, 2, 4, 6, 8
+   */
+  range(startOrEnd: number, end?: number, step = 1, numPartitions?: number): DataFrame {
+    const start = end === undefined ? 0 : startOrEnd;
+    const actualEnd = end === undefined ? startOrEnd : end;
+    return DataFrame._fromPlan(this, {
+      type: "range",
+      start,
+      end: actualEnd,
+      step,
+      numPartitions,
+    });
+  }
+
+  /**
    * Create a DataFrame from Arrow IPC data.
    *
    * @param data  - Arrow IPC streaming format bytes

@@ -501,3 +501,114 @@ describe("buildRelation() — localRelation", () => {
     }
   });
 });
+
+// ── M1: New plan types ──────────────────────────────────────────────────────
+
+describe("buildRelation() — range", () => {
+  it("builds a Range relation", () => {
+    const result = buildRelation({
+      type: "range",
+      start: 0,
+      end: 100,
+      step: 2,
+    });
+    assert.equal(result.relType.case, "range");
+    if (result.relType.case === "range") {
+      assert.equal(result.relType.value.start, 0n);
+      assert.equal(result.relType.value.end, 100n);
+      assert.equal(result.relType.value.step, 2n);
+    }
+  });
+
+  it("builds a Range relation with numPartitions", () => {
+    const result = buildRelation({
+      type: "range",
+      start: 0,
+      end: 50,
+      step: 1,
+      numPartitions: 4,
+    });
+    if (result.relType.case === "range") {
+      assert.equal(result.relType.value.numPartitions, 4);
+    }
+  });
+});
+
+describe("buildRelation() — withColumnsRenamed", () => {
+  it("builds a WithColumnsRenamed relation", () => {
+    const result = buildRelation({
+      type: "withColumnsRenamed",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      renames: [
+        { colName: "old_name", newColName: "new_name" },
+        { colName: "a", newColName: "b" },
+      ],
+    });
+    assert.equal(result.relType.case, "withColumnsRenamed");
+    if (result.relType.case === "withColumnsRenamed") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.renames.length, 2);
+      assert.equal(result.relType.value.renames[0].colName, "old_name");
+      assert.equal(result.relType.value.renames[0].newColName, "new_name");
+    }
+  });
+});
+
+describe("buildRelation() — subqueryAlias", () => {
+  it("builds a SubqueryAlias relation", () => {
+    const result = buildRelation({
+      type: "subqueryAlias",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      alias: "t1",
+    });
+    assert.equal(result.relType.case, "subqueryAlias");
+    if (result.relType.case === "subqueryAlias") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.alias, "t1");
+    }
+  });
+});
+
+describe("buildRelation() — hint", () => {
+  it("builds a Hint relation", () => {
+    const result = buildRelation({
+      type: "hint",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      name: "broadcast",
+      parameters: [],
+    });
+    assert.equal(result.relType.case, "hint");
+    if (result.relType.case === "hint") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.name, "broadcast");
+      assert.equal(result.relType.value.parameters.length, 0);
+    }
+  });
+
+  it("builds a Hint relation with parameters", () => {
+    const result = buildRelation({
+      type: "hint",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      name: "repartition",
+      parameters: [{ type: "literal", value: 10 }],
+    });
+    if (result.relType.case === "hint") {
+      assert.equal(result.relType.value.parameters.length, 1);
+    }
+  });
+});
+
+describe("buildRelation() — tail", () => {
+  it("builds a Tail relation", () => {
+    const result = buildRelation({
+      type: "tail",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      limit: 5,
+    });
+    assert.equal(result.relType.case, "tail");
+    if (result.relType.case === "tail") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.limit, 5);
+    }
+  });
+});

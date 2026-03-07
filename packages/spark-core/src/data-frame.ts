@@ -30,7 +30,7 @@
  */
 
 import type { SparkSession } from "./spark-session.js";
-import type { LogicalPlan, SortOrder } from "./plan/logical-plan.js";
+import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
@@ -245,6 +245,36 @@ export class DataFrame {
   }
 
   /**
+   * Rename a single column.
+   *
+   * Maps to Spark Connect's `Relation.WithColumnsRenamed`.
+   */
+  withColumnRenamed(existing: string, newName: string): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "withColumnsRenamed",
+      child: this._plan,
+      renames: [{ colName: existing, newColName: newName }],
+    });
+  }
+
+  /**
+   * Rename multiple columns at once.
+   *
+   * @param colsMap - mapping of { existingName: newName }
+   */
+  withColumnsRenamed(colsMap: Record<string, string>): DataFrame {
+    const renames = Object.entries(colsMap).map(([colName, newColName]) => ({
+      colName,
+      newColName,
+    }));
+    return DataFrame._fromPlan(this._session, {
+      type: "withColumnsRenamed",
+      child: this._plan,
+      renames,
+    });
+  }
+
+  /**
    * Remove duplicate rows, optionally considering only a subset of columns.
    *
    * Maps to Spark Connect's `Relation.Deduplicate`.
@@ -376,6 +406,105 @@ export class DataFrame {
       type: "toDF",
       child: this._plan,
       columnNames,
+    });
+  }
+
+  // ── Aliasing ──────────────────────────────────────────────────────────────
+
+  /**
+   * Assign an alias to this DataFrame, useful for self-joins.
+   *
+   * Maps to Spark Connect's `Relation.SubqueryAlias`.
+   */
+  alias(name: string): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "subqueryAlias",
+      child: this._plan,
+      alias: name,
+    });
+  }
+
+  // ── Hints ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Attach an optimizer hint to this DataFrame.
+   *
+   * @example df.hint("broadcast")
+   * @example df.join(right.hint("broadcast"), ...)
+   */
+  hint(name: string, ...parameters: Array<string | number | boolean>): DataFrame {
+    const paramExprs = parameters.map((p): Expression => ({ type: "literal", value: p }));
+    return DataFrame._fromPlan(this._session, {
+      type: "hint",
+      child: this._plan,
+      name,
+      parameters: paramExprs,
+    });
+  }
+
+  // ── Select with SQL expressions ──────────────────────────────────────────
+
+  /**
+   * Select columns using SQL expression strings.
+   * Each string is parsed by the server as an expression.
+   *
+   * @example df.selectExpr("age * 2 as doubled_age", "name")
+   */
+  selectExpr(...exprs: string[]): DataFrame {
+    const sqlExprs = exprs.map(
+      (e): Expression => ({
+        type: "expressionString",
+        expression: e,
+      }),
+    );
+    return DataFrame._fromPlan(this._session, {
+      type: "project",
+      child: this._plan,
+      expressions: sqlExprs,
+    });
+  }
+
+  // ── Transform ─────────────────────────────────────────────────────────────
+
+  /**
+   * Apply a user-defined function to this DataFrame and return the result.
+   * This is purely client-side — it just calls `fn(this)`.
+   *
+   * Enables fluent pipeline composition:
+   * @example df.transform(withDoubledAge).transform(withSalaryBand)
+   */
+  transform<T extends DataFrame>(fn: (df: DataFrame) => T): T {
+    return fn(this);
+  }
+
+  // ── Sort within partitions ────────────────────────────────────────────────
+
+  /**
+   * Sort within each partition (non-global sort).
+   *
+   * Maps to Spark Connect's `Relation.Sort` with `isGlobal=false`.
+   */
+  sortWithinPartitions(...columns: Array<Column | string>): DataFrame {
+    const order: SortOrder[] = columns.map((c) => {
+      const expr = typeof c === "string" ? col(c)._expr : c._expr;
+      if (typeof c !== "string" && expr.type === "sortOrder") {
+        return {
+          expression: expr.inner,
+          direction: expr.direction,
+          nullOrdering: expr.nullOrdering,
+        };
+      }
+      return {
+        expression: expr,
+        direction: "ascending" as const,
+        nullOrdering: "nulls_last" as const,
+      };
+    });
+    return DataFrame._fromPlan(this._session, {
+      type: "sort",
+      child: this._plan,
+      order,
+      isGlobal: false,
     });
   }
 
@@ -541,6 +670,49 @@ export class DataFrame {
    */
   async take(n: number): Promise<Row[]> {
     return this.head(n);
+  }
+
+  /**
+   * Return the last `n` rows as an array.
+   *
+   * Maps to Spark Connect's `Relation.Tail`.
+   */
+  async tail(n: number): Promise<Row[]> {
+    const tailDf = DataFrame._fromPlan(this._session, {
+      type: "tail",
+      child: this._plan,
+      limit: n,
+    });
+    return tailDf.collect();
+  }
+
+  /**
+   * Return the column names as a string array.
+   * Uses the AnalyzePlan.Schema RPC to resolve the schema without executing.
+   */
+  async columns(): Promise<string[]> {
+    const raw = await this.schema();
+    const structType = StructType.fromProto(raw);
+    return structType.fieldNames;
+  }
+
+  /**
+   * Return column names and their data types as [name, type] pairs.
+   * Uses the AnalyzePlan.Schema RPC.
+   */
+  async dtypes(): Promise<[string, string][]> {
+    const raw = await this.schema();
+    const structType = StructType.fromProto(raw);
+    return structType.fields.map((f) => [f.name, f.dataType]);
+  }
+
+  /**
+   * Returns true if the DataFrame has no rows.
+   * Uses head(1) to check — stops after the first row.
+   */
+  async isEmpty(): Promise<boolean> {
+    const rows = await this.head(1);
+    return rows.length === 0;
   }
 
   /**

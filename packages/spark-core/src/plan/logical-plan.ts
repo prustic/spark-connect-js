@@ -70,6 +70,8 @@ export type Expression =
       arguments: Expression[];
       isDistinct?: boolean;
     }
+  // SQL expression string (maps to Spark Connect's Expression.ExpressionString)
+  | { type: "expressionString"; expression: string }
   // Cast expression (maps to Spark Connect's Expression.Cast)
   | { type: "cast"; inner: Expression; targetType: string }
   // Window expression (maps to Spark Connect's Expression.Window)
@@ -117,7 +119,12 @@ export type LogicalPlan =
   | NAFillPlan
   | NADropPlan
   | ToDFPlan
-  | DescribePlan;
+  | DescribePlan
+  | RangePlan
+  | WithColumnsRenamedPlan
+  | SubqueryAliasPlan
+  | HintPlan
+  | TailPlan;
 
 /**
  * Read from a data source.
@@ -373,4 +380,57 @@ export interface DescribePlan {
   type: "describe";
   child: LogicalPlan;
   cols: string[];
+}
+
+/**
+ * Generate a sequence of integers.
+ * → Spark Connect: Relation.Range
+ */
+export interface RangePlan {
+  type: "range";
+  start: number;
+  end: number;
+  step: number;
+  numPartitions?: number;
+}
+
+/**
+ * Rename columns by name mapping.
+ * → Spark Connect: Relation.WithColumnsRenamed
+ */
+export interface WithColumnsRenamedPlan {
+  type: "withColumnsRenamed";
+  child: LogicalPlan;
+  renames: { colName: string; newColName: string }[];
+}
+
+/**
+ * Assign a name (alias) to a DataFrame / subquery.
+ * → Spark Connect: Relation.SubqueryAlias
+ */
+export interface SubqueryAliasPlan {
+  type: "subqueryAlias";
+  child: LogicalPlan;
+  alias: string;
+}
+
+/**
+ * Attach a hint to a relation.
+ * → Spark Connect: Relation.Hint
+ */
+export interface HintPlan {
+  type: "hint";
+  child: LogicalPlan;
+  name: string;
+  parameters: Expression[];
+}
+
+/**
+ * Fetch the last N rows.
+ * → Spark Connect: Relation.Tail
+ */
+export interface TailPlan {
+  type: "tail";
+  child: LogicalPlan;
+  limit: number;
 }

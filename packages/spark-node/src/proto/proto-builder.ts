@@ -49,6 +49,7 @@ import {
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
   Expression_CastSchema,
+  Expression_ExpressionStringSchema,
   type Catalog,
   CatalogSchema,
   CurrentDatabaseSchema,
@@ -69,6 +70,12 @@ import {
   Expression_Window_WindowFrameSchema,
   Expression_Window_WindowFrame_FrameType,
   Expression_Window_WindowFrame_FrameBoundarySchema,
+  RangeSchema,
+  WithColumnsRenamedSchema,
+  WithColumnsRenamed_RenameSchema,
+  SubqueryAliasSchema,
+  HintSchema,
+  TailSchema,
 } from "@spark-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -421,6 +428,69 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    case "range":
+      return create(RelationSchema, {
+        relType: {
+          case: "range",
+          value: create(RangeSchema, {
+            start: BigInt(plan.start),
+            end: BigInt(plan.end),
+            step: BigInt(plan.step),
+            numPartitions: plan.numPartitions,
+          }),
+        },
+      });
+
+    case "withColumnsRenamed":
+      return create(RelationSchema, {
+        relType: {
+          case: "withColumnsRenamed",
+          value: create(WithColumnsRenamedSchema, {
+            input: buildRelation(plan.child),
+            renames: plan.renames.map((r) =>
+              create(WithColumnsRenamed_RenameSchema, {
+                colName: r.colName,
+                newColName: r.newColName,
+              }),
+            ),
+          }),
+        },
+      });
+
+    case "subqueryAlias":
+      return create(RelationSchema, {
+        relType: {
+          case: "subqueryAlias",
+          value: create(SubqueryAliasSchema, {
+            input: buildRelation(plan.child),
+            alias: plan.alias,
+          }),
+        },
+      });
+
+    case "hint":
+      return create(RelationSchema, {
+        relType: {
+          case: "hint",
+          value: create(HintSchema, {
+            input: buildRelation(plan.child),
+            name: plan.name,
+            parameters: plan.parameters.map(buildExpression),
+          }),
+        },
+      });
+
+    case "tail":
+      return create(RelationSchema, {
+        relType: {
+          case: "tail",
+          value: create(TailSchema, {
+            input: buildRelation(plan.child),
+            limit: plan.limit,
+          }),
+        },
+      });
   }
 }
 
@@ -598,6 +668,16 @@ export function buildExpression(expr: CoreExpression): Expression {
             functionName: expr.name,
             arguments: expr.arguments.map(buildExpression),
             isDistinct: expr.isDistinct ?? false,
+          }),
+        },
+      });
+
+    case "expressionString":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "expressionString",
+          value: create(Expression_ExpressionStringSchema, {
+            expression: expr.expression,
           }),
         },
       });

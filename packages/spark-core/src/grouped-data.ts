@@ -91,4 +91,28 @@ export class GroupedData {
     );
     return this.agg(...avgExprs);
   }
+
+  /** Shorthand for agg(min(column)) */
+  min(...columnNames: string[]): DataFrame {
+    const minExprs = columnNames.map((name) =>
+      new Column({
+        type: "aggregateFunction",
+        name: "min",
+        arguments: [{ type: "unresolvedAttribute", name }],
+      }).alias(`min(${name})`),
+    );
+    return this.agg(...minExprs);
+  }
+
+  /** Shorthand for agg(max(column)) */
+  max(...columnNames: string[]): DataFrame {
+    const maxExprs = columnNames.map((name) =>
+      new Column({
+        type: "aggregateFunction",
+        name: "max",
+        arguments: [{ type: "unresolvedAttribute", name }],
+      }).alias(`max(${name})`),
+    );
+    return this.agg(...maxExprs);
+  }
 }

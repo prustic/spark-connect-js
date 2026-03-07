@@ -573,3 +573,233 @@ describe("DataFrameReader shortcuts", () => {
     }
   });
 });
+
+// ── M1: New features ────────────────────────────────────────────────────────
+
+describe("SparkSession.range()", () => {
+  it("range(end) defaults start=0, step=1", () => {
+    const { spark } = createSession();
+    const df = spark.range(10);
+    assert.equal(df._plan.type, "range");
+    if (df._plan.type === "range") {
+      assert.equal(df._plan.start, 0);
+      assert.equal(df._plan.end, 10);
+      assert.equal(df._plan.step, 1);
+      assert.equal(df._plan.numPartitions, undefined);
+    }
+  });
+
+  it("range(start, end) with explicit start", () => {
+    const { spark } = createSession();
+    const df = spark.range(5, 20);
+    if (df._plan.type === "range") {
+      assert.equal(df._plan.start, 5);
+      assert.equal(df._plan.end, 20);
+      assert.equal(df._plan.step, 1);
+    }
+  });
+
+  it("range(start, end, step) with step", () => {
+    const { spark } = createSession();
+    const df = spark.range(0, 100, 10);
+    if (df._plan.type === "range") {
+      assert.equal(df._plan.start, 0);
+      assert.equal(df._plan.end, 100);
+      assert.equal(df._plan.step, 10);
+    }
+  });
+
+  it("range() with numPartitions", () => {
+    const { spark } = createSession();
+    const df = spark.range(0, 100, 1, 4);
+    if (df._plan.type === "range") {
+      assert.equal(df._plan.numPartitions, 4);
+    }
+  });
+});
+
+describe("DataFrame.withColumnRenamed()", () => {
+  it("wraps plan in a withColumnsRenamed node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").withColumnRenamed("old", "new");
+    assert.equal(df._plan.type, "withColumnsRenamed");
+    if (df._plan.type === "withColumnsRenamed") {
+      assert.deepStrictEqual(df._plan.renames, [{ colName: "old", newColName: "new" }]);
+    }
+  });
+});
+
+describe("DataFrame.withColumnsRenamed()", () => {
+  it("renames multiple columns", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").withColumnsRenamed({ a: "x", b: "y" });
+    assert.equal(df._plan.type, "withColumnsRenamed");
+    if (df._plan.type === "withColumnsRenamed") {
+      assert.equal(df._plan.renames.length, 2);
+      assert.equal(df._plan.renames[0].colName, "a");
+      assert.equal(df._plan.renames[0].newColName, "x");
+    }
+  });
+});
+
+describe("DataFrame.alias()", () => {
+  it("wraps plan in a subqueryAlias node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").alias("t1");
+    assert.equal(df._plan.type, "subqueryAlias");
+    if (df._plan.type === "subqueryAlias") {
+      assert.equal(df._plan.alias, "t1");
+      assert.equal(df._plan.child.type, "sql");
+    }
+  });
+});
+
+describe("DataFrame.hint()", () => {
+  it("wraps plan in a hint node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").hint("broadcast");
+    assert.equal(df._plan.type, "hint");
+    if (df._plan.type === "hint") {
+      assert.equal(df._plan.name, "broadcast");
+      assert.equal(df._plan.parameters.length, 0);
+    }
+  });
+
+  it("accepts parameters", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").hint("repartition", 10);
+    if (df._plan.type === "hint") {
+      assert.equal(df._plan.parameters.length, 1);
+      assert.deepStrictEqual(df._plan.parameters[0], { type: "literal", value: 10 });
+    }
+  });
+});
+
+describe("DataFrame.selectExpr()", () => {
+  it("wraps plan in a project node with SQL expressions", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").selectExpr("age * 2 as doubled", "name");
+    assert.equal(df._plan.type, "project");
+    if (df._plan.type === "project") {
+      assert.equal(df._plan.expressions.length, 2);
+    }
+  });
+});
+
+describe("DataFrame.transform()", () => {
+  it("applies a function to the DataFrame", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const result = df.transform((d) => d.limit(5));
+    assert.equal(result._plan.type, "limit");
+  });
+});
+
+describe("DataFrame.sortWithinPartitions()", () => {
+  it("produces a sort node with isGlobal=false", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").sortWithinPartitions("x");
+    assert.equal(df._plan.type, "sort");
+    if (df._plan.type === "sort") {
+      assert.equal(df._plan.isGlobal, false);
+    }
+  });
+});
+
+describe("DataFrame.tail()", () => {
+  it("is an action that creates a tail plan and collects", async () => {
+    const t = mockTransport();
+    const { spark } = createSession(t);
+    const df = spark.sql("SELECT * FROM t");
+    // tail is an action — but without decoder it will throw
+    await assert.rejects(() => df.tail(5), /Arrow decoder/);
+  });
+});
+
+describe("DataFrame.isEmpty()", () => {
+  it("returns true for empty DataFrame", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [])
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    const result = await df.isEmpty();
+    assert.equal(result, true);
+  });
+
+  it("returns false for non-empty DataFrame", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [{ id: 1 }])
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    const result = await df.isEmpty();
+    assert.equal(result, false);
+  });
+});
+
+describe("DataFrame.columns() / dtypes()", () => {
+  it("columns() uses analyzePlan to get column names", async () => {
+    const transport: Transport & { calls: LogicalPlan[] } = {
+      calls: [],
+      async *executePlan(_sid: string, plan: LogicalPlan): AsyncIterable<Uint8Array> {
+        this.calls.push(plan);
+      },
+      async analyzePlan(): Promise<Record<string, unknown>> {
+        return {
+          type: "schema",
+          schema: {
+            struct: {
+              fields: [
+                { name: "id", type: { kind: { case: "integer", value: {} } }, nullable: true },
+                { name: "name", type: { kind: { case: "string", value: {} } }, nullable: true },
+              ],
+            },
+          },
+        };
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const cols = await df.columns();
+    assert.deepStrictEqual(cols, ["id", "name"]);
+  });
+
+  it("dtypes() returns [name, type] pairs", async () => {
+    const transport: Transport & { calls: LogicalPlan[] } = {
+      calls: [],
+      async *executePlan(_sid: string, plan: LogicalPlan): AsyncIterable<Uint8Array> {
+        this.calls.push(plan);
+      },
+      async analyzePlan(): Promise<Record<string, unknown>> {
+        return {
+          type: "schema",
+          schema: {
+            struct: {
+              fields: [
+                { name: "id", type: { kind: { case: "integer", value: {} } }, nullable: true },
+                { name: "name", type: { kind: { case: "string", value: {} } }, nullable: true },
+              ],
+            },
+          },
+        };
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const dtypes = await df.dtypes();
+    assert.equal(dtypes.length, 2);
+    assert.equal(dtypes[0][0], "id");
+    assert.equal(dtypes[1][0], "name");
+  });
+});

@@ -249,6 +249,52 @@ export class PlanBuilder {
             cols: plan.cols,
           },
         };
+
+      case "range":
+        return {
+          range: {
+            start: plan.start,
+            end: plan.end,
+            step: plan.step,
+            numPartitions: plan.numPartitions,
+          },
+        };
+
+      case "withColumnsRenamed":
+        return {
+          withColumnsRenamed: {
+            input: PlanBuilder.toRelation(plan.child),
+            renames: plan.renames.map((r) => ({
+              colName: r.colName,
+              newColName: r.newColName,
+            })),
+          },
+        };
+
+      case "subqueryAlias":
+        return {
+          subqueryAlias: {
+            input: PlanBuilder.toRelation(plan.child),
+            alias: plan.alias,
+          },
+        };
+
+      case "hint":
+        return {
+          hint: {
+            input: PlanBuilder.toRelation(plan.child),
+            name: plan.name,
+            parameters: plan.parameters.map((e) => PlanBuilder.toExpression(e)),
+          },
+        };
+
+      case "tail":
+        return {
+          tail: {
+            input: PlanBuilder.toRelation(plan.child),
+            limit: plan.limit,
+          },
+        };
     }
   }
 
@@ -320,6 +366,13 @@ export class PlanBuilder {
             functionName: expr.name,
             arguments: expr.arguments.map((e) => PlanBuilder.toExpression(e)),
             isDistinct: expr.isDistinct ?? false,
+          },
+        };
+
+      case "expressionString":
+        return {
+          expressionString: {
+            expression: expr.expression,
           },
         };
 

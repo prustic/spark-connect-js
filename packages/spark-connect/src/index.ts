@@ -108,6 +108,12 @@ export {
   StatSummarySchema,
   type LocalRelation,
   LocalRelationSchema,
+  type Tail,
+  TailSchema,
+  type Hint,
+  HintSchema,
+  type WithColumnsRenamed_Rename,
+  WithColumnsRenamed_RenameSchema,
 } from "./gen/spark/connect/relations_pb.js";
 
 // ─── Expression messages ────────────────────────────────────────────────────
@@ -169,6 +175,12 @@ export {
   type FunctionExists,
   FunctionExistsSchema,
 } from "./gen/spark/connect/catalog_pb.js";
+
+// ─── Expression.ExpressionString ────────────────────────────────────────────
+export {
+  type Expression_ExpressionString,
+  Expression_ExpressionStringSchema,
+} from "./gen/spark/connect/expressions_pb.js";
 
 // ─── Expression.Cast messages ───────────────────────────────────────────────
 export {
