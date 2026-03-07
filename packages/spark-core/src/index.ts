@@ -135,7 +135,7 @@ export {
   lag,
   lead,
   ntile,
-} from "./functions.js";
+} from "./functions/index.js";
 
 // Re-export type-only interfaces for consumers that need them without pulling
 // in implementation modules.

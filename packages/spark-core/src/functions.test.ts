@@ -36,7 +36,7 @@ import {
   lag,
   lead,
   ntile,
-} from "./functions.js";
+} from "./functions/index.js";
 
 describe("when/otherwise", () => {
   it("builds a when expression with otherwise", () => {
