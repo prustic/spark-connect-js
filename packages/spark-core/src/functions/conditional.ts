@@ -1,5 +1,5 @@
 /**
- * Conditional functions: when/otherwise, cast, coalesce.
+ * Conditional functions: when/otherwise, cast, coalesce, null-handling, predicates.
  */
 
 import { Column, fnExpr, toExpr, type ColOrName, fn } from "./_helpers.js";
@@ -74,4 +74,55 @@ export function isnull(column: ColOrName): Column {
 
 export function isnan(column: ColOrName): Column {
   return fn("isnan", column);
+}
+
+export function isnotnull(column: ColOrName): Column {
+  return fn("isnotnull", column);
+}
+
+export function nanvl(col1: ColOrName, col2: ColOrName): Column {
+  return fn("nanvl", col1, col2);
+}
+
+export function ifnull(col1: ColOrName, col2: ColOrName): Column {
+  return fn("ifnull", col1, col2);
+}
+
+export const nvl = ifnull;
+
+export function nvl2(col1: ColOrName, col2: ColOrName, col3: ColOrName): Column {
+  return fn("nvl2", col1, col2, col3);
+}
+
+export function nullif(col1: ColOrName, col2: ColOrName): Column {
+  return fn("nullif", col1, col2);
+}
+
+// ─── Expression / misc predicates ───────────────────────────────────────────
+
+/** Parses a SQL expression string into a Column. */
+export function expr(expression: string): Column {
+  return new Column({ type: "expressionString", expression });
+}
+
+export function monotonically_increasing_id(): Column {
+  return new Column(fnExpr("monotonically_increasing_id"));
+}
+
+export function spark_partition_id(): Column {
+  return new Column(fnExpr("spark_partition_id"));
+}
+
+export function typeof_(column: ColOrName): Column {
+  return fn("typeof", column);
+}
+
+export function uuid(): Column {
+  return new Column(fnExpr("uuid"));
+}
+
+export function broadcast(df: Column): Column {
+  // broadcast is typically used at the DataFrame level via hint("broadcast"),
+  // but as a function it just passes through the column
+  return df;
 }

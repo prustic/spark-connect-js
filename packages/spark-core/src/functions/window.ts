@@ -19,6 +19,23 @@ export function dense_rank(): Column {
   return new Column(fnExpr("dense_rank"));
 }
 
+/** Returns the cumulative distribution of values within a window partition. */
+export function cume_dist(): Column {
+  return new Column(fnExpr("cume_dist"));
+}
+
+/** Returns the relative rank (percentile) within a window partition. */
+export function percent_rank(): Column {
+  return new Column(fnExpr("percent_rank"));
+}
+
+/** Returns the value of the nth row in a window frame (1-based). */
+export function nth_value(column: ColOrName, offset: number, ignoreNulls = false): Column {
+  return new Column(
+    fnExpr("nth_value", toExpr(column), _lit(offset)._expr, _lit(ignoreNulls)._expr),
+  );
+}
+
 /** Returns the value N rows before the current row in a window partition. */
 export function lag(column: ColOrName, offset = 1, defaultValue?: ColOrName): Column {
   const args = [toExpr(column), _lit(offset)._expr];

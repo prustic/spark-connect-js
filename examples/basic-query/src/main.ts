@@ -23,8 +23,123 @@ import {
   rank,
   dense_rank,
   lag,
+  lead,
+  ntile,
+  cume_dist,
+  percent_rank,
   Window,
   DataFrame,
+  // Math
+  abs,
+  ceil,
+  floor,
+  sqrt,
+  pow,
+  log,
+  log2,
+  log10,
+  sin,
+  cos,
+  degrees,
+  radians,
+  factorial,
+  greatest,
+  least,
+  hex,
+  unhex,
+  rand,
+  e,
+  pi,
+  // String
+  lower,
+  trim,
+  concat_ws,
+  split,
+  lpad,
+  rpad,
+  reverse,
+  repeat,
+  length,
+  substring,
+  instr,
+  translate,
+  regexp_replace,
+  initcap,
+  soundex,
+  base64,
+  unbase64,
+  // Datetime
+  current_date,
+  current_timestamp,
+  year,
+  month,
+  dayofweek,
+  hour,
+  date_add,
+  date_sub,
+  datediff,
+  months_between,
+  date_format,
+  to_date,
+  to_timestamp,
+  unix_timestamp,
+  from_unixtime,
+  // Aggregate
+  min,
+  max,
+  stddev,
+  variance,
+  collect_list,
+  collect_set,
+  first,
+  last,
+  countDistinct,
+  approx_count_distinct,
+  corr,
+  // Collection / Array / Map
+  array,
+  array_contains,
+  array_distinct,
+  array_sort,
+  array_union,
+  array_intersect,
+  array_except,
+  size,
+  explode,
+  struct,
+  create_map,
+  map_keys,
+  map_values,
+  // Hash
+  md5,
+  sha1,
+  sha2,
+  hash,
+  xxhash64,
+  crc32,
+  // JSON
+  to_json,
+  get_json_object,
+  json_array_length,
+  json_object_keys,
+  // Bitwise
+  bitwise_not,
+  shiftleft,
+  shiftright,
+  // Sort
+  asc,
+  desc,
+  asc_nulls_first,
+  desc_nulls_last,
+  // Conditional
+  coalesce,
+  isnull,
+  isnan,
+  nanvl,
+  ifnull,
+  typeof_,
+  monotonically_increasing_id,
+  expr,
 } from "@spark-js/node";
 
 const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
@@ -390,6 +505,293 @@ async function main(): Promise<void> {
   await employees.groupBy("department").min("salary").show();
   console.log("Max salary by department:");
   await employees.groupBy("department").max("salary").show();
+
+  // ── 39. Math Functions ─────────────────────────────────────────────
+  console.log("\n=== 39. Math Functions ===");
+  const mathDemo = spark.range(1, 7).withColumn("val", col("id").multiply(lit(10)));
+  await mathDemo
+    .withColumn("abs_neg", abs(col("id").multiply(lit(-1))))
+    .withColumn("ceil_div", ceil(col("id").divide(lit(3))))
+    .withColumn("floor_div", floor(col("id").divide(lit(3))))
+    .withColumn("sqrt_val", sqrt(col("val")))
+    .withColumn("pow_2", pow(col("id"), 2))
+    .withColumn("log_val", log(col("val")))
+    .withColumn("log2_val", log2(col("val")))
+    .withColumn("log10_val", log10(col("val")))
+    .select("id", "val", "abs_neg", "ceil_div", "floor_div", "sqrt_val", "pow_2", "log_val")
+    .show();
+
+  console.log("Trig + constants:");
+  await spark
+    .range(1, 4)
+    .withColumn("sin_id", sin(col("id")))
+    .withColumn("cos_id", cos(col("id")))
+    .withColumn("deg", degrees(col("id")))
+    .withColumn("rad", radians(lit(180)))
+    .withColumn("fact", factorial(col("id")))
+    .withColumn("hex_id", hex(col("id")))
+    .withColumn("unhex_ff", unhex(lit("FF")))
+    .select("id", "sin_id", "cos_id", "deg", "fact", "hex_id", "unhex_ff")
+    .show();
+
+  console.log("greatest / least / rand / e / pi:");
+  await spark
+    .range(1, 4)
+    .withColumn("a", col("id").multiply(lit(3)))
+    .withColumn("b", col("id").multiply(lit(7)))
+    .withColumn("max_ab", greatest("a", "b"))
+    .withColumn("min_ab", least("a", "b"))
+    .withColumn("random", rand())
+    .withColumn("euler", e())
+    .withColumn("pi_val", pi())
+    .select("id", "a", "b", "max_ab", "min_ab", "random", "euler", "pi_val")
+    .show();
+
+  // ── 40. String Functions ──────────────────────────────────────────
+  console.log("\n=== 40. String Functions ===");
+  const strDemo = spark.sql(`
+    SELECT * FROM VALUES
+      ('Hello World', 'spark'),
+      ('  trim me  ', 'java'),
+      ('fooBarBaz',   'scala')
+    AS data(text, lang)
+  `);
+  await strDemo
+    .withColumn("lower_text", lower(col("text")))
+    .withColumn("trimmed", trim(col("text")))
+    .withColumn("len", length(col("text")))
+    .withColumn("initcapped", initcap(col("text")))
+    .withColumn("reversed", reverse(col("text")))
+    .select("text", "lower_text", "trimmed", "len", "initcapped", "reversed")
+    .show();
+
+  console.log("concat_ws / split / pad / substring:");
+  await strDemo
+    .withColumn("merged", concat_ws("-", col("text"), col("lang")))
+    .withColumn("words", split(col("text"), " "))
+    .withColumn("lpadded", lpad(col("lang"), 10, "*"))
+    .withColumn("rpadded", rpad(col("lang"), 10, "*"))
+    .withColumn("sub", substring(col("text"), 1, 5))
+    .select("text", "merged", "lpadded", "rpadded", "sub")
+    .show();
+
+  console.log("instr / translate / regexp_replace / soundex:");
+  await strDemo
+    .withColumn("pos_o", instr(col("text"), "o"))
+    .withColumn("translated", translate(col("text"), "aeiou", "AEIOU"))
+    .withColumn("replaced", regexp_replace(col("text"), "[A-Z]", "_"))
+    .withColumn("snd", soundex(col("text")))
+    .withColumn("b64", base64(col("lang")))
+    .withColumn("ub64", unbase64(base64(col("lang"))))
+    .withColumn("repeated", repeat(col("lang"), 3))
+    .select("text", "pos_o", "translated", "replaced", "snd", "b64", "repeated")
+    .show();
+
+  // ── 41. Datetime Functions ────────────────────────────────────────
+  console.log("\n=== 41. Datetime Functions ===");
+  const dtDemo = spark.sql(`
+    SELECT * FROM VALUES
+      ('2024-01-15', '2024-06-30 14:30:00'),
+      ('2024-03-20', '2024-12-25 09:15:00'),
+      ('2024-07-04', '2024-07-04 00:00:00')
+    AS data(date_str, ts_str)
+  `);
+  const withDates = dtDemo
+    .withColumn("dt", to_date(col("date_str")))
+    .withColumn("ts", to_timestamp(col("ts_str")));
+  await withDates
+    .withColumn("yr", year(col("dt")))
+    .withColumn("mon", month(col("dt")))
+    .withColumn("dow", dayofweek(col("dt")))
+    .withColumn("hr", hour(col("ts")))
+    .withColumn("formatted", date_format(col("dt"), "MMMM dd, yyyy"))
+    .select("date_str", "yr", "mon", "dow", "hr", "formatted")
+    .show();
+
+  console.log("date_add / date_sub / datediff / months_between:");
+  await withDates
+    .withColumn("plus_7d", date_add(col("dt"), 7))
+    .withColumn("minus_3d", date_sub(col("dt"), 3))
+    .withColumn("diff_days", datediff(col("ts"), col("dt")))
+    .withColumn("diff_months", months_between(col("ts"), col("dt")))
+    .select("date_str", "ts_str", "plus_7d", "minus_3d", "diff_days", "diff_months")
+    .show();
+
+  console.log("unix_timestamp / from_unixtime / current_date / current_timestamp:");
+  await withDates
+    .withColumn("epoch", unix_timestamp(col("ts")))
+    .withColumn("back_str", from_unixtime(unix_timestamp(col("ts")), "yyyy/MM/dd"))
+    .withColumn("today", current_date())
+    .withColumn("now", current_timestamp())
+    .select("ts_str", "epoch", "back_str", "today", "now")
+    .show();
+
+  // ── 42. Expanded Aggregates ───────────────────────────────────────
+  console.log("\n=== 42. Expanded Aggregates ===");
+  console.log("stddev / variance / corr / min / max:");
+  const empWithId = employees.withColumn("emp_id", monotonically_increasing_id());
+  await empWithId
+    .groupBy("department")
+    .agg(
+      count(col("name")).as("n"),
+      min(col("salary")).as("min_sal"),
+      max(col("salary")).as("max_sal"),
+      round(stddev(col("salary")), 2).as("stddev_sal"),
+      round(variance(col("salary")), 2).as("var_sal"),
+      round(corr(col("salary"), col("emp_id")), 4).as("corr_sal_id"),
+    )
+    .show();
+
+  console.log("collect_list / collect_set:");
+  await employees
+    .groupBy("department")
+    .agg(collect_list(col("name")).as("name_list"), collect_set(col("name")).as("name_set"))
+    .show();
+
+  console.log("first / last / countDistinct / approx_count_distinct:");
+  await employees
+    .groupBy("department")
+    .agg(
+      first(col("name")).as("first_name"),
+      last(col("name")).as("last_name"),
+      countDistinct(col("salary")).as("distinct_salaries"),
+      approx_count_distinct(col("salary")).as("approx_distinct"),
+    )
+    .show();
+
+  // ── 43. Expanded Window Functions ──────────────────────────────────
+  console.log("\n=== 43. Expanded Window Functions ===");
+  const w2 = Window.partitionBy("department").orderBy(col("salary").desc());
+  await employees
+    .withColumn("lead_sal", lead("salary", 1).over(w2))
+    .withColumn("ntile_3", ntile(3).over(w2))
+    .withColumn("cume", cume_dist().over(w2))
+    .withColumn("pct_rank", percent_rank().over(w2))
+    .select("name", "department", "salary", "lead_sal", "ntile_3", "cume", "pct_rank")
+    .show();
+
+  // ── 44. Collection / Array / Map ──────────────────────────────────
+  console.log("\n=== 44. Collection / Array / Map ===");
+  const arrDemo = spark.sql(`
+    SELECT * FROM VALUES
+      (ARRAY(1, 2, 3, 2), ARRAY(2, 3, 4)),
+      (ARRAY(5, 5, 6),    ARRAY(6, 7, 8)),
+      (ARRAY(9, 10),      ARRAY(10, 11, 12))
+    AS data(a, b)
+  `);
+  console.log("array ops (contains, distinct, sort, union, intersect, except, size):");
+  await arrDemo
+    .withColumn("has_2", array_contains(col("a"), lit(2)))
+    .withColumn("a_dist", array_distinct(col("a")))
+    .withColumn("a_sorted", array_sort(col("a")))
+    .withColumn("a_union_b", array_union(col("a"), col("b")))
+    .withColumn("a_inter_b", array_intersect(col("a"), col("b")))
+    .withColumn("a_except_b", array_except(col("a"), col("b")))
+    .withColumn("a_size", size(col("a")))
+    .show(3, false);
+
+  console.log("array() constructor + explode:");
+  const arrDemo2 = spark.sql(`
+    SELECT * FROM VALUES (1, 10), (2, 20), (3, 30) AS data(x, y)
+  `);
+  await arrDemo2
+    .withColumn("arr", array(col("x"), col("y")))
+    .select(col("x"), col("arr"), explode(col("arr")).as("element"))
+    .show();
+
+  console.log("struct / create_map / map_keys / map_values:");
+  await employees
+    .withColumn("info", struct("name", "department"))
+    .withColumn("salary_map", create_map(lit("salary"), col("salary")))
+    .withColumn("keys", map_keys(create_map(lit("salary"), col("salary"))))
+    .withColumn("vals", map_values(create_map(lit("salary"), col("salary"))))
+    .select("name", "info", "salary_map", "keys", "vals")
+    .show(3, false);
+
+  // ── 45. Hash Functions ────────────────────────────────────────────
+  console.log("\n=== 45. Hash Functions ===");
+  await employees
+    .withColumn("md5_name", md5(col("name")))
+    .withColumn("sha1_name", sha1(col("name")))
+    .withColumn("sha2_name", sha2(col("name"), 256))
+    .withColumn("hash_name", hash(col("name")))
+    .withColumn("xxh64_name", xxhash64(col("name")))
+    .withColumn("crc32_name", crc32(col("name")))
+    .select("name", "md5_name", "sha1_name", "hash_name", "crc32_name")
+    .show(3, false);
+
+  // ── 46. JSON Functions ────────────────────────────────────────────
+  console.log("\n=== 46. JSON Functions ===");
+  const jsonDemo = spark.sql(`
+    SELECT * FROM VALUES
+      ('{"name":"Alice","age":30}'),
+      ('{"name":"Bob","age":25}'),
+      ('[1,2,3]')
+    AS data(json_str)
+  `);
+  await jsonDemo
+    .withColumn("as_struct", to_json(struct(lit("hello").as("greeting"))))
+    .withColumn("get_name", get_json_object(col("json_str"), "$.name"))
+    .withColumn("arr_len", json_array_length(lit("[1,2,3]")))
+    .withColumn("obj_keys", json_object_keys(col("json_str")))
+    .select("json_str", "get_name", "arr_len", "obj_keys")
+    .show(3, false);
+
+  // ── 47. Bitwise Functions ─────────────────────────────────────────
+  console.log("\n=== 47. Bitwise Functions ===");
+  await spark
+    .range(1, 9)
+    .withColumn("not_id", bitwise_not(col("id")))
+    .withColumn("shl_2", shiftleft(col("id"), 2))
+    .withColumn("shr_1", shiftright(col("id"), 1))
+    .show();
+
+  // ── 48. Sort Functions ────────────────────────────────────────────
+  console.log("\n=== 48. Sort Functions ===");
+  const sortDemo = spark.sql(`
+    SELECT * FROM VALUES
+      ('Alice', 90000),
+      ('Bob',   NULL),
+      ('Carol', 70000),
+      ('Dave',  NULL),
+      ('Eve',   95000)
+    AS data(name, salary)
+  `);
+  console.log("asc(name):");
+  await sortDemo.sort(asc("name")).show();
+  console.log("desc(salary):");
+  await sortDemo.sort(desc("salary")).show();
+  console.log("asc_nulls_first(salary):");
+  await sortDemo.sort(asc_nulls_first("salary")).show();
+  console.log("desc_nulls_last(salary):");
+  await sortDemo.sort(desc_nulls_last("salary")).show();
+
+  // ── 49. Conditional / Utility ─────────────────────────────────────
+  console.log("\n=== 49. Conditional / Utility ===");
+  const condDemo = spark.sql(`
+    SELECT * FROM VALUES
+      (1,    NULL,  3),
+      (NULL, 20,    NULL),
+      (5,    CAST('NaN' AS DOUBLE), 7)
+    AS data(a, b, c)
+  `);
+  console.log("coalesce / isnull / isnan / nanvl / ifnull:");
+  await condDemo
+    .withColumn("coal", coalesce(col("a"), col("b"), col("c")))
+    .withColumn("a_null", isnull(col("a")))
+    .withColumn("b_nan", isnan(col("b")))
+    .withColumn("b_safe", nanvl(col("b"), lit(0)))
+    .withColumn("a_or_c", ifnull(col("a"), col("c")))
+    .select("a", "b", "c", "coal", "a_null", "b_nan", "b_safe", "a_or_c")
+    .show();
+
+  console.log("typeof / monotonically_increasing_id / expr:");
+  await employees
+    .withColumn("type_sal", typeof_(col("salary")))
+    .withColumn("mono_id", monotonically_increasing_id())
+    .withColumn("expr_calc", expr("salary * 2"))
+    .select("name", "salary", "type_sal", "mono_id", "expr_calc")
+    .show();
 
   // ── Cleanup ────────────────────────────────────────────────────────────
   await spark.stop();
