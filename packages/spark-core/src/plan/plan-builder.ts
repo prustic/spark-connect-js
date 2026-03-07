@@ -47,6 +47,24 @@ export class PlanBuilder {
           },
         };
 
+      case "readTable":
+        return {
+          read: {
+            namedTable: {
+              unparsedIdentifier: plan.tableName,
+              options: plan.options,
+            },
+          },
+        };
+
+      case "localRelation":
+        return {
+          localRelation: {
+            data: plan.data,
+            schema: plan.schema,
+          },
+        };
+
       case "sql":
         return {
           sql: {

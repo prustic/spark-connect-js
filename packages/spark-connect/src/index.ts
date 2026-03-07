@@ -106,6 +106,8 @@ export {
   StatDescribeSchema,
   type StatSummary,
   StatSummarySchema,
+  type LocalRelation,
+  LocalRelationSchema,
 } from "./gen/spark/connect/relations_pb.js";
 
 // ─── Expression messages ────────────────────────────────────────────────────

@@ -234,6 +234,42 @@ async function main(): Promise<void> {
   console.log("After dropna:");
   await withNulls.dropna().show();
 
+  // ── 23. Count (optimised) ─────────────────────────────────────────────
+  console.log("\n=== 23. Count (optimised) ===");
+  const empCount = await employees.count();
+  console.log(`Employee count: ${empCount}`);
+
+  // ── 24. toLocalIterator / forEach ─────────────────────────────────────
+  console.log("\n=== 24. toLocalIterator ===");
+  console.log("Streaming rows one-by-one:");
+  for await (const row of employees.select("name", "salary").toLocalIterator()) {
+    console.log(`  ${String(row.name)}: ${String(row.salary)}`);
+  }
+
+  console.log("\nforEach callback:");
+  const names: string[] = [];
+  await employees.select("name").forEach((row) => {
+    names.push(row.name as string);
+  });
+  console.log(`  Collected names: ${names.join(", ")}`);
+
+  // ── 25. first / head / take ───────────────────────────────────────────
+  console.log("\n=== 25. first / head / take ===");
+  const firstRow = await employees.first();
+  console.log("first():", firstRow);
+
+  const headRows = await employees.head(2);
+  console.log("head(2):", headRows);
+
+  const takeRows = await employees.take(3);
+  console.log("take(3):", takeRows);
+
+  // ── 26. DataFrameReader shortcuts ─────────────────────────────────────
+  console.log("\n=== 26. DataFrameReader: table() ===");
+  // "emp" temp view was registered in section 10
+  const fromTable = spark.read.table("emp");
+  await fromTable.show();
+
   // ── Cleanup ────────────────────────────────────────────────────────────
   await spark.stop();
   console.log("\nSession stopped.");

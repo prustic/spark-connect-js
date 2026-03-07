@@ -341,3 +341,235 @@ describe("DataFrame.describe()", () => {
     }
   });
 });
+
+describe("DataFrame.count()", () => {
+  it("builds an aggregate count plan instead of collecting all data", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [{ count: 42 }])
+      .getOrCreate();
+
+    const result = await spark.sql("SELECT * FROM t").count();
+
+    assert.equal(result, 42);
+    // Verify the plan sent to transport is an aggregate, not the original SQL
+    assert.equal(t.calls.length, 1);
+    assert.equal(t.calls[0].type, "aggregate");
+    if (t.calls[0].type === "aggregate") {
+      assert.equal(t.calls[0].groupingExpressions.length, 0);
+      assert.equal(t.calls[0].aggregateExpressions.length, 1);
+      const agg = t.calls[0].aggregateExpressions[0];
+      assert.equal(agg.type, "alias");
+      if (agg.type === "alias") {
+        assert.equal(agg.name, "count");
+        assert.equal(agg.inner.type, "unresolvedFunction");
+      }
+    }
+  });
+
+  it("returns 0 for empty result", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [])
+      .getOrCreate();
+
+    const result = await spark.sql("SELECT * FROM t").count();
+    assert.equal(result, 0);
+  });
+});
+
+describe("DataFrame.toLocalIterator()", () => {
+  it("yields rows one at a time from streaming chunks", async () => {
+    let callCount = 0;
+    const transport: Transport = {
+      async *executePlan() {
+        // Simulate two Arrow chunks arriving from the server
+        callCount++;
+        yield new Uint8Array([1]); // chunk 1
+        yield new Uint8Array([2]); // chunk 2
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .arrowDecoder(async (chunks) => {
+        // Decode each chunk into mock rows
+        const id = chunks[0][0];
+        return [{ id }, { id: id + 10 }];
+      })
+      .getOrCreate();
+
+    const rows: Record<string, unknown>[] = [];
+    for await (const row of spark.sql("SELECT * FROM t").toLocalIterator()) {
+      rows.push(row);
+    }
+
+    assert.equal(callCount, 1);
+    assert.deepStrictEqual(rows, [{ id: 1 }, { id: 11 }, { id: 2 }, { id: 12 }]);
+  });
+
+  it("throws without arrow decoder", async () => {
+    const { spark } = createSession();
+    const iter = spark.sql("SELECT 1").toLocalIterator();
+    await assert.rejects(iter.next(), /Arrow decoder/);
+  });
+});
+
+describe("DataFrame.forEach()", () => {
+  it("calls callback for each row", async () => {
+    const transport: Transport = {
+      async *executePlan() {
+        yield new Uint8Array([1]);
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .arrowDecoder(async () => [{ id: 1 }, { id: 2 }, { id: 3 }])
+      .getOrCreate();
+
+    const collected: number[] = [];
+    await spark.sql("SELECT * FROM t").forEach((row) => {
+      collected.push(row.id as number);
+    });
+
+    assert.deepStrictEqual(collected, [1, 2, 3]);
+  });
+});
+
+describe("DataFrame.first() / head() / take()", () => {
+  it("first() returns the first row", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [{ id: 1 }])
+      .getOrCreate();
+
+    const row = await spark.sql("SELECT * FROM t").first();
+    assert.deepStrictEqual(row, { id: 1 });
+    // Verify it built a limit(1) plan
+    assert.equal(t.calls[0].type, "limit");
+    if (t.calls[0].type === "limit") {
+      assert.equal(t.calls[0].limit, 1);
+    }
+  });
+
+  it("first() returns null for empty result", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [])
+      .getOrCreate();
+
+    const row = await spark.sql("SELECT * FROM t").first();
+    assert.equal(row, null);
+  });
+
+  it("head(n) returns first n rows", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [{ id: 1 }, { id: 2 }, { id: 3 }])
+      .getOrCreate();
+
+    const rows = await spark.sql("SELECT * FROM t").head(3);
+    assert.equal(rows.length, 3);
+    assert.equal(t.calls[0].type, "limit");
+    if (t.calls[0].type === "limit") {
+      assert.equal(t.calls[0].limit, 3);
+    }
+  });
+
+  it("take(n) is an alias for head(n)", async () => {
+    const t = mockTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(t)
+      .arrowDecoder(async () => [{ id: 1 }, { id: 2 }])
+      .getOrCreate();
+
+    const rows = await spark.sql("SELECT * FROM t").take(2);
+    assert.equal(rows.length, 2);
+  });
+});
+
+describe("SparkSession.createDataFrame()", () => {
+  it("builds a localRelation plan with Arrow data", () => {
+    const { spark } = createSession();
+    const arrowData = new Uint8Array([1, 2, 3]);
+    const df = spark.createDataFrame(arrowData, "id INT, name STRING");
+    assert.equal(df._plan.type, "localRelation");
+    if (df._plan.type === "localRelation") {
+      assert.deepStrictEqual(df._plan.data, arrowData);
+      assert.equal(df._plan.schema, "id INT, name STRING");
+    }
+  });
+
+  it("works without an explicit schema", () => {
+    const { spark } = createSession();
+    const df = spark.createDataFrame(new Uint8Array([1]));
+    if (df._plan.type === "localRelation") {
+      assert.equal(df._plan.schema, undefined);
+    }
+  });
+});
+
+describe("DataFrameReader shortcuts", () => {
+  it("table() builds a readTable plan", () => {
+    const { spark } = createSession();
+    const df = spark.read.table("my_db.my_table");
+    assert.equal(df._plan.type, "readTable");
+    if (df._plan.type === "readTable") {
+      assert.equal(df._plan.tableName, "my_db.my_table");
+    }
+  });
+
+  it("json() builds a read plan with json format", () => {
+    const { spark } = createSession();
+    const df = spark.read.json("/data/file.json");
+    assert.equal(df._plan.type, "read");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "json");
+      assert.equal(df._plan.path, "/data/file.json");
+    }
+  });
+
+  it("csv() builds a read plan with csv format", () => {
+    const { spark } = createSession();
+    const df = spark.read.csv("/data/file.csv");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "csv");
+    }
+  });
+
+  it("parquet() builds a read plan with parquet format", () => {
+    const { spark } = createSession();
+    const df = spark.read.parquet("/data/file.parquet");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "parquet");
+    }
+  });
+
+  it("orc() builds a read plan with orc format", () => {
+    const { spark } = createSession();
+    const df = spark.read.orc("/data/file.orc");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "orc");
+    }
+  });
+
+  it("table() preserves options", () => {
+    const { spark } = createSession();
+    const df = spark.read.option("mergeSchema", "true").table("my_table");
+    if (df._plan.type === "readTable") {
+      assert.deepStrictEqual(df._plan.options, { mergeSchema: "true" });
+    }
+  });
+});

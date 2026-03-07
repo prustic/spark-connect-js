@@ -169,6 +169,24 @@ export class SparkSession {
     });
   }
 
+  /**
+   * Create a DataFrame from Arrow IPC data.
+   *
+   * @param data  - Arrow IPC streaming format bytes
+   * @param schema - Optional DDL-formatted schema string (e.g. "id INT, name STRING")
+   *
+   * @example
+   *   const arrowData = ArrowEncoder.encode(rows, schema);
+   *   const df = spark.createDataFrame(arrowData);
+   */
+  createDataFrame(data: Uint8Array, schema?: string): DataFrame {
+    return DataFrame._fromPlan(this, {
+      type: "localRelation",
+      data,
+      schema,
+    });
+  }
+
   /** @internal — used by DataFrame to send plans via the injected transport */
   _executePlan(plan: LogicalPlan): AsyncIterable<Uint8Array> {
     return this.transport.executePlan(this.sessionId, plan);
@@ -290,5 +308,34 @@ class DataFrameReader {
       path,
       options: { ...this._options },
     });
+  }
+
+  /** Read a named table (catalog table or temp view). */
+  table(tableName: string): DataFrame {
+    return DataFrame._fromPlan(this.session, {
+      type: "readTable",
+      tableName,
+      options: { ...this._options },
+    });
+  }
+
+  /** Shortcut for .format("json").load(path). */
+  json(path: string): DataFrame {
+    return this.format("json").load(path);
+  }
+
+  /** Shortcut for .format("csv").load(path). */
+  csv(path: string): DataFrame {
+    return this.format("csv").load(path);
+  }
+
+  /** Shortcut for .format("parquet").load(path). */
+  parquet(path: string): DataFrame {
+    return this.format("parquet").load(path);
+  }
+
+  /** Shortcut for .format("orc").load(path). */
+  orc(path: string): DataFrame {
+    return this.format("orc").load(path);
   }
 }

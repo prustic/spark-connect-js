@@ -24,6 +24,8 @@ import {
   RelationSchema,
   ReadSchema,
   Read_DataSourceSchema,
+  Read_NamedTableSchema,
+  LocalRelationSchema,
   SQLSchema,
   FilterSchema,
   ProjectSchema,
@@ -104,6 +106,33 @@ export function buildRelation(plan: LogicalPlan): Relation {
                 options: plan.options,
               }),
             },
+          }),
+        },
+      });
+
+    case "readTable":
+      return create(RelationSchema, {
+        relType: {
+          case: "read",
+          value: create(ReadSchema, {
+            readType: {
+              case: "namedTable",
+              value: create(Read_NamedTableSchema, {
+                unparsedIdentifier: plan.tableName,
+                options: plan.options,
+              }),
+            },
+          }),
+        },
+      });
+
+    case "localRelation":
+      return create(RelationSchema, {
+        relType: {
+          case: "localRelation",
+          value: create(LocalRelationSchema, {
+            data: plan.data,
+            schema: plan.schema,
           }),
         },
       });
@@ -430,40 +459,6 @@ function buildFrameBoundary(boundary: CoreFrameBoundary) {
         boundary: { case: "value", value: buildExpression(boundary.value) },
       });
   }
-}
-
-/**
- * Build a raw Expression_Literal (for fields that expect Literal, not full Expression).
- */
-function buildLiteral(expr: CoreExpression & { type: "literal" }) {
-  if (expr.value === null) {
-    return create(Expression_LiteralSchema, {
-      literalType: { case: undefined, value: undefined },
-    });
-  }
-  if (typeof expr.value === "string") {
-    return create(Expression_LiteralSchema, {
-      literalType: { case: "string", value: expr.value },
-    });
-  }
-  if (typeof expr.value === "boolean") {
-    return create(Expression_LiteralSchema, {
-      literalType: { case: "boolean", value: expr.value },
-    });
-  }
-  if (typeof expr.value === "bigint") {
-    return create(Expression_LiteralSchema, {
-      literalType: { case: "long", value: expr.value },
-    });
-  }
-  if (Number.isInteger(expr.value) && Number.isSafeInteger(expr.value)) {
-    return create(Expression_LiteralSchema, {
-      literalType: { case: "integer", value: expr.value },
-    });
-  }
-  return create(Expression_LiteralSchema, {
-    literalType: { case: "double", value: expr.value },
-  });
 }
 
 /**

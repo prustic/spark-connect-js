@@ -98,6 +98,8 @@ export type FrameBoundary =
 
 export type LogicalPlan =
   | ReadPlan
+  | ReadTablePlan
+  | LocalRelationPlan
   | SqlPlan
   | FilterPlan
   | ProjectPlan
@@ -126,6 +128,26 @@ export interface ReadPlan {
   format: string;
   path: string;
   options: Record<string, string>;
+}
+
+/**
+ * Read from a named table.
+ * → Spark Connect: Relation.Read { ReadType.NamedTable }
+ */
+export interface ReadTablePlan {
+  type: "readTable";
+  tableName: string;
+  options: Record<string, string>;
+}
+
+/**
+ * Create a DataFrame from local data (Arrow IPC bytes).
+ * → Spark Connect: Relation.LocalRelation { data, schema }
+ */
+export interface LocalRelationPlan {
+  type: "localRelation";
+  data?: Uint8Array;
+  schema?: string;
 }
 
 /**

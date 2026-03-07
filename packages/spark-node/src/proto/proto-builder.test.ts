@@ -453,3 +453,51 @@ describe("buildExpression() — window", () => {
     }
   });
 });
+
+describe("buildRelation() — readTable", () => {
+  it("builds a Read.NamedTable relation", () => {
+    const result = buildRelation({
+      type: "readTable",
+      tableName: "my_db.my_table",
+      options: { mergeSchema: "true" },
+    });
+    assert.equal(result.relType.case, "read");
+    if (result.relType.case === "read") {
+      assert.equal(result.relType.value.readType.case, "namedTable");
+      if (result.relType.value.readType.case === "namedTable") {
+        assert.equal(result.relType.value.readType.value.unparsedIdentifier, "my_db.my_table");
+        assert.deepStrictEqual(result.relType.value.readType.value.options, {
+          mergeSchema: "true",
+        });
+      }
+    }
+  });
+});
+
+describe("buildRelation() — localRelation", () => {
+  it("builds a LocalRelation with data and schema", () => {
+    const data = new Uint8Array([1, 2, 3]);
+    const result = buildRelation({
+      type: "localRelation",
+      data,
+      schema: "id INT, name STRING",
+    });
+    assert.equal(result.relType.case, "localRelation");
+    if (result.relType.case === "localRelation") {
+      assert.deepStrictEqual(result.relType.value.data, data);
+      assert.equal(result.relType.value.schema, "id INT, name STRING");
+    }
+  });
+
+  it("builds a LocalRelation with only schema", () => {
+    const result = buildRelation({
+      type: "localRelation",
+      schema: "id INT",
+    });
+    assert.equal(result.relType.case, "localRelation");
+    if (result.relType.case === "localRelation") {
+      assert.equal(result.relType.value.data, undefined);
+      assert.equal(result.relType.value.schema, "id INT");
+    }
+  });
+});

@@ -423,18 +423,11 @@ export class DataFrame {
    *   4. Each batch is decoded from Arrow's columnar format into Row objects.
    *
    * ⚠️  MEMORY WARNING: collect() materialises the ENTIRE result set in the
-   * Node.js heap.  For large datasets, prefer .toArrow() (returns raw Arrow
-   * tables) or .forEach() (streaming row-by-row processing).
+   * Node.js heap.  For large datasets, prefer .toLocalIterator() for
+   * streaming row-by-row processing, or .forEach() for a callback approach.
    */
   async collect(): Promise<Row[]> {
-    const decoder = this._session._arrowDecoder;
-    if (!decoder) {
-      throw new Error(
-        "No Arrow decoder configured. " +
-          "Use @spark-js/node which provides one automatically, " +
-          "or pass arrowDecoder in SparkSessionConfig.",
-      );
-    }
+    const decoder = this._ensureDecoder();
 
     const chunks: Uint8Array[] = [];
     for await (const batch of this._session._executePlan(this._plan)) {
@@ -446,12 +439,108 @@ export class DataFrame {
 
   /**
    * Return the number of rows.  Equivalent to `SELECT COUNT(*) FROM ...`.
-   * This adds an Aggregate(count) plan node rather than collecting all data.
+   *
+   * Builds a proper `Aggregate(count(1))` plan so only a single scalar
+   * is materialised — the full dataset is never collected into JS memory.
    */
   async count(): Promise<number> {
-    // Simplified: in production this would build a proper aggregate plan.
-    const rows = await this.collect();
-    return rows.length;
+    const countPlan: LogicalPlan = {
+      type: "aggregate",
+      child: this._plan,
+      groupingExpressions: [],
+      aggregateExpressions: [
+        {
+          type: "alias",
+          name: "count",
+          inner: {
+            type: "unresolvedFunction",
+            name: "count",
+            arguments: [{ type: "literal", value: 1 }],
+          },
+        },
+      ],
+    };
+
+    const decoder = this._ensureDecoder();
+    const chunks: Uint8Array[] = [];
+    for await (const batch of this._session._executePlan(countPlan)) {
+      chunks.push(batch);
+    }
+    const rows = await decoder(chunks);
+    return (rows[0]?.count as number) ?? 0;
+  }
+
+  /**
+   * Return an async iterator that yields rows one at a time as they arrive
+   * from the Spark Connect server.  Each Arrow IPC chunk is decoded on the
+   * fly, so only one batch needs to be in memory at a time.
+   *
+   * Use this instead of collect() for large result sets to avoid OOM.
+   *
+   * @example
+   *   for await (const row of df.toLocalIterator()) {
+   *     console.log(row);
+   *   }
+   */
+  async *toLocalIterator(): AsyncIterableIterator<Row> {
+    const decoder = this._ensureDecoder();
+
+    for await (const chunk of this._session._executePlan(this._plan)) {
+      const rows = await decoder([chunk]);
+      for (const row of rows) {
+        yield row;
+      }
+    }
+  }
+
+  /**
+   * Process each row with a callback as it streams from the server.
+   * Rows are decoded and passed to the callback one batch at a time,
+   * avoiding full materialisation in memory.
+   *
+   * @example
+   *   await df.forEach((row) => console.log(row.name, row.salary));
+   */
+  async forEach(fn: (row: Row) => void): Promise<void> {
+    for await (const row of this.toLocalIterator()) {
+      fn(row);
+    }
+  }
+
+  /** @internal */
+  private _ensureDecoder() {
+    const decoder = this._session._arrowDecoder;
+    if (!decoder) {
+      throw new Error(
+        "No Arrow decoder configured. " +
+          "Use @spark-js/node which provides one automatically, " +
+          "or pass arrowDecoder in SparkSessionConfig.",
+      );
+    }
+    return decoder;
+  }
+
+  /**
+   * Return the first row as a Row object, or null if the DataFrame is empty.
+   */
+  async first(): Promise<Row | null> {
+    const rows = await this.limit(1).collect();
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Return the first `n` rows as an array (alias for limit + collect).
+   */
+  async head(n = 1): Promise<Row[]> {
+    return this.limit(n).collect();
+  }
+
+  /**
+   * Return the first `n` rows as an array.
+   * Alias for head() — matches PySpark's take() semantics.
+   */
+  async take(n: number): Promise<Row[]> {
+    return this.head(n);
   }
 
   /**
