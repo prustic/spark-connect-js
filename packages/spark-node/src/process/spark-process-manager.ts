@@ -95,9 +95,10 @@ export class SparkProcessManager {
   private _buildArgs(): string[] {
     const args: string[] = ["--class", "org.apache.spark.sql.connect.service.SparkConnectServer"];
 
-    // Add packages (Spark Connect jar + user packages)
-    const packages = ["org.apache.spark:spark-connect_2.13:3.5.0", ...this.options.packages];
-    args.push("--packages", packages.join(","));
+    // Add user-supplied --packages (Spark 4.0+ bundles Connect)
+    if (this.options.packages.length > 0) {
+      args.push("--packages", this.options.packages.join(","));
+    }
 
     // Add --conf entries
     const conf: Record<string, string> = {
