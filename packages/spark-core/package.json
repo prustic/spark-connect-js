@@ -35,7 +35,7 @@
     "dev": "tsc --build --watch",
     "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
     "test": "node --test $(find dist -name '*.test.js')",
-    "test:coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude='**/*.test.js' --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test-reporter=spec --test-reporter-destination=stdout $(find dist -name '*.test.js')",
+    "test:coverage": "c8 --reporter=lcov --reporter=text --reports-dir=coverage --src=src --exclude='dist/**/*.test.js' node --test $(find dist -name '*.test.js')",
     "lint": "eslint"
   },
   "engines": {

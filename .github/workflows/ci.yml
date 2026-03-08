@@ -34,6 +34,7 @@ jobs:
         with:
           files: packages/spark-core/coverage/lcov.info
           flags: spark-core
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - uses: codecov/codecov-action@v5
@@ -41,4 +42,5 @@ jobs:
         with:
           files: packages/spark-node/coverage/lcov.info
           flags: spark-node
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}

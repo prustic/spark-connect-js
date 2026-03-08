@@ -26,6 +26,7 @@
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.30.0",
     "@spark-connect-js/prettier-config": "workspace:*",
+    "c8": "^11.0.0",
     "prettier": "catalog:",
     "turbo": "^2.4.0",
     "typescript": "catalog:"
