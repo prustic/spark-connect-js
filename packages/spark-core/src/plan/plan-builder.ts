@@ -295,6 +295,24 @@ export class PlanBuilder {
             limit: plan.limit,
           },
         };
+
+      case "repartition":
+        return {
+          repartition: {
+            input: PlanBuilder.toRelation(plan.child),
+            numPartitions: plan.numPartitions,
+            shuffle: plan.shuffle,
+          },
+        };
+
+      case "repartitionByExpression":
+        return {
+          repartitionByExpression: {
+            input: PlanBuilder.toRelation(plan.child),
+            partitionExprs: plan.partitionExprs.map((e) => PlanBuilder.toExpression(e)),
+            numPartitions: plan.numPartitions,
+          },
+        };
     }
   }
 

@@ -803,3 +803,188 @@ describe("DataFrame.columns() / dtypes()", () => {
     assert.equal(dtypes[1][0], "name");
   });
 });
+
+describe("DataFrame.repartition()", () => {
+  it("creates a repartition plan with shuffle=true", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").repartition(10);
+    assert.equal(df._plan.type, "repartition");
+    if (df._plan.type === "repartition") {
+      assert.equal(df._plan.numPartitions, 10);
+      assert.equal(df._plan.shuffle, true);
+    }
+  });
+
+  it("creates a repartitionByExpression plan when columns are specified", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").repartition(10, "id", "name");
+    assert.equal(df._plan.type, "repartitionByExpression");
+    if (df._plan.type === "repartitionByExpression") {
+      assert.equal(df._plan.numPartitions, 10);
+      assert.equal(df._plan.partitionExprs.length, 2);
+    }
+  });
+
+  it("accepts Column objects when repartitioning by columns", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").repartition(4, col("id"));
+    assert.equal(df._plan.type, "repartitionByExpression");
+    if (df._plan.type === "repartitionByExpression") {
+      assert.equal(df._plan.numPartitions, 4);
+      assert.equal(df._plan.partitionExprs.length, 1);
+    }
+  });
+});
+
+describe("DataFrame.coalesce()", () => {
+  it("creates a repartition plan with shuffle=false", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").coalesce(2);
+    assert.equal(df._plan.type, "repartition");
+    if (df._plan.type === "repartition") {
+      assert.equal(df._plan.numPartitions, 2);
+      assert.equal(df._plan.shuffle, false);
+    }
+  });
+});
+
+describe("DataFrame.repartitionByRange()", () => {
+  it("creates a repartitionByExpression plan with sort-order expressions", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").repartitionByRange(10, "age");
+    assert.equal(df._plan.type, "repartitionByExpression");
+    if (df._plan.type === "repartitionByExpression") {
+      assert.equal(df._plan.numPartitions, 10);
+      assert.equal(df._plan.partitionExprs.length, 1);
+      assert.equal(df._plan.partitionExprs[0].type, "sortOrder");
+    }
+  });
+
+  it("preserves existing sort order on Column expressions", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").repartitionByRange(5, col("age").desc());
+    assert.equal(df._plan.type, "repartitionByExpression");
+    if (df._plan.type === "repartitionByExpression") {
+      const expr = df._plan.partitionExprs[0];
+      assert.equal(expr.type, "sortOrder");
+      if (expr.type === "sortOrder") {
+        assert.equal(expr.direction, "descending");
+      }
+    }
+  });
+});
+
+describe("DataFrame caching", () => {
+  function mockAnalyzeTransport(
+    analyzeHandler: (req: Record<string, unknown>) => Record<string, unknown>,
+  ) {
+    const analyzeCalls: Record<string, unknown>[] = [];
+    const transport: Transport & { analyzeCalls: Record<string, unknown>[] } = {
+      analyzeCalls,
+      async *executePlan(): AsyncIterable<Uint8Array> {},
+      async analyzePlan(
+        _sid: string,
+        req: Record<string, unknown>,
+      ): Promise<Record<string, unknown>> {
+        analyzeCalls.push(req);
+        return analyzeHandler(req);
+      },
+    };
+    return transport;
+  }
+
+  it("cache() sends a persist analyze request", async () => {
+    const transport = mockAnalyzeTransport(() => ({ type: "persist" }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const result = await df.cache();
+    assert.equal(result, df);
+    assert.equal(transport.analyzeCalls.length, 1);
+    assert.equal(transport.analyzeCalls[0].type, "persist");
+  });
+
+  it("persist() accepts a custom storage level", async () => {
+    const transport = mockAnalyzeTransport(() => ({ type: "persist" }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.persist({
+      useDisk: true,
+      useMemory: false,
+      useOffHeap: false,
+      deserialized: false,
+      replication: 1,
+    });
+    const req = transport.analyzeCalls[0];
+    const sl = req.storageLevel as Record<string, unknown>;
+    assert.equal(sl.useDisk, true);
+    assert.equal(sl.useMemory, false);
+  });
+
+  it("unpersist() sends an unpersist analyze request", async () => {
+    const transport = mockAnalyzeTransport(() => ({ type: "unpersist" }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const result = await df.unpersist();
+    assert.equal(result, df);
+    assert.equal(transport.analyzeCalls[0].type, "unpersist");
+  });
+
+  it("unpersist(true) passes blocking flag", async () => {
+    const transport = mockAnalyzeTransport(() => ({ type: "unpersist" }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.unpersist(true);
+    const req = transport.analyzeCalls[0];
+    assert.equal(req.blocking, true);
+  });
+
+  it("getStorageLevel() returns the storage level from analyze response", async () => {
+    const transport = mockAnalyzeTransport(() => ({
+      type: "getStorageLevel",
+      storageLevel: {
+        useDisk: true,
+        useMemory: true,
+        useOffHeap: false,
+        deserialized: true,
+        replication: 1,
+      },
+    }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const level = await df.getStorageLevel();
+    assert.equal(level.useDisk, true);
+    assert.equal(level.useMemory, true);
+    assert.equal(level.deserialized, true);
+    assert.equal(level.replication, 1);
+  });
+
+  it("getStorageLevel() returns NONE when no level is set", async () => {
+    const transport = mockAnalyzeTransport(() => ({
+      type: "getStorageLevel",
+    }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const level = await df.getStorageLevel();
+    assert.equal(level.useDisk, false);
+    assert.equal(level.useMemory, false);
+    assert.equal(level.replication, 1);
+  });
+});

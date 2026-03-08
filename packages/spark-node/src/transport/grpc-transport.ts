@@ -26,6 +26,10 @@ import {
   AnalyzePlanResponseSchema,
   AnalyzePlanRequest_SchemaSchema,
   AnalyzePlanRequest_ExplainSchema,
+  AnalyzePlanRequest_PersistSchema,
+  AnalyzePlanRequest_UnpersistSchema,
+  AnalyzePlanRequest_GetStorageLevelSchema,
+  StorageLevelSchema,
   CommandSchema,
   WriteOperationSchema,
   WriteOperation_SaveMode,
@@ -412,6 +416,61 @@ function buildAnalyzePlanRequest(
     });
   }
 
+  if (type === "persist") {
+    const sl = request.storageLevel as
+      | {
+          useDisk: boolean;
+          useMemory: boolean;
+          useOffHeap: boolean;
+          deserialized: boolean;
+          replication: number;
+        }
+      | undefined;
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "persist",
+        value: create(AnalyzePlanRequest_PersistSchema, {
+          relation: relation!,
+          storageLevel: sl
+            ? create(StorageLevelSchema, {
+                useDisk: sl.useDisk,
+                useMemory: sl.useMemory,
+                useOffHeap: sl.useOffHeap,
+                deserialized: sl.deserialized,
+                replication: sl.replication,
+              })
+            : undefined,
+        }),
+      },
+    });
+  }
+
+  if (type === "unpersist") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "unpersist",
+        value: create(AnalyzePlanRequest_UnpersistSchema, {
+          relation: relation!,
+          blocking: (request.blocking as boolean) ?? false,
+        }),
+      },
+    });
+  }
+
+  if (type === "getStorageLevel") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "getStorageLevel",
+        value: create(AnalyzePlanRequest_GetStorageLevelSchema, {
+          relation: relation!,
+        }),
+      },
+    });
+  }
+
   throw new Error(`Unsupported analyze type: ${type}`);
 }
 
@@ -426,6 +485,25 @@ function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unk
       return { type: "schema", schema: result.value.schema };
     case "explain":
       return { type: "explain", explainString: result.value.explainString };
+    case "persist":
+      return { type: "persist" };
+    case "unpersist":
+      return { type: "unpersist" };
+    case "getStorageLevel": {
+      const sl = result.value.storageLevel;
+      return {
+        type: "getStorageLevel",
+        storageLevel: sl
+          ? {
+              useDisk: sl.useDisk,
+              useMemory: sl.useMemory,
+              useOffHeap: sl.useOffHeap,
+              deserialized: sl.deserialized,
+              replication: sl.replication,
+            }
+          : undefined,
+      };
+    }
     default:
       return { type: result.case };
   }

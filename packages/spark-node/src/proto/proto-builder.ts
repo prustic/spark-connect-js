@@ -76,6 +76,8 @@ import {
   SubqueryAliasSchema,
   HintSchema,
   TailSchema,
+  RepartitionSchema,
+  RepartitionByExpressionSchema,
 } from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -488,6 +490,30 @@ export function buildRelation(plan: LogicalPlan): Relation {
           value: create(TailSchema, {
             input: buildRelation(plan.child),
             limit: plan.limit,
+          }),
+        },
+      });
+
+    case "repartition":
+      return create(RelationSchema, {
+        relType: {
+          case: "repartition",
+          value: create(RepartitionSchema, {
+            input: buildRelation(plan.child),
+            numPartitions: plan.numPartitions,
+            shuffle: plan.shuffle,
+          }),
+        },
+      });
+
+    case "repartitionByExpression":
+      return create(RelationSchema, {
+        relType: {
+          case: "repartitionByExpression",
+          value: create(RepartitionByExpressionSchema, {
+            input: buildRelation(plan.child),
+            partitionExprs: plan.partitionExprs.map(buildExpression),
+            numPartitions: plan.numPartitions,
           }),
         },
       });

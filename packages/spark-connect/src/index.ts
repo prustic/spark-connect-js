@@ -45,6 +45,15 @@ export {
   AnalyzePlanRequest_SchemaSchema,
   type AnalyzePlanRequest_Explain,
   AnalyzePlanRequest_ExplainSchema,
+  type AnalyzePlanRequest_Persist,
+  AnalyzePlanRequest_PersistSchema,
+  type AnalyzePlanRequest_Unpersist,
+  AnalyzePlanRequest_UnpersistSchema,
+  type AnalyzePlanRequest_GetStorageLevel,
+  AnalyzePlanRequest_GetStorageLevelSchema,
+  type AnalyzePlanResponse_Persist,
+  type AnalyzePlanResponse_Unpersist,
+  type AnalyzePlanResponse_GetStorageLevel,
 } from "./gen/spark/connect/base_pb.js";
 
 // Relation (logical plan) messages
@@ -114,6 +123,10 @@ export {
   HintSchema,
   type WithColumnsRenamed_Rename,
   WithColumnsRenamed_RenameSchema,
+  type Repartition,
+  RepartitionSchema,
+  type RepartitionByExpression,
+  RepartitionByExpressionSchema,
 } from "./gen/spark/connect/relations_pb.js";
 
 // Expression messages
@@ -202,3 +215,9 @@ export {
   type CreateDataFrameViewCommand,
   CreateDataFrameViewCommandSchema,
 } from "./gen/spark/connect/commands_pb.js";
+
+// Common messages (StorageLevel, etc.)
+export {
+  type StorageLevel as ProtoStorageLevel,
+  StorageLevelSchema,
+} from "./gen/spark/connect/common_pb.js";
