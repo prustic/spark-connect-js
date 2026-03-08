@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@types/node':
+      specifier: ^25.3.5
+      version: 25.3.5
     eslint:
       specifier: ^9.17.0
       version: 9.39.3
@@ -92,7 +95,7 @@ importers:
         specifier: workspace:*
         version: link:../../tooling/typescript
       '@types/node':
-        specifier: ^25.3.5
+        specifier: 'catalog:'
         version: 25.3.5
       eslint:
         specifier: 'catalog:'
@@ -142,7 +145,7 @@ importers:
         specifier: workspace:*
         version: link:../../tooling/typescript
       '@types/node':
-        specifier: ^25.3.5
+        specifier: 'catalog:'
         version: 25.3.5
       eslint:
         specifier: 'catalog:'
@@ -175,7 +178,7 @@ importers:
   tooling/typescript:
     devDependencies:
       '@types/node':
-        specifier: ^25.3.5
+        specifier: 'catalog:'
         version: 25.3.5
       typescript:
         specifier: 'catalog:'

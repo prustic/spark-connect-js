@@ -5,6 +5,7 @@ packages:
   - "tests/*"
 
 catalog:
+  "@types/node": ^25.3.5
   typescript: ^5.7.0
   prettier: ^3.4.0
   eslint: ^9.17.0
