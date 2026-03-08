@@ -35,42 +35,45 @@ const spark = connect("sc://localhost:15002");
 
 ### Transformations
 
-| Method                                      | Description                             |
-| ------------------------------------------- | --------------------------------------- |
-| `select(...cols)`                           | Project a set of columns or expressions |
-| `selectExpr(...exprs)`                      | Project using SQL expression strings    |
-| `filter(condition)`                         | Filter rows by condition                |
-| `where(condition)`                          | Alias for `filter`                      |
-| `groupBy(...cols)`                          | Group by columns, returns GroupedData   |
-| `sort(...cols)`                             | Sort by columns                         |
-| `orderBy(...cols)`                          | Alias for `sort`                        |
-| `limit(n)`                                  | Take the first n rows                   |
-| `offset(n)`                                 | Skip the first n rows                   |
-| `join(other, on, how)`                      | Join with another DataFrame             |
-| `crossJoin(other)`                          | Cross join                              |
-| `drop(...cols)`                             | Drop columns                            |
-| `withColumn(name, col)`                     | Add or replace a column                 |
-| `withColumns(colsMap)`                      | Add or replace multiple columns         |
-| `withColumnRenamed(existing, new)`          | Rename a column                         |
-| `withColumnsRenamed(colsMap)`               | Rename multiple columns                 |
-| `toDF(...cols)`                             | Rename all columns                      |
-| `alias(name)`                               | Assign a table alias                    |
-| `distinct()`                                | Remove duplicate rows                   |
-| `dropDuplicates(subset?)`                   | Remove duplicates, optionally by subset |
-| `union(other)`                              | Union two DataFrames                    |
-| `unionAll(other)`                           | Alias for `union`                       |
-| `unionByName(other, allowMissing?)`         | Union by column name                    |
-| `intersect(other)`                          | Set intersection                        |
-| `intersectAll(other)`                       | Set intersection preserving duplicates  |
-| `subtract(other)`                           | Set difference                          |
-| `exceptAll(other)`                          | Set difference preserving duplicates    |
-| `sample(fraction, withReplacement?, seed?)` | Random sample                           |
-| `describe(...cols)`                         | Summary statistics                      |
-| `fillna(value, subset?)`                    | Replace nulls                           |
-| `dropna(how?, thresh?, subset?)`            | Drop rows with nulls                    |
-| `hint(name, ...params)`                     | Optimizer hint                          |
-| `transform(fn)`                             | Apply a DataFrame-to-DataFrame function |
-| `sortWithinPartitions(...cols)`             | Sort within each partition              |
+| Method                                       | Description                             |
+| -------------------------------------------- | --------------------------------------- |
+| `select(...cols)`                            | Project a set of columns or expressions |
+| `selectExpr(...exprs)`                       | Project using SQL expression strings    |
+| `filter(condition)`                          | Filter rows by condition                |
+| `where(condition)`                           | Alias for `filter`                      |
+| `groupBy(...cols)`                           | Group by columns, returns GroupedData   |
+| `sort(...cols)`                              | Sort by columns                         |
+| `orderBy(...cols)`                           | Alias for `sort`                        |
+| `limit(n)`                                   | Take the first n rows                   |
+| `offset(n)`                                  | Skip the first n rows                   |
+| `join(other, on, how)`                       | Join with another DataFrame             |
+| `crossJoin(other)`                           | Cross join                              |
+| `drop(...cols)`                              | Drop columns                            |
+| `withColumn(name, col)`                      | Add or replace a column                 |
+| `withColumns(colsMap)`                       | Add or replace multiple columns         |
+| `withColumnRenamed(existing, new)`           | Rename a column                         |
+| `withColumnsRenamed(colsMap)`                | Rename multiple columns                 |
+| `toDF(...cols)`                              | Rename all columns                      |
+| `alias(name)`                                | Assign a table alias                    |
+| `distinct()`                                 | Remove duplicate rows                   |
+| `dropDuplicates(subset?)`                    | Remove duplicates, optionally by subset |
+| `union(other)`                               | Union two DataFrames                    |
+| `unionAll(other)`                            | Alias for `union`                       |
+| `unionByName(other, allowMissing?)`          | Union by column name                    |
+| `intersect(other)`                           | Set intersection                        |
+| `intersectAll(other)`                        | Set intersection preserving duplicates  |
+| `subtract(other)`                            | Set difference                          |
+| `exceptAll(other)`                           | Set difference preserving duplicates    |
+| `sample(fraction, withReplacement?, seed?)`  | Random sample                           |
+| `describe(...cols)`                          | Summary statistics                      |
+| `fillna(value, subset?)`                     | Replace nulls                           |
+| `dropna(how?, thresh?, subset?)`             | Drop rows with nulls                    |
+| `hint(name, ...params)`                      | Optimizer hint                          |
+| `transform(fn)`                              | Apply a DataFrame-to-DataFrame function |
+| `sortWithinPartitions(...cols)`              | Sort within each partition              |
+| `repartition(numPartitions, ...cols?)`       | Repartition with optional columns       |
+| `repartitionByRange(numPartitions, ...cols)` | Range-partition by columns              |
+| `coalesce(numPartitions)`                    | Reduce partitions without shuffle       |
 
 ### Actions
 
@@ -85,6 +88,15 @@ const spark = connect("sc://localhost:15002");
 | `tail(n)`                        | Last n rows                  |
 | `toLocalIterator()`              | Async iterator over rows     |
 | `forEach(fn)`                    | Apply a function to each row |
+
+### Caching & Persistence
+
+| Method                   | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `cache()`                | Cache with default storage level (MEMORY_AND_DISK) |
+| `persist(storageLevel?)` | Cache with a specific StorageLevel                 |
+| `unpersist(blocking?)`   | Remove from cache                                  |
+| `getStorageLevel()`      | Get the current StorageLevel                       |
 
 ### Properties
 
@@ -286,10 +298,14 @@ import { col, sum, avg, year, upper, when, Window } from "@spark-connect-js/node
 ## Types
 
 ```typescript
-import { DataType, StructType, StructField } from "@spark-connect-js/node";
+import { DataType, StructType, StructField, StorageLevel } from "@spark-connect-js/node";
 ```
 
 `DataType`, `StructType`, `StructField` for schema definitions and `cast()` operations.
+
+`StorageLevel` for cache persistence levels. Pre-defined constants:
+
+`MEMORY_ONLY`, `MEMORY_ONLY_2`, `MEMORY_ONLY_SER`, `MEMORY_ONLY_SER_2`, `MEMORY_AND_DISK`, `MEMORY_AND_DISK_2`, `MEMORY_AND_DISK_SER`, `MEMORY_AND_DISK_SER_2`, `DISK_ONLY`, `DISK_ONLY_2`, `OFF_HEAP`, `NONE`
 
 ---
 

@@ -47,8 +47,10 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `hint`                                     | ✅     |
 | `transform`                                | ✅     |
 | `sortWithinPartitions`                     | ✅     |
-| `repartition` / `coalesce`                 | -      |
-| `cache` / `persist` / `unpersist`          | -      |
+| `repartition` / `coalesce`                 | ✅     |
+| `repartitionByRange`                       | ✅     |
+| `cache` / `persist` / `unpersist`          | ✅     |
+| `getStorageLevel`                          | ✅     |
 | `cube` / `rollup` / `pivot`                | -      |
 | `melt` / `unpivot`                         | -      |
 | `summary` / `replace`                      | -      |
@@ -155,8 +157,6 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 
 These are planned but not available in the current release:
 
-- **Caching & persistence**: `cache()`, `persist()`, `unpersist()`
-- **Repartitioning**: `repartition()`, `coalesce()`, `repartitionByRange()`
 - **Advanced grouping**: `cube()`, `rollup()`, `pivot()`, `melt()`/`unpivot()`
 - **Stat functions**: `.stat.corr()`, `.stat.cov()`, `.stat.crosstab()`
 - **I/O shortcuts**: `read.csv()`, `read.parquet()`, `write.json()`, etc.
