@@ -1,4 +1,6 @@
 import eslint from "@eslint/js";
+import prettierConfig from "eslint-config-prettier";
+import prettierPlugin from "eslint-plugin-prettier";
 import tseslint from "typescript-eslint";
 
 /**
@@ -8,17 +10,25 @@ import tseslint from "typescript-eslint";
  * bugs that plain TypeScript misses: floating promises, unsafe `any` usage,
  * and incorrect async patterns — all critical when building a gRPC streaming
  * client that juggles Arrow buffers and async iterables.
+ *
+ * Prettier is integrated via eslint-plugin-prettier so formatting violations
+ * surface as lint errors and get auto-fixed with `eslint --fix`.
  */
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
+  prettierConfig,
   {
+    plugins: {
+      prettier: prettierPlugin,
+    },
     languageOptions: {
       parserOptions: {
         projectService: true,
       },
     },
     rules: {
+      "prettier/prettier": "error",
       // Allow unused vars prefixed with _ (common for destructuring discards)
       "@typescript-eslint/no-unused-vars": [
         "error",
