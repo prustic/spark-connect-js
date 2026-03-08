@@ -2,6 +2,9 @@
 
 Generated TypeScript types and service definitions from the [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html) protobuf spec.
 
+> [!NOTE]
+> This project is in early development. APIs may change between releases.
+
 ```bash
 npm install @spark-connect-js/connect
 ```

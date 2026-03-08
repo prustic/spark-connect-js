@@ -2,6 +2,9 @@
 
 TypeScript client for [Apache Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html). Talks to Spark over gRPC and decodes results with Apache Arrow.
 
+> [!NOTE]
+> This project is in early development. APIs may change between releases.
+
 ```bash
 npm install @spark-connect-js/node
 ```

@@ -2,6 +2,9 @@
 
 DataFrame API and logical plan builder for [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), in pure TypeScript with zero runtime dependencies.
 
+> [!NOTE]
+> This project is in early development. APIs may change between releases.
+
 ```bash
 npm install @spark-connect-js/core
 ```
