@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "description": "Pure TypeScript core: logical DataFrame API and Spark Connect plan builder — no runtime dependencies",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prustic/spark-connect-js.git",
+    "directory": "packages/spark-core"
+  },
+  "homepage": "https://github.com/prustic/spark-connect-js/tree/main/packages/spark-core",
+  "bugs": "https://github.com/prustic/spark-connect-js/issues",
+  "keywords": [
+    "spark",
+    "spark-connect",
+    "dataframe",
+    "typescript"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +33,7 @@
   "scripts": {
     "build": "tsc --build",
     "dev": "tsc --build --watch",
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
     "test": "node --test $(find dist -name '*.test.js')",
     "test:coverage": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude='**/*.test.js' --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test-reporter=spec --test-reporter-destination=stdout $(find dist -name '*.test.js')",
     "lint": "eslint"

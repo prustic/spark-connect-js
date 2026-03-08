@@ -8,7 +8,7 @@
     "build": "tsc --build",
     "dev": "tsc --build --watch",
     "start": "node dist/main.js",
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
     "lint": "eslint",
     "spark:up": "docker compose up -d --wait",
     "spark:down": "docker compose down"
