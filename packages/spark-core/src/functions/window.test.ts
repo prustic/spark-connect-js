@@ -1,8 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  row_number, rank, dense_rank, cume_dist, percent_rank, nth_value,
-  lag, lead, ntile,
+  row_number,
+  rank,
+  dense_rank,
+  cume_dist,
+  percent_rank,
+  nth_value,
+  lag,
+  lead,
+  ntile,
 } from "./window.js";
 
 import type { Column } from "../column.js";

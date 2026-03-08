@@ -2,9 +2,23 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { col, lit } from "../column.js";
 import {
-  when, cast, coalesce, isnull, isnan, isnotnull, nanvl,
-  ifnull, nvl, nvl2, nullif, expr, monotonically_increasing_id,
-  spark_partition_id, typeof_, uuid, broadcast,
+  when,
+  cast,
+  coalesce,
+  isnull,
+  isnan,
+  isnotnull,
+  nanvl,
+  ifnull,
+  nvl,
+  nvl2,
+  nullif,
+  expr,
+  monotonically_increasing_id,
+  spark_partition_id,
+  typeof_,
+  uuid,
+  broadcast,
 } from "./conditional.js";
 
 import type { Column } from "../column.js";

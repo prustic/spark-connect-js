@@ -1,8 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  from_json, to_json, get_json_object, json_tuple,
-  schema_of_json, json_array_length, json_object_keys,
+  from_json,
+  to_json,
+  get_json_object,
+  json_tuple,
+  schema_of_json,
+  json_array_length,
+  json_object_keys,
 } from "./json.js";
 
 import type { Column } from "../column.js";
