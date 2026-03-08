@@ -4,6 +4,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # managed via pnpm catalog in pnpm-workspace.yaml
+      - dependency-name: typescript
+      - dependency-name: eslint
+      - dependency-name: prettier
     groups:
       dev-dependencies:
         dependency-type: development
