@@ -1,11 +1,8 @@
 /**
- * basic-query — Spark Connect example showcasing the DataFrame API
+ * basic-query -- Spark Connect example
  *
- * Prerequisites:
- *   docker compose up -d        # start Spark Connect on port 15002
- *
- * Run:
- *   pnpm build && node dist/main.js
+ * Start Spark:  docker compose up -d
+ * Run:          pnpm build && node dist/main.js
  */
 
 import {
@@ -28,7 +25,7 @@ import {
   cume_dist,
   percent_rank,
   Window,
-  DataFrame,
+  type DataFrame,
   // Math
   abs,
   ceil,
@@ -147,44 +144,44 @@ const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 async function main(): Promise<void> {
   const spark = connect(SPARK_REMOTE);
 
-  // ── 1. SparkSession.range() ────────────────────────────────────────────
-  console.log("=== 1. SparkSession.range() ===");
+  // 1. SparkSession.range()
+  console.log("SparkSession.range()");
   const range = spark.range(10).withColumn("doubled", col("id").multiply(lit(2)));
   await range.show();
 
-  // ── 2. Filter + Select ──────────────────────────────────────────────────
-  console.log("\n=== 2. Filter + Select ===");
+  // 2. Filter + Select
+  console.log("\nFilter + Select");
   const filtered = range.filter(col("id").gt(lit(5))).select("id", "doubled");
   await filtered.show();
 
-  // ── 3. Sort / OrderBy ──────────────────────────────────────────────────
-  console.log("\n=== 3. Sort descending ===");
+  // 3. Sort / OrderBy
+  console.log("\nSort descending");
   const sorted = range.sort(col("id").desc());
   await sorted.show();
 
-  // ── 4. Limit + Offset ──────────────────────────────────────────────────
-  console.log("\n=== 4. Limit 3, Offset 2 ===");
+  // 4. Limit + Offset
+  console.log("\nLimit 3, Offset 2");
   const paged = range.limit(3).offset(2);
   await paged.show();
 
-  // ── 5. withColumn ──────────────────────────────────────────────────────
-  console.log("\n=== 5. withColumn ===");
+  // 5. withColumn
+  console.log("\nwithColumn");
   const withTripled = range.withColumn("tripled", col("id").multiply(lit(3)));
   await withTripled.show(5);
 
-  // ── 6. Drop columns ───────────────────────────────────────────────────
-  console.log("\n=== 6. Drop 'doubled' column ===");
+  // 6. Drop columns
+  console.log("\nDrop 'doubled' column");
   const dropped = range.drop("doubled");
   await dropped.show(5);
 
-  // ── 7. Distinct / dropDuplicates ───────────────────────────────────────
-  console.log("\n=== 7. Distinct ===");
+  // 7. Distinct / dropDuplicates
+  console.log("\nDistinct");
   const dupes = spark.sql("SELECT id % 3 AS bucket FROM range(10)");
   const distinct = dupes.distinct();
   await distinct.show();
 
-  // ── 8. GroupBy + Aggregation ───────────────────────────────────────────
-  console.log("\n=== 8. GroupBy + Count ===");
+  // 8. GroupBy + Aggregation
+  console.log("\nGroupBy + Count");
   const employees = spark.sql(`
     SELECT * FROM VALUES
       ('Alice', 'Engineering', 90000),
@@ -204,8 +201,8 @@ async function main(): Promise<void> {
   console.log("\nDepartment avg salary:");
   await deptAvg.show();
 
-  // ── 9. Join ────────────────────────────────────────────────────────────
-  console.log("\n=== 9. Join ===");
+  // 9. Join
+  console.log("\nJoin");
   const departments = spark.sql(`
     SELECT * FROM VALUES
       ('Engineering', 'Building A'),
@@ -217,16 +214,16 @@ async function main(): Promise<void> {
   const joined = employees.join(departments, col("department").eq(col("dept_name")), "inner");
   await joined.select("name", "department", "location").show();
 
-  // ── 10. Temp View + SQL query ──────────────────────────────────────────
-  console.log("\n=== 10. Temp View + SQL ===");
+  // 10. Temp View + SQL query
+  console.log("\nTemp View + SQL");
   await employees.createOrReplaceTempView("emp");
   const topEarners = spark.sql(
     "SELECT name, salary FROM emp WHERE salary > 85000 ORDER BY salary DESC",
   );
   await topEarners.show();
 
-  // ── 11. Explain plan ───────────────────────────────────────────────────
-  console.log("\n=== 11. Explain Plan ===");
+  // 11. Explain plan
+  console.log("\nExplain Plan");
   const complex = employees
     .filter(col("salary").gt(lit(70000)))
     .select("name", "salary")
@@ -234,14 +231,14 @@ async function main(): Promise<void> {
   const plan = await complex.explain("simple");
   console.log(plan);
 
-  // ── 12. Collect as JSON ────────────────────────────────────────────────
-  console.log("\n=== 12. Collect ===");
+  // 12. Collect as JSON
+  console.log("\nCollect");
   const rows = await filtered.collect();
   console.log(`Collected ${String(rows.length)} rows:`);
   console.log(JSON.stringify(rows, null, 2));
 
-  // ── 13. Expression Functions: when / otherwise ────────────────────────
-  console.log("\n=== 13. When / Otherwise ===");
+  // 13. Expression Functions: when / otherwise
+  console.log("\nWhen / Otherwise");
   const withTier = employees.withColumn(
     "tier",
     when(col("salary").gte(lit(90000)), lit("senior"))
@@ -250,15 +247,15 @@ async function main(): Promise<void> {
   );
   await withTier.select("name", "salary", "tier").show();
 
-  // ── 14. Cast + String Functions ───────────────────────────────────────
-  console.log("\n=== 14. Cast + Upper ===");
+  // 14. Cast + String Functions
+  console.log("\nCast + Upper");
   const casted = employees
     .withColumn("salary_str", cast(col("salary"), "string"))
     .withColumn("upper_name", upper(col("name")));
   await casted.select("upper_name", "salary_str").show();
 
-  // ── 15. Math Functions ────────────────────────────────────────────────
-  console.log("\n=== 15. Round / Aggregates ===");
+  // 15. Math Functions
+  console.log("\nRound / Aggregates");
   const deptStats = employees
     .groupBy("department")
     .agg(
@@ -268,12 +265,12 @@ async function main(): Promise<void> {
     );
   await deptStats.show();
 
-  // ── 16. Schema Inspection ─────────────────────────────────────────────
-  console.log("\n=== 16. Schema ===");
+  // 16. Schema Inspection
+  console.log("\nSchema");
   await employees.printSchema();
 
-  // ── 17. Catalog API ───────────────────────────────────────────────────
-  console.log("\n=== 17. Catalog ===");
+  // 17. Catalog API
+  console.log("\nCatalog");
   const currentDb = await spark.catalog.currentDatabase();
   console.log(`Current database: ${currentDb}`);
 
@@ -284,8 +281,8 @@ async function main(): Promise<void> {
   const empExists = await spark.catalog.tableExists("emp");
   console.log(`Table 'emp' exists: ${String(empExists)}`);
 
-  // ── 18. Union / Intersect / Except ─────────────────────────────────────
-  console.log("\n=== 18. Union / Intersect / Except ===");
+  // 18. Union / Intersect / Except
+  console.log("\nUnion / Intersect / Except");
   const eng = employees.filter(col("department").eq(lit("Engineering")));
   const mkt = employees.filter(col("department").eq(lit("Marketing")));
   const unioned = eng.union(mkt);
@@ -302,8 +299,8 @@ async function main(): Promise<void> {
   console.log("Except (all - Engineering):");
   await excepted.show();
 
-  // ── 19. Column Methods: isNull, isin, like, between ───────────────────
-  console.log("\n=== 19. Column Methods ===");
+  // 19. Column Methods: isNull, isin, like, between
+  console.log("\nColumn Methods");
   const withNulls = spark.sql(`
     SELECT * FROM VALUES
       ('Alice', 90000),
@@ -324,8 +321,8 @@ async function main(): Promise<void> {
   console.log("between filter:");
   await employees.filter(col("salary").between(lit(72000), lit(91000))).show();
 
-  // ── 20. Window Functions ───────────────────────────────────────────────
-  console.log("\n=== 20. Window Functions ===");
+  // 20. Window Functions
+  console.log("\nWindow Functions");
   const w = Window.partitionBy("department").orderBy(col("salary").desc());
   const ranked = employees
     .withColumn("row_num", row_number().over(w))
@@ -336,13 +333,13 @@ async function main(): Promise<void> {
     .select("name", "department", "salary", "row_num", "rnk", "dense_rnk", "prev_salary")
     .show();
 
-  // ── 21. Describe ──────────────────────────────────────────────────────
-  console.log("\n=== 21. Describe ===");
+  // 21. Describe
+  console.log("\nDescribe");
   const stats = employees.describe("salary");
   await stats.show();
 
-  // ── 22. FillNA / DropNA ───────────────────────────────────────────────
-  console.log("\n=== 22. FillNA / DropNA ===");
+  // 22. FillNA / DropNA
+  console.log("\nFillNA / DropNA");
   console.log("Original with nulls:");
   await withNulls.show();
   console.log("After fillna(0):");
@@ -350,13 +347,13 @@ async function main(): Promise<void> {
   console.log("After dropna:");
   await withNulls.dropna().show();
 
-  // ── 23. Count (optimised) ─────────────────────────────────────────────
-  console.log("\n=== 23. Count (optimised) ===");
+  // 23. Count (optimised)
+  console.log("\nCount (optimised)");
   const empCount = await employees.count();
   console.log(`Employee count: ${empCount}`);
 
-  // ── 24. toLocalIterator / forEach ─────────────────────────────────────
-  console.log("\n=== 24. toLocalIterator ===");
+  // 24. toLocalIterator / forEach
+  console.log("\ntoLocalIterator");
   console.log("Streaming rows one-by-one:");
   for await (const row of employees.select("name", "salary").toLocalIterator()) {
     console.log(`  ${String(row.name)}: ${String(row.salary)}`);
@@ -369,8 +366,8 @@ async function main(): Promise<void> {
   });
   console.log(`  Collected names: ${names.join(", ")}`);
 
-  // ── 25. first / head / take ───────────────────────────────────────────
-  console.log("\n=== 25. first / head / take ===");
+  // 25. first / head / take
+  console.log("\nfirst / head / take");
   const firstRow = await employees.first();
   console.log("first():", firstRow);
 
@@ -380,21 +377,21 @@ async function main(): Promise<void> {
   const takeRows = await employees.take(3);
   console.log("take(3):", takeRows);
 
-  // ── 26. DataFrameReader shortcuts ─────────────────────────────────────
-  console.log("\n=== 26. DataFrameReader: table() ===");
+  // 26. DataFrameReader shortcuts
+  console.log("\nDataFrameReader: table()");
   // "emp" temp view was registered in section 10
   const fromTable = spark.read.table("emp");
   await fromTable.show();
 
-  // ── 27. SparkSession.range() variants ──────────────────────────────────
-  console.log("\n=== 27. SparkSession.range() variants ===");
+  // 27. SparkSession.range() variants
+  console.log("\nSparkSession.range() variants");
   console.log("range(5):");
   await spark.range(5).show();
   console.log("range(2, 10, 2):");
   await spark.range(2, 10, 2).show();
 
-  // ── 28. withColumnRenamed / withColumnsRenamed ────────────────────────
-  console.log("\n=== 28. Rename Columns ===");
+  // 28. withColumnRenamed / withColumnsRenamed
+  console.log("\nRename Columns");
   const renamed = employees
     .withColumnRenamed("name", "employee_name")
     .withColumnRenamed("salary", "pay");
@@ -407,8 +404,8 @@ async function main(): Promise<void> {
   });
   await batchRenamed.show();
 
-  // ── 29. selectExpr ────────────────────────────────────────────────────
-  console.log("\n=== 29. selectExpr ===");
+  // 29. selectExpr
+  console.log("\nselectExpr");
   const withExprs = employees.selectExpr(
     "name",
     "salary * 1.1 AS raised_salary",
@@ -416,8 +413,8 @@ async function main(): Promise<void> {
   );
   await withExprs.show();
 
-  // ── 30. transform (pipeline composition) ──────────────────────────────
-  console.log("\n=== 30. transform ===");
+  // 30. transform (pipeline composition)
+  console.log("\ntransform");
   const addBonus = (df: DataFrame) => df.withColumn("bonus", col("salary").multiply(lit(0.1)));
   const addLevel = (df: DataFrame) =>
     df.withColumn(
@@ -427,8 +424,8 @@ async function main(): Promise<void> {
   const pipeline = employees.transform(addBonus).transform(addLevel);
   await pipeline.select("name", "salary", "bonus", "level").show();
 
-  // ── 31. alias + hint ──────────────────────────────────────────────────
-  console.log("\n=== 31. alias + hint ===");
+  // 31. alias + hint
+  console.log("\nalias + hint");
   const aliased = employees.alias("emp");
   const aliasedPlan = await aliased.select("emp.name", "emp.salary").explain("simple");
   console.log("Aliased plan:");
@@ -439,18 +436,18 @@ async function main(): Promise<void> {
   console.log("Broadcast hint plan:");
   console.log(hintedPlan);
 
-  // ── 32. sortWithinPartitions ──────────────────────────────────────────
-  console.log("\n=== 32. sortWithinPartitions ===");
+  // 32. sortWithinPartitions
+  console.log("\nsortWithinPartitions");
   const partSorted = employees.sortWithinPartitions(col("salary").desc());
   await partSorted.show();
 
-  // ── 33. tail ──────────────────────────────────────────────────────────
-  console.log("\n=== 33. tail ===");
+  // 33. tail
+  console.log("\ntail");
   const lastTwo = await employees.sort(col("salary").asc()).tail(2);
   console.log("Last 2 by salary:", lastTwo);
 
-  // ── 34. columns / dtypes / isEmpty ────────────────────────────────────
-  console.log("\n=== 34. columns / dtypes / isEmpty ===");
+  // 34. columns / dtypes / isEmpty
+  console.log("\ncolumns / dtypes / isEmpty");
   const colNames = await employees.columns();
   console.log("Column names:", colNames);
 
@@ -463,8 +460,8 @@ async function main(): Promise<void> {
   const notEmpty = await employees.isEmpty();
   console.log("isEmpty (all employees):", notEmpty);
 
-  // ── 35. Column sort ordering variants ─────────────────────────────────
-  console.log("\n=== 35. Sort ordering variants ===");
+  // 35. Column sort ordering variants
+  console.log("\nSort ordering variants");
   const withNullSalaries = spark.sql(`
     SELECT * FROM VALUES
       ('Alice', 90000),
@@ -479,8 +476,8 @@ async function main(): Promise<void> {
   console.log("desc_nulls_last:");
   await withNullSalaries.sort(col("salary").desc_nulls_last()).show();
 
-  // ── 36. Column ilike / substr ─────────────────────────────────────────
-  console.log("\n=== 36. ilike / substr ===");
+  // 36. Column ilike / substr
+  console.log("\nilike / substr");
   console.log("ilike (case-insensitive):");
   await employees.filter(col("name").ilike("%alice%")).show();
 
@@ -490,8 +487,8 @@ async function main(): Promise<void> {
     .select("name", "short_name")
     .show();
 
-  // ── 37. Bitwise operations ────────────────────────────────────────────
-  console.log("\n=== 37. Bitwise operations ===");
+  // 37. Bitwise operations
+  console.log("\nBitwise operations");
   const nums = spark.range(8);
   await nums
     .withColumn("and_3", col("id").bitwiseAND(lit(3)))
@@ -499,15 +496,15 @@ async function main(): Promise<void> {
     .withColumn("xor_5", col("id").bitwiseXOR(lit(5)))
     .show();
 
-  // ── 38. GroupedData min / max ─────────────────────────────────────────
-  console.log("\n=== 38. GroupedData min / max ===");
+  // 38. GroupedData min / max
+  console.log("\nGroupedData min / max");
   console.log("Min salary by department:");
   await employees.groupBy("department").min("salary").show();
   console.log("Max salary by department:");
   await employees.groupBy("department").max("salary").show();
 
-  // ── 39. Math Functions ─────────────────────────────────────────────
-  console.log("\n=== 39. Math Functions ===");
+  // 39. Math Functions
+  console.log("\nMath Functions");
   const mathDemo = spark.range(1, 7).withColumn("val", col("id").multiply(lit(10)));
   await mathDemo
     .withColumn("abs_neg", abs(col("id").multiply(lit(-1))))
@@ -547,8 +544,8 @@ async function main(): Promise<void> {
     .select("id", "a", "b", "max_ab", "min_ab", "random", "euler", "pi_val")
     .show();
 
-  // ── 40. String Functions ──────────────────────────────────────────
-  console.log("\n=== 40. String Functions ===");
+  // 40. String Functions
+  console.log("\nString Functions");
   const strDemo = spark.sql(`
     SELECT * FROM VALUES
       ('Hello World', 'spark'),
@@ -587,8 +584,8 @@ async function main(): Promise<void> {
     .select("text", "pos_o", "translated", "replaced", "snd", "b64", "repeated")
     .show();
 
-  // ── 41. Datetime Functions ────────────────────────────────────────
-  console.log("\n=== 41. Datetime Functions ===");
+  // 41. Datetime Functions
+  console.log("\nDatetime Functions");
   const dtDemo = spark.sql(`
     SELECT * FROM VALUES
       ('2024-01-15', '2024-06-30 14:30:00'),
@@ -626,8 +623,8 @@ async function main(): Promise<void> {
     .select("ts_str", "epoch", "back_str", "today", "now")
     .show();
 
-  // ── 42. Expanded Aggregates ───────────────────────────────────────
-  console.log("\n=== 42. Expanded Aggregates ===");
+  // 42. Expanded Aggregates
+  console.log("\nExpanded Aggregates");
   console.log("stddev / variance / corr / min / max:");
   const empWithId = employees.withColumn("emp_id", monotonically_increasing_id());
   await empWithId
@@ -659,8 +656,8 @@ async function main(): Promise<void> {
     )
     .show();
 
-  // ── 43. Expanded Window Functions ──────────────────────────────────
-  console.log("\n=== 43. Expanded Window Functions ===");
+  // 43. Expanded Window Functions
+  console.log("\nExpanded Window Functions");
   const w2 = Window.partitionBy("department").orderBy(col("salary").desc());
   await employees
     .withColumn("lead_sal", lead("salary", 1).over(w2))
@@ -670,8 +667,8 @@ async function main(): Promise<void> {
     .select("name", "department", "salary", "lead_sal", "ntile_3", "cume", "pct_rank")
     .show();
 
-  // ── 44. Collection / Array / Map ──────────────────────────────────
-  console.log("\n=== 44. Collection / Array / Map ===");
+  // 44. Collection / Array / Map
+  console.log("\nCollection / Array / Map");
   const arrDemo = spark.sql(`
     SELECT * FROM VALUES
       (ARRAY(1, 2, 3, 2), ARRAY(2, 3, 4)),
@@ -708,8 +705,8 @@ async function main(): Promise<void> {
     .select("name", "info", "salary_map", "keys", "vals")
     .show(3, false);
 
-  // ── 45. Hash Functions ────────────────────────────────────────────
-  console.log("\n=== 45. Hash Functions ===");
+  // 45. Hash Functions
+  console.log("\nHash Functions");
   await employees
     .withColumn("md5_name", md5(col("name")))
     .withColumn("sha1_name", sha1(col("name")))
@@ -720,8 +717,8 @@ async function main(): Promise<void> {
     .select("name", "md5_name", "sha1_name", "hash_name", "crc32_name")
     .show(3, false);
 
-  // ── 46. JSON Functions ────────────────────────────────────────────
-  console.log("\n=== 46. JSON Functions ===");
+  // 46. JSON Functions
+  console.log("\nJSON Functions");
   const jsonDemo = spark.sql(`
     SELECT * FROM VALUES
       ('{"name":"Alice","age":30}'),
@@ -737,8 +734,8 @@ async function main(): Promise<void> {
     .select("json_str", "get_name", "arr_len", "obj_keys")
     .show(3, false);
 
-  // ── 47. Bitwise Functions ─────────────────────────────────────────
-  console.log("\n=== 47. Bitwise Functions ===");
+  // 47. Bitwise Functions
+  console.log("\nBitwise Functions");
   await spark
     .range(1, 9)
     .withColumn("not_id", bitwise_not(col("id")))
@@ -746,8 +743,8 @@ async function main(): Promise<void> {
     .withColumn("shr_1", shiftright(col("id"), 1))
     .show();
 
-  // ── 48. Sort Functions ────────────────────────────────────────────
-  console.log("\n=== 48. Sort Functions ===");
+  // 48. Sort Functions
+  console.log("\nSort Functions");
   const sortDemo = spark.sql(`
     SELECT * FROM VALUES
       ('Alice', 90000),
@@ -766,8 +763,8 @@ async function main(): Promise<void> {
   console.log("desc_nulls_last(salary):");
   await sortDemo.sort(desc_nulls_last("salary")).show();
 
-  // ── 49. Conditional / Utility ─────────────────────────────────────
-  console.log("\n=== 49. Conditional / Utility ===");
+  // 49. Conditional / Utility
+  console.log("\nConditional / Utility");
   const condDemo = spark.sql(`
     SELECT * FROM VALUES
       (1,    NULL,  3),
@@ -793,7 +790,7 @@ async function main(): Promise<void> {
     .select("name", "salary", "type_sal", "mono_id", "expr_calc")
     .show();
 
-  // ── Cleanup ────────────────────────────────────────────────────────────
+  // Cleanup
   await spark.stop();
   console.log("\nSession stopped.");
 }

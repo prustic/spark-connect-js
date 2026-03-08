@@ -8,7 +8,7 @@
     ·
     <a href="https://github.com/prustic/spark-connect-js/blob/main/CONTRIBUTING.md">Contributing</a>
     ·
-    <a href="https://github.com/prustic/spark-connect-js/blob/main/docs/roadmap.md">Roadmap</a>
+    <a href="https://github.com/prustic/spark-connect-js/blob/main/docs/api.md">API</a>
   </p>
 
   <p align="center">
@@ -19,13 +19,16 @@
   </p>
 </p>
 
+> [!NOTE]
+> This project is in early development. APIs may change between releases.
+
 ## About
 
-spark-connect-js is a TypeScript client for [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), the thin client protocol introduced in Spark 3.4 and expanded in Spark 4.0. It gives you the PySpark DataFrame API — `col()`, `groupBy()`, `agg()`, `Window`, and 248 built-in functions — with full TypeScript types and zero JVM dependencies.
+spark-connect-js is a TypeScript client for [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), the thin client protocol introduced in Spark 3.4 and expanded in Spark 4.0. It provides a Spark-like DataFrame API with full TypeScript types.
 
-Plans are built locally in pure TypeScript, serialized to protobuf, and executed server-side. Results come back as Arrow IPC and decode natively.
+Plans are built in TypeScript and executed on the server over gRPC. The core package has no runtime dependencies, so it can work with different runtimes. Right now there's a Node.js adapter using gRPC and Apache Arrow.
 
-## Quick Start
+## Quick Start (Node.js)
 
 ```bash
 npm install @spark-connect-js/node
@@ -47,17 +50,15 @@ const result = await spark
 await spark.stop();
 ```
 
-Requires Node.js >= 22 and a running Spark Connect server (Spark 4.0+).
+Requires a running Spark Connect server (Spark 4.0+). The Node.js adapter requires Node >= 22.
 
 ## Packages
 
-| Package                     | Description                                                 |
-| --------------------------- | ----------------------------------------------------------- |
-| `@spark-connect-js/node`    | Node.js runtime — gRPC transport + Arrow decoding           |
-| `@spark-connect-js/core`    | DataFrame API and plan builder — pure TypeScript, zero deps |
-| `@spark-connect-js/connect` | Generated protobuf types                                    |
-
-`@spark-connect-js/node` re-exports everything from `core`.
+| Package                     | Description                                        |
+| --------------------------- | -------------------------------------------------- |
+| `@spark-connect-js/node`    | Node.js runtime: gRPC transport + Arrow decoding   |
+| `@spark-connect-js/core`    | DataFrame API and plan builder (platform-agnostic) |
+| `@spark-connect-js/connect` | Generated protobuf types                           |
 
 ## Development
 

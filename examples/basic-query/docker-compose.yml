@@ -1,6 +1,6 @@
 services:
   spark-connect:
-    # Apache Spark 4.0 — Connect server is bundled in the image
+    # Apache Spark 4.0 - Connect server is bundled in the image
     image: apache/spark:4.0.0-preview2
     ports:
       - "15002:15002"

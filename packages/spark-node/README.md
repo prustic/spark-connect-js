@@ -1,16 +1,10 @@
 # @spark-connect-js/node
 
-Node.js runtime for [spark-connect-js](https://github.com/prustic/spark-connect-js) — gRPC transport, Arrow decoding, and the `connect()` helper.
-
-This is the main package most users need. It re-exports everything from `@spark-connect-js/core`.
-
-## Install
+TypeScript client for [Apache Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html). Talks to Spark over gRPC and decodes results with Apache Arrow.
 
 ```bash
 npm install @spark-connect-js/node
 ```
-
-## Usage
 
 ```typescript
 import { connect, col, sum, desc } from "@spark-connect-js/node";
@@ -28,10 +22,11 @@ const result = await spark
 await spark.stop();
 ```
 
-## Requirements
+Requires Node.js >= 22 and a running [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html) server (Spark 4.0+).
 
-- Node.js >= 22
-- Spark Connect server (Spark 4.0+)
+## Documentation
+
+See the [spark-connect-js](https://github.com/prustic/spark-connect-js) repository for full documentation, examples, and contributing guidelines.
 
 ## License
 

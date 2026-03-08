@@ -1,13 +1,13 @@
 # Contributing to spark-connect-js
 
-Thank you for your interest in contributing! This document covers how to participate — for development setup, see the [README](README.md).
+For development setup, see the [README](README.md).
 
 ## Ways to Contribute
 
-- **Report bugs** — open an issue with reproduction steps
-- **Suggest features** — open an issue describing the use case
-- **Submit a PR** — bug fixes, new functions, documentation improvements
-- **Improve docs** — typos, unclear explanations, missing examples
+- **Report bugs**: open an issue with reproduction steps
+- **Suggest features**: open an issue describing the use case
+- **Submit a PR**: bug fixes, new functions, documentation improvements
+- **Improve docs**: typos, unclear explanations, missing examples
 
 ## Opening Issues
 
@@ -20,10 +20,10 @@ Thank you for your interest in contributing! This document covers how to partici
 1. Fork the repo and create a branch from `main`.
 2. Make your changes with tests.
 3. Run `pnpm blt` to verify build, lint, and tests all pass.
-4. Add a changeset: `pnpm changeset` — describe what changed and select the affected packages.
+4. Add a changeset: `pnpm changeset` (describe what changed and select the affected packages).
 5. Open a PR against `main`.
 
-Keep PRs focused — one concern per PR. If a PR touches multiple unrelated things, split it up.
+Keep PRs focused. One concern per PR. If a PR touches multiple unrelated things, split it up.
 
 ## Commit Messages
 
