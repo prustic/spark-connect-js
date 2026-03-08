@@ -1,4 +1,4 @@
-import config from "@spark-js/eslint-config/base";
+import config from "@spark-connect-js/eslint-config/base";
 
 export default [
   ...config,

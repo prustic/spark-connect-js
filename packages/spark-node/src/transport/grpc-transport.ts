@@ -1,7 +1,7 @@
 /**
  * ─── GrpcTransport ──────────────────────────────────────────────────────────
  *
- * Concrete implementation of @spark-js/core's Transport interface using
+ * Concrete implementation of @spark-connect-js/core's Transport interface using
  * @grpc/grpc-js to communicate with the Spark Connect gRPC service.
  *
  * @see Spark Connect service proto: sql/connect/common/src/main/protobuf/spark/connect/base.proto
@@ -10,7 +10,7 @@
  *
  * Uses @bufbuild/protobuf for message serialization and @grpc/grpc-js for
  * the HTTP/2 transport. Messages are created using the generated schemas
- * from @spark-js/connect and serialized to binary protobuf on the wire.
+ * from @spark-connect-js/connect and serialized to binary protobuf on the wire.
  */
 
 import * as grpc from "@grpc/grpc-js";
@@ -39,10 +39,10 @@ import {
   type ReleaseSessionResponse,
   type AnalyzePlanRequest,
   type AnalyzePlanResponse,
-} from "@spark-js/connect";
-import type { Transport } from "@spark-js/core";
-import type { LogicalPlan } from "@spark-js/core";
-import { SparkConnectError } from "@spark-js/core";
+} from "@spark-connect-js/connect";
+import type { Transport } from "@spark-connect-js/core";
+import type { LogicalPlan } from "@spark-connect-js/core";
+import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation } from "../proto/proto-builder.js";
 
 /** gRPC channel options tuned for Spark Connect workloads. */
@@ -310,7 +310,7 @@ function wrapGrpcError(err: unknown): SparkConnectError {
 
 // ─── Command building ───────────────────────────────────────────────────────
 
-import type { Command } from "@spark-js/connect";
+import type { Command } from "@spark-connect-js/connect";
 
 const SAVE_MODE_MAP: Record<string, WriteOperation_SaveMode> = {
   append: WriteOperation_SaveMode.APPEND,
@@ -323,7 +323,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
   const type = command.type as string;
 
   if (type === "writeOperation") {
-    const plan = command.plan as import("@spark-js/core").LogicalPlan;
+    const plan = command.plan as import("@spark-connect-js/core").LogicalPlan;
     const relation = buildRelation(plan);
     const saveType = command.saveType as { case: string; value: unknown };
     const mode =
@@ -365,7 +365,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
   }
 
   if (type === "createDataframeView") {
-    const plan = command.plan as import("@spark-js/core").LogicalPlan;
+    const plan = command.plan as import("@spark-connect-js/core").LogicalPlan;
     const relation = buildRelation(plan);
     return create(CommandSchema, {
       commandType: {
@@ -390,7 +390,7 @@ function buildAnalyzePlanRequest(
   request: Record<string, unknown>,
 ): AnalyzePlanRequest {
   const type = request.type as string;
-  const plan = request.plan as import("@spark-js/core").LogicalPlan | undefined;
+  const plan = request.plan as import("@spark-connect-js/core").LogicalPlan | undefined;
   const relation = plan ? buildRelation(plan) : undefined;
 
   const base = {

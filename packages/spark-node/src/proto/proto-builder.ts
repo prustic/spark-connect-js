@@ -18,7 +18,7 @@ import type {
   Expression as CoreExpression,
   SortOrder as CoreSortOrder,
   FrameBoundary as CoreFrameBoundary,
-} from "@spark-js/core";
+} from "@spark-connect-js/core";
 import {
   type Relation,
   RelationSchema,
@@ -76,7 +76,7 @@ import {
   SubqueryAliasSchema,
   HintSchema,
   TailSchema,
-} from "@spark-js/connect";
+} from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
 const OPERATOR_FN: Record<string, string> = {

@@ -1,6 +1,6 @@
 /**
  * ════════════════════════════════════════════════════════════════════════════════
- * @spark-js/core  —  Pure TypeScript Logical DataFrame API
+ * @spark-connect-js/core  —  Pure TypeScript Logical DataFrame API
  * ════════════════════════════════════════════════════════════════════════════════
  *
  * This package is the **platform-agnostic** heart of the Spark JS client.
@@ -15,7 +15,7 @@
  *   2. Builds **logical plans** — tree-structured descriptions of the query the
  *      user wants to run.  These plans are serialised as Spark Connect protocol
  *      buffers and sent to the Spark Connect server by a runtime adapter
- *      (e.g. @spark-js/node).
+ *      (e.g. @spark-connect-js/node).
  *
  *   3. Defines the Column expression DSL used inside filter() and agg() so that
  *      predicate push-down and projection pruning can happen server-side on the
@@ -40,11 +40,11 @@
  *
  * ─── Relationship to other packages ─────────────────────────────────────────
  *
- *   @spark-js/core  ←  imported by every runtime adapter
+ *   @spark-connect-js/core  ←  imported by every runtime adapter
  *       │
- *       ├── @spark-js/node   (gRPC transport, Arrow decoding, Node Buffers)
- *       ├── @spark-js/deno   (future — Deno-native transport)
- *       └── @spark-js/web    (future — HTTP/2 + browser Arrow)
+ *       ├── @spark-connect-js/node   (gRPC transport, Arrow decoding, Node Buffers)
+ *       ├── @spark-connect-js/deno   (future — Deno-native transport)
+ *       └── @spark-connect-js/web    (future — HTTP/2 + browser Arrow)
  *
  * ════════════════════════════════════════════════════════════════════════════════
  */

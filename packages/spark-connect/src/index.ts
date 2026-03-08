@@ -1,5 +1,5 @@
 /**
- * @spark-js/connect — Generated TypeScript types from Spark Connect protobuf definitions.
+ * @spark-connect-js/connect — Generated TypeScript types from Spark Connect protobuf definitions.
  *
  * Re-exports the key types and schemas needed by the transport layer.
  * Consumer packages import from here rather than reaching into gen/ directly.

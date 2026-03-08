@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildRelation, buildExpression } from "./proto-builder.js";
-import type { LogicalPlan, Expression as CoreExpression } from "@spark-js/core";
+import type { LogicalPlan, Expression as CoreExpression } from "@spark-connect-js/core";
 
 describe("buildRelation()", () => {
   it("builds a SQL relation", () => {

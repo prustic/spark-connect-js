@@ -18,7 +18,7 @@
  *   1. Holds a session ID (UUID) to correlate requests on the server.
  *   2. Provides the builder-pattern entry for creating DataFrames.
  *   3. Delegates actual plan execution to a `Transport` injected by the
- *      runtime adapter (e.g. @spark-js/node injects a gRPC transport).
+ *      runtime adapter (e.g. @spark-connect-js/node injects a gRPC transport).
  *
  * The Transport interface is intentionally defined here in core so that this
  * package has no dependency on Node, Deno, or browser APIs.
@@ -83,7 +83,7 @@ export interface Transport {
 
 /**
  * Decodes concatenated Arrow IPC bytes into Row objects.
- * Injected by the runtime adapter (e.g. @spark-js/node provides an
+ * Injected by the runtime adapter (e.g. @spark-connect-js/node provides an
  * apache-arrow based implementation).
  */
 export type ArrowDecoderFn = (chunks: Uint8Array[]) => Promise<Row[]>;
@@ -283,7 +283,7 @@ class SparkSessionBuilder {
     if (!this.config.transport) {
       throw new Error(
         "SparkSession requires a Transport implementation. " +
-          "Use @spark-js/node's GrpcTransport or supply a custom one.",
+          "Use @spark-connect-js/node's GrpcTransport or supply a custom one.",
       );
     }
     return SparkSession._create(this.config as SparkSessionConfig);

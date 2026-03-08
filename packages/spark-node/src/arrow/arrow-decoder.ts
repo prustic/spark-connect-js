@@ -49,14 +49,14 @@
  * ArrayBuffer stays alive — a classic memory leak pattern.
  */
 
-import type { Row } from "@spark-js/core";
+import type { Row } from "@spark-connect-js/core";
 
 /**
  * Decodes Arrow IPC stream chunks into Row arrays.
  *
  * Uses the `apache-arrow` npm package for actual decoding.  The import is
  * dynamic to avoid hard failures if the package isn't installed (it's listed
- * as a dependency of @spark-js/node, but dynamic import gives better errors).
+ * as a dependency of @spark-connect-js/node, but dynamic import gives better errors).
  */
 export class ArrowDecoder {
   /**

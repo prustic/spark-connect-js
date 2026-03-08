@@ -1,5 +1,5 @@
 {
-  "name": "spark-js",
+  "name": "spark-connect-js",
   "version": "0.0.0",
   "private": true,
   "description": "High-performance, multi-target JavaScript Spark Connect client monorepo",
@@ -20,10 +20,10 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
-    "@spark-js/prettier-config": "workspace:*",
+    "@spark-connect-js/prettier-config": "workspace:*",
     "prettier": "catalog:",
     "turbo": "^2.4.0",
     "typescript": "catalog:"
   },
-  "prettier": "@spark-js/prettier-config"
+  "prettier": "@spark-connect-js/prettier-config"
 }

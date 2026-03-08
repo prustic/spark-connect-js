@@ -1,5 +1,5 @@
 {
-  "name": "@spark-js/example-basic-query",
+  "name": "@spark-connect-js/example-basic-query",
   "version": "0.0.0",
   "private": true,
   "description": "Basic example: connect to Spark Connect, run SQL, collect results",
@@ -17,11 +17,11 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@spark-js/node": "workspace:*"
+    "@spark-connect-js/node": "workspace:*"
   },
   "devDependencies": {
-    "@spark-js/eslint-config": "workspace:*",
-    "@spark-js/typescript-config": "workspace:*",
+    "@spark-connect-js/eslint-config": "workspace:*",
+    "@spark-connect-js/typescript-config": "workspace:*",
     "eslint": "catalog:",
     "typescript": "catalog:"
   }

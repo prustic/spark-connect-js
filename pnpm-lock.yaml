@@ -20,7 +20,7 @@ importers:
 
   .:
     devDependencies:
-      '@spark-js/prettier-config':
+      '@spark-connect-js/prettier-config':
         specifier: workspace:*
         version: link:tooling/prettier
       prettier:
@@ -35,14 +35,14 @@ importers:
 
   examples/basic-query:
     dependencies:
-      '@spark-js/node':
+      '@spark-connect-js/node':
         specifier: workspace:*
         version: link:../../packages/spark-node
     devDependencies:
-      '@spark-js/eslint-config':
+      '@spark-connect-js/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@spark-js/typescript-config':
+      '@spark-connect-js/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:
@@ -61,10 +61,10 @@ importers:
       '@bufbuild/protoc-gen-es':
         specifier: ^2.0.0
         version: 2.11.0(@bufbuild/protobuf@2.11.0)
-      '@spark-js/eslint-config':
+      '@spark-connect-js/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@spark-js/typescript-config':
+      '@spark-connect-js/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:
@@ -76,10 +76,10 @@ importers:
 
   packages/spark-core:
     devDependencies:
-      '@spark-js/eslint-config':
+      '@spark-connect-js/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@spark-js/typescript-config':
+      '@spark-connect-js/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
       '@types/node':
@@ -100,20 +100,20 @@ importers:
       '@grpc/proto-loader':
         specifier: ^0.7.0
         version: 0.7.15
-      '@spark-js/connect':
+      '@spark-connect-js/connect':
         specifier: workspace:*
         version: link:../spark-connect
-      '@spark-js/core':
+      '@spark-connect-js/core':
         specifier: workspace:*
         version: link:../spark-core
       apache-arrow:
         specifier: ^18.0.0
         version: 18.1.0
     devDependencies:
-      '@spark-js/eslint-config':
+      '@spark-connect-js/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@spark-js/typescript-config':
+      '@spark-connect-js/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:

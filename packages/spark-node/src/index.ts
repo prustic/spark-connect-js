@@ -1,9 +1,9 @@
 /**
  * ════════════════════════════════════════════════════════════════════════════════
- * @spark-js/node  —  Node.js Spark Connect Runtime Adapter
+ * @spark-connect-js/node  —  Node.js Spark Connect Runtime Adapter
  * ════════════════════════════════════════════════════════════════════════════════
  *
- * This package bridges @spark-js/core's platform-agnostic DataFrame API with
+ * This package bridges @spark-connect-js/core's platform-agnostic DataFrame API with
  * the real world of Node.js I/O.  It is responsible for everything that
  * requires a Node.js runtime:
  *
@@ -56,14 +56,14 @@
  *   • **gRPC/HTTP2**: Connection multiplexing, flow control, keepalive pings,
  *     deadline propagation, and error codes (UNAVAILABLE, DEADLINE_EXCEEDED).
  *
- * ─── Relationship to @spark-js/core ─────────────────────────────────────────
+ * ─── Relationship to @spark-connect-js/core ─────────────────────────────────────────
  *
- *   @spark-js/core defines the Transport interface.  This package provides
+ *   @spark-connect-js/core defines the Transport interface.  This package provides
  *   `GrpcTransport` — the concrete implementation that satisfies it.
  *
  *   Usage:
- *     import { SparkSession } from "@spark-js/core";
- *     import { GrpcTransport } from "@spark-js/node";
+ *     import { SparkSession } from "@spark-connect-js/core";
+ *     import { GrpcTransport } from "@spark-connect-js/node";
  *
  *     const spark = SparkSession.builder()
  *       .remote("sc://localhost:15002")
@@ -83,7 +83,7 @@ export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
 export { buildRelation, buildExpression } from "./proto/proto-builder.js";
 
-// Re-export core for convenience — consumers only need to depend on @spark-js/node
+// Re-export core for convenience — consumers only need to depend on @spark-connect-js/node
 export {
   SparkSession,
   DataFrame,
@@ -362,7 +362,7 @@ export {
   asc_nulls_last,
   desc_nulls_first,
   desc_nulls_last,
-} from "@spark-js/core";
+} from "@spark-connect-js/core";
 
 export type {
   Row,
@@ -374,11 +374,11 @@ export type {
   CatalogOperation,
   WindowFrame,
   FrameBoundary,
-} from "@spark-js/core";
+} from "@spark-connect-js/core";
 
 // ─── Convenience: fully-wired session factory ───────────────────────────────
 
-import { SparkSession } from "@spark-js/core";
+import { SparkSession } from "@spark-connect-js/core";
 import { GrpcTransport } from "./transport/grpc-transport.js";
 import { ArrowDecoder } from "./arrow/arrow-decoder.js";
 
@@ -396,11 +396,11 @@ function parseEndpoint(remote: string): string {
 /**
  * Create a fully-wired SparkSession for Node.js.
  *
- * This is the primary entry point for @spark-js/node. It creates a
+ * This is the primary entry point for @spark-connect-js/node. It creates a
  * SparkSession with GrpcTransport and ArrowDecoder pre-configured.
  *
  * @example
- *   import { connect, col, lit } from "@spark-js/node";
+ *   import { connect, col, lit } from "@spark-connect-js/node";
  *
  *   const spark = connect("sc://localhost:15002");
  *   const df = spark.sql("SELECT * FROM my_table");

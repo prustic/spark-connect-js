@@ -1,5 +1,5 @@
 {
-  "name": "@spark-js/connect",
+  "name": "@spark-connect-js/connect",
   "version": "0.1.0",
   "description": "Generated TypeScript types and service stubs from Spark Connect protobuf definitions",
   "license": "Apache-2.0",
@@ -34,8 +34,8 @@
   },
   "devDependencies": {
     "@bufbuild/protoc-gen-es": "^2.0.0",
-    "@spark-js/eslint-config": "workspace:*",
-    "@spark-js/typescript-config": "workspace:*",
+    "@spark-connect-js/eslint-config": "workspace:*",
+    "@spark-connect-js/typescript-config": "workspace:*",
     "eslint": "catalog:",
     "typescript": "catalog:"
   }

@@ -642,7 +642,7 @@ export class DataFrame {
     if (!decoder) {
       throw new Error(
         "No Arrow decoder configured. " +
-          "Use @spark-js/node which provides one automatically, " +
+          "Use @spark-connect-js/node which provides one automatically, " +
           "or pass arrowDecoder in SparkSessionConfig.",
       );
     }
