@@ -1,32 +1,14 @@
 /**
- * ─── DataFrame ──────────────────────────────────────────────────────────────
+ * Lazy DataFrame — each transformation returns a new instance wrapping
+ * a logical plan tree. No work happens until an action (collect, count, etc.)
+ * triggers execution via Spark Connect.
  *
- * The DataFrame is the primary abstraction in Spark's structured API.
- * In the JVM, a DataFrame is an alias for Dataset[Row] — each instance wraps
- * a LogicalPlan that Catalyst will analyse, optimise, and execute.
+ * @see sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala
+ * @see sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
  *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala
- * @see Catalyst plans: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
- *
- * Our TypeScript DataFrame works the same way:
- *   1. Every transformation (filter, select, groupBy) returns a NEW DataFrame
- *      with a new LogicalPlan wrapping the previous one.
- *   2. No computation happens until an **action** (collect, show, count) is
- *      called, triggering plan serialisation → Spark Connect RPC → Arrow
- *      result decoding.
- *
- * ─── Why laziness matters ───────────────────────────────────────────────────
- *
- * Spark's optimizer (Catalyst) needs the FULL plan before it can:
- *   • Push predicates down into the scan (predicate pushdown)
- *   • Prune unused columns (projection pruning)
- *   • Reorder joins (cost-based optimization)
- *   • Fold constant expressions
- *
- * If we eagerly executed each step, none of these optimisations could fire.
- * This is fundamentally different from libraries like lodash or RxJS where
- * lazy chaining is a convenience — here it is a **correctness requirement**
- * for generating efficient Spark jobs.
+ * Laziness is a correctness requirement, not a convenience — Catalyst needs
+ * the full plan to push predicates, prune columns, reorder joins, and fold
+ * constant expressions.
  */
 
 import type { SparkSession } from "./spark-session.js";
@@ -56,14 +38,10 @@ export class DataFrame {
     this._plan = plan;
   }
 
-  // ── Transformations (lazy — return new DataFrame) ─────────────────────────
+  // Transformations
 
   /**
    * Filter rows by a boolean Column expression.
-   *
-   * Maps to Catalyst's `Filter(condition, child)` logical node.
-   * The condition is serialised as a Spark Connect `Expression` protobuf and
-   * resolved on the JVM, not evaluated in JS.
    *
    * @example
    *   df.filter(col("age").gt(lit(30)))
@@ -83,14 +61,7 @@ export class DataFrame {
     return this.filter(condition);
   }
 
-  /**
-   * Project (select) a subset of columns.
-   *
-   * Maps to Catalyst's `Project(expressions, child)`.
-   * Projection pruning means only the selected columns will be read from
-   * the data source — critical for Parquet/ORC columnar formats where
-   * skipping columns avoids I/O entirely.
-   */
+  /** Project (select) a subset of columns. */
   select(...columns: Array<Column | string>): DataFrame {
     const exprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
     return DataFrame._fromPlan(this._session, {
@@ -100,25 +71,13 @@ export class DataFrame {
     });
   }
 
-  /**
-   * Group by one or more columns, returning a GroupedData handle that
-   * exposes aggregation methods (agg, count, sum, avg, etc.).
-   *
-   * Maps to the first half of Catalyst's `Aggregate` node — the grouping
-   * expressions.  The aggregation expressions are added when you call
-   * .agg() on the returned GroupedData.
-   */
+  /** Group by one or more columns, returning a GroupedData handle for aggregation. */
   groupBy(...columns: Array<Column | string>): GroupedData {
     const groupExprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
     return new GroupedData(this, groupExprs);
   }
 
-  /**
-   * Limit the number of rows.
-   *
-   * Maps to Catalyst's `LocalLimit` / `GlobalLimit` nodes.
-   * On a cluster this still shuffles data to honour the global limit.
-   */
+  /** Limit the number of rows. */
   limit(n: number): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "limit",
@@ -128,14 +87,8 @@ export class DataFrame {
   }
 
   /**
-   * Sort by one or more columns. Each argument can be:
-   *   - A string column name (ascending by default)
-   *   - A Column object (ascending by default)
-   *
-   * For descending sort, use DataFrame.sort() with SortOrder objects
-   * or call .orderBy() with a helper.
-   *
-   * Maps to Catalyst's `Sort(order, global=true, child)`.
+   * Sort by one or more columns (ascending by default).
+   * Use col("x").desc() for descending order.
    */
   sort(...columns: Array<Column | string>): DataFrame {
     const order: SortOrder[] = columns.map((c) => {
@@ -172,8 +125,6 @@ export class DataFrame {
    * @param other - The right side DataFrame
    * @param condition - Join condition (a boolean Column expression)
    * @param joinType - Type of join (default: "inner")
-   *
-   * Maps to Catalyst's `Join(left, right, joinType, condition)`.
    */
   join(
     other: DataFrame,
@@ -201,11 +152,7 @@ export class DataFrame {
     return this.join(other, undefined, "cross");
   }
 
-  /**
-   * Drop one or more columns by name.
-   *
-   * Maps to Spark Connect's `Relation.Drop`.
-   */
+  /** Drop one or more columns by name. */
   drop(...columnNames: string[]): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "drop",
@@ -218,8 +165,6 @@ export class DataFrame {
    * Add or replace a column.
    *
    * @example df.withColumn("doubled", col("value").multiply(lit(2)))
-   *
-   * Maps to Spark Connect's `Relation.WithColumns`.
    */
   withColumn(name: string, expression: Column): DataFrame {
     return DataFrame._fromPlan(this._session, {
@@ -244,11 +189,7 @@ export class DataFrame {
     });
   }
 
-  /**
-   * Rename a single column.
-   *
-   * Maps to Spark Connect's `Relation.WithColumnsRenamed`.
-   */
+  /** Rename a single column. */
   withColumnRenamed(existing: string, newName: string): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "withColumnsRenamed",
@@ -274,11 +215,7 @@ export class DataFrame {
     });
   }
 
-  /**
-   * Remove duplicate rows, optionally considering only a subset of columns.
-   *
-   * Maps to Spark Connect's `Relation.Deduplicate`.
-   */
+  /** Remove duplicate rows, optionally considering only a subset of columns. */
   dropDuplicates(...columnNames: string[]): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "deduplicate",
@@ -293,11 +230,7 @@ export class DataFrame {
     return this.dropDuplicates();
   }
 
-  /**
-   * Skip the first N rows.
-   *
-   * Maps to Spark Connect's `Relation.Offset`.
-   */
+  /** Skip the first N rows. */
   offset(n: number): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "offset",
@@ -306,7 +239,7 @@ export class DataFrame {
     });
   }
 
-  // ── Set operations ────────────────────────────────────────────────────────
+  // Set operations
 
   /** Return a new DataFrame with rows from both this and other (duplicates kept). */
   union(other: DataFrame): DataFrame {
@@ -362,7 +295,7 @@ export class DataFrame {
     });
   }
 
-  // ── Sampling ──────────────────────────────────────────────────────────────
+  // Sampling
 
   /** Return a random sample of rows. */
   sample(fraction: number, withReplacement = false, seed?: number): DataFrame {
@@ -376,7 +309,7 @@ export class DataFrame {
     });
   }
 
-  // ── Null handling ─────────────────────────────────────────────────────────
+  // Null handling
 
   /** Replace null values. If cols is empty, applies to all columns. */
   fillna(value: string | number | boolean, cols: string[] = []): DataFrame {
@@ -398,7 +331,7 @@ export class DataFrame {
     });
   }
 
-  // ── Column rename ─────────────────────────────────────────────────────────
+  // Column rename
 
   /** Return a new DataFrame with renamed columns (positional). */
   toDF(...columnNames: string[]): DataFrame {
@@ -409,12 +342,10 @@ export class DataFrame {
     });
   }
 
-  // ── Aliasing ──────────────────────────────────────────────────────────────
+  // Aliasing
 
   /**
    * Assign an alias to this DataFrame, useful for self-joins.
-   *
-   * Maps to Spark Connect's `Relation.SubqueryAlias`.
    */
   alias(name: string): DataFrame {
     return DataFrame._fromPlan(this._session, {
@@ -424,7 +355,7 @@ export class DataFrame {
     });
   }
 
-  // ── Hints ─────────────────────────────────────────────────────────────────
+  // Hints
 
   /**
    * Attach an optimizer hint to this DataFrame.
@@ -442,7 +373,7 @@ export class DataFrame {
     });
   }
 
-  // ── Select with SQL expressions ──────────────────────────────────────────
+  // Select with SQL expressions
 
   /**
    * Select columns using SQL expression strings.
@@ -464,7 +395,7 @@ export class DataFrame {
     });
   }
 
-  // ── Transform ─────────────────────────────────────────────────────────────
+  // Transform
 
   /**
    * Apply a user-defined function to this DataFrame and return the result.
@@ -477,13 +408,9 @@ export class DataFrame {
     return fn(this);
   }
 
-  // ── Sort within partitions ────────────────────────────────────────────────
+  // Sort within partitions
 
-  /**
-   * Sort within each partition (non-global sort).
-   *
-   * Maps to Spark Connect's `Relation.Sort` with `isGlobal=false`.
-   */
+  /** Sort within each partition (non-global sort). */
   sortWithinPartitions(...columns: Array<Column | string>): DataFrame {
     const order: SortOrder[] = columns.map((c) => {
       const expr = typeof c === "string" ? col(c)._expr : c._expr;
@@ -508,7 +435,7 @@ export class DataFrame {
     });
   }
 
-  // ── Statistics ────────────────────────────────────────────────────────────
+  // Statistics
 
   /** Compute summary statistics (count, mean, stddev, min, max) for columns. */
   describe(...cols: string[]): DataFrame {
@@ -519,7 +446,7 @@ export class DataFrame {
     });
   }
 
-  // ── Writer ─────────────────────────────────────────────────────────────────
+  // Writer
 
   /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
   get write(): DataFrameWriter {
@@ -540,20 +467,13 @@ export class DataFrame {
     });
   }
 
-  // ── Actions (eager — trigger plan execution) ──────────────────────────────
+  // Actions
 
   /**
-   * Execute the plan and collect ALL result rows into a JS array.
+   * Execute the plan and collect all result rows into a JS array.
    *
-   * This is the most critical code path in the entire client:
-   *   1. The LogicalPlan tree is serialised to Spark Connect protobuf.
-   *   2. The protobuf is sent over gRPC (via the injected Transport).
-   *   3. The server responds with a stream of Arrow IPC record batches.
-   *   4. Each batch is decoded from Arrow's columnar format into Row objects.
-   *
-   * ⚠️  MEMORY WARNING: collect() materialises the ENTIRE result set in the
-   * Node.js heap.  For large datasets, prefer .toLocalIterator() for
-   * streaming row-by-row processing, or .forEach() for a callback approach.
+   * For large datasets, prefer toLocalIterator() or forEach() to
+   * avoid loading everything into memory.
    */
   async collect(): Promise<Row[]> {
     const decoder = this._ensureDecoder();
@@ -567,10 +487,8 @@ export class DataFrame {
   }
 
   /**
-   * Return the number of rows.  Equivalent to `SELECT COUNT(*) FROM ...`.
-   *
-   * Builds a proper `Aggregate(count(1))` plan so only a single scalar
-   * is materialised — the full dataset is never collected into JS memory.
+   * Return the number of rows.
+   * Uses an aggregate count plan — the full dataset is not collected.
    */
   async count(): Promise<number> {
     const countPlan: LogicalPlan = {
@@ -600,11 +518,8 @@ export class DataFrame {
   }
 
   /**
-   * Return an async iterator that yields rows one at a time as they arrive
-   * from the Spark Connect server.  Each Arrow IPC chunk is decoded on the
-   * fly, so only one batch needs to be in memory at a time.
-   *
-   * Use this instead of collect() for large result sets to avoid OOM.
+   * Async iterator that yields rows one at a time.
+   * Only one batch is in memory at a time.
    *
    * @example
    *   for await (const row of df.toLocalIterator()) {
@@ -624,8 +539,6 @@ export class DataFrame {
 
   /**
    * Process each row with a callback as it streams from the server.
-   * Rows are decoded and passed to the callback one batch at a time,
-   * avoiding full materialisation in memory.
    *
    * @example
    *   await df.forEach((row) => console.log(row.name, row.salary));

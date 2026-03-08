@@ -1,5 +1,5 @@
 /**
- * ─── Window ─────────────────────────────────────────────────────────────────
+ * Window
  *
  * Window specification for window functions (row_number, rank, lag, etc.).
  *

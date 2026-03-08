@@ -1,5 +1,5 @@
 /**
- * ─── Functions ──────────────────────────────────────────────────────────────
+ * Functions
  *
  * Built-in functions that mirror PySpark's `pyspark.sql.functions` module.
  *
@@ -16,7 +16,7 @@
 // Re-export col and lit so users can import everything from functions
 export { col, lit } from "../column.js";
 
-// ─── Conditional / Predicate ─────────────────────────────────────────────────
+// Conditional / Predicate
 export {
   when,
   WhenBuilder,
@@ -38,7 +38,7 @@ export {
   broadcast,
 } from "./conditional.js";
 
-// ─── String ──────────────────────────────────────────────────────────────────
+// String
 export {
   upper,
   lower,
@@ -81,7 +81,7 @@ export {
   encode,
 } from "./string.js";
 
-// ─── Date / Timestamp ────────────────────────────────────────────────────────
+// Date / Timestamp
 export {
   year,
   month,
@@ -113,7 +113,7 @@ export {
   date_part,
 } from "./datetime.js";
 
-// ─── Math ────────────────────────────────────────────────────────────────────
+// Math
 export {
   abs,
   round,
@@ -161,7 +161,7 @@ export {
   pi,
 } from "./math.js";
 
-// ─── Aggregate ───────────────────────────────────────────────────────────────
+// Aggregate
 export {
   count,
   sum,
@@ -209,7 +209,7 @@ export {
   bit_xor,
 } from "./aggregate.js";
 
-// ─── Collection / Array / Map ────────────────────────────────────────────────
+// Collection / Array / Map
 export {
   struct,
   array,
@@ -251,7 +251,7 @@ export {
   map_concat,
 } from "./collection.js";
 
-// ─── Window ──────────────────────────────────────────────────────────────────
+// Window
 export {
   row_number,
   rank,
@@ -264,10 +264,10 @@ export {
   ntile,
 } from "./window.js";
 
-// ─── Hash ────────────────────────────────────────────────────────────────────
+// Hash
 export { md5, sha1, sha2, hash, xxhash64, crc32 } from "./hash.js";
 
-// ─── JSON ────────────────────────────────────────────────────────────────────
+// JSON
 export {
   from_json,
   to_json,
@@ -278,7 +278,7 @@ export {
   json_object_keys,
 } from "./json.js";
 
-// ─── Bitwise ─────────────────────────────────────────────────────────────────
+// Bitwise
 export {
   bitwise_not,
   bit_count,
@@ -289,10 +289,10 @@ export {
   shiftrightunsigned,
 } from "./bitwise.js";
 
-// ─── CSV ─────────────────────────────────────────────────────────────────────
+// CSV
 export { from_csv, to_csv, schema_of_csv } from "./csv.js";
 
-// ─── Sort ────────────────────────────────────────────────────────────────────
+// Sort
 export {
   asc,
   desc,

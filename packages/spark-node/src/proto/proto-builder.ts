@@ -1,5 +1,5 @@
 /**
- * ─── ProtoBuilder ───────────────────────────────────────────────────────────
+ * ProtoBuilder
  *
  * Converts the spark-core LogicalPlan/Expression tree into proper
  * @bufbuild/protobuf messages using the generated Spark Connect schemas.

@@ -1,5 +1,5 @@
 /**
- * ─── SparkConnectError ──────────────────────────────────────────────────────
+ * SparkConnectError
  *
  * Structured error type for Spark Connect failures. Wraps the underlying
  * transport error (gRPC status, network issue, etc.) with Spark-specific

@@ -1,5 +1,5 @@
 /**
- * ─── Row ────────────────────────────────────────────────────────────────────
+ * Row
  *
  * A Row is the JS-native representation of one record returned by a DataFrame
  * action.  It maps column names to JS values. *

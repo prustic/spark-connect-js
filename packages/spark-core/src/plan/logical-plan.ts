@@ -1,5 +1,5 @@
 /**
- * ─── LogicalPlan ────────────────────────────────────────────────────────────
+ * LogicalPlan
  *
  * These types represent the **logical plan tree** that mirrors Spark Catalyst's
  * internal plan representation.  Every DataFrame transformation appends a new
@@ -10,7 +10,7 @@
  * @see Spark Connect proto (Relation): connector/connect/common/src/main/protobuf/spark/connect/relations.proto
  * @see Spark Connect proto (Expression): connector/connect/common/src/main/protobuf/spark/connect/expressions.proto
  *
- * ─── How this maps to Spark internals ───────────────────────────────────────
+ * How this maps to Spark internals
  *
  * Spark's Catalyst engine processes plans in phases:
  *
@@ -34,7 +34,7 @@
  * a malformed unresolved plan causes cryptic AnalysisExceptions.
  */
 
-// ─── Expression types ───────────────────────────────────────────────────────
+// Expression types
 // These model nodes in the expression tree inside filter, select, and agg.
 
 export type Expression =
@@ -95,7 +95,7 @@ export type FrameBoundary =
   | { type: "unbounded" }
   | { type: "value"; value: Expression };
 
-// ─── Plan node types ────────────────────────────────────────────────────────
+// Plan node types
 // Each type maps to a Spark Connect `Relation` protobuf variant.
 
 export type LogicalPlan =

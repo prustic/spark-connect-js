@@ -1,44 +1,15 @@
 /**
- * ─── SparkProcessManager ────────────────────────────────────────────────────
+ * Spawns and manages a local Spark Connect server process.
+ * Useful for local development and testing.
  *
- * Optional utility for spawning and managing a local Spark Connect server
- * process from Node.js.  Useful for local development and testing.
+ * @see connector/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectServer.scala
+ * @see core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala
  *
- * @see Spark Connect server entry: connector/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectServer.scala
- * @see Spark submit: core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala
- *
- * ─── How Spark Connect Server Starts ────────────────────────────────────────
- *
- * The Spark Connect server is a JVM process:
- *   $SPARK_HOME/sbin/start-connect-server.sh \
- *     --packages org.apache.spark:spark-connect_2.13:3.5.0 \
- *     --conf spark.connect.grpc.binding.port=15002
- *
- * Or via spark-submit:
- *   spark-submit --class org.apache.spark.sql.connect.service.SparkConnectServer \
- *     --packages ... spark-connect-server.jar
- *
- * The server opens a gRPC listener (default :15002) and manages Spark sessions
- * on behalf of remote clients.  Each client session gets its own isolated
- * SparkSession on the JVM side.
- *
- * ─── child_process Considerations ───────────────────────────────────────────
- *
- *   • spawn() vs exec(): We use spawn() because exec() buffers ALL stdout/
- *     stderr in memory — the Spark server can produce GB of logs.
- *
- *   • Signal handling: JVM needs SIGTERM for graceful shutdown (runs shutdown
- *     hooks, flushes data).  If it doesn't exit within a timeout, escalate
- *     to SIGKILL.  Never send SIGKILL first — it skips JVM shutdown hooks
- *     and can corrupt shuffle files / temp directories.
- *
- *   • Detached mode: If the Node process exits, should the Spark server
- *     keep running?  We default to attached (killed on parent exit) but
- *     support detached mode via options.
- *
- *   • Health check: After spawning, we poll the gRPC port until the server
- *     accepts connections (or timeout).  The JVM takes several seconds to
- *     start — NEVER assume it's ready immediately after spawn.
+ * child_process notes:
+ *   - spawn() over exec() — the server can produce GB of logs.
+ *   - SIGTERM first for graceful JVM shutdown; SIGKILL only after timeout.
+ *   - After spawning, poll the gRPC port before returning — JVM startup
+ *     takes several seconds.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -74,12 +45,7 @@ export class SparkProcessManager {
     };
   }
 
-  /**
-   * Spawn the Spark Connect server and wait until it's accepting gRPC
-   * connections.
-   *
-   * @throws If the server fails to start within the configured timeout
-   */
+  /** Spawn the server and wait until it accepts gRPC connections. */
   async start(): Promise<void> {
     if (this.process) {
       throw new Error("Spark Connect server is already running.");
@@ -93,21 +59,15 @@ export class SparkProcessManager {
       detached: this.options.detached,
     });
 
-    // Log server output for debugging (pipe to Node's stdout/stderr)
-    this.process.stdout?.pipe(process.stdout);
-    this.process.stderr?.pipe(process.stderr);
+    // Log server output for debugging
+    this.process.stdout?.on("data", (chunk: Buffer) => process.stdout.write(chunk));
+    this.process.stderr?.on("data", (chunk: Buffer) => process.stderr.write(chunk));
 
     // Wait for the gRPC port to become available
     await this._waitForReady();
   }
 
-  /**
-   * Gracefully stop the Spark Connect server.
-   *
-   * Sends SIGTERM first, allowing the JVM to run shutdown hooks (flush
-   * shuffle data, clean temp dirs, deregister from cluster manager).
-   * Escalates to SIGKILL after 10 seconds if the process hasn't exited.
-   */
+  /** Stop the server. Sends SIGTERM first, escalates to SIGKILL after 10s. */
   async stop(): Promise<void> {
     if (!this.process) return;
 

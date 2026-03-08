@@ -1,5 +1,5 @@
 /**
- * ─── DataFrameWriter ────────────────────────────────────────────────────────
+ * DataFrameWriter
  *
  * Provides methods for writing a DataFrame to external storage systems.
  * Mirrors Spark's `DataFrameWriter` (accessed via `df.write`).

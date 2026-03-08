@@ -1,13 +1,11 @@
 /**
- * ════════════════════════════════════════════════════════════════════════════════
  * @spark-connect-js/core  —  Pure TypeScript Logical DataFrame API
- * ════════════════════════════════════════════════════════════════════════════════
  *
  * This package is the **platform-agnostic** heart of the Spark JS client.
  * It contains ZERO runtime dependencies, no Node APIs, no browser APIs — only
  * pure TypeScript types and logic that model Spark's query planning layer.
  *
- * ─── What this package does ─────────────────────────────────────────────────
+ * What this package does
  *
  *   1. Provides a fluent DataFrame API (read → filter → groupBy → agg → collect)
  *      that mirrors PySpark / Scala Spark semantics.
@@ -21,7 +19,7 @@
  *      predicate push-down and projection pruning can happen server-side on the
  *      JVM, not in JavaScript.
  *
- * ─── Why Spark internals knowledge is required ──────────────────────────────
+ * Why Spark internals knowledge is required
  *
  *   • Every DataFrame method maps to a node in Spark's Catalyst logical plan
  *     tree (UnresolvedRelation → Filter → Aggregate → Project).  If the plan
@@ -38,7 +36,7 @@
  *     IEEE-754 double — mapping it naïvely to Spark's IntegerType or LongType
  *     causes silent precision loss in aggregation results.
  *
- * ─── Relationship to other packages ─────────────────────────────────────────
+ * Relationship to other packages
  *
  *   @spark-connect-js/core  ←  imported by every runtime adapter
  *       │
@@ -46,10 +44,9 @@
  *       ├── @spark-connect-js/deno   (future — Deno-native transport)
  *       └── @spark-connect-js/web    (future — HTTP/2 + browser Arrow)
  *
- * ════════════════════════════════════════════════════════════════════════════════
  */
 
-// ─── Core Types ──────────────────────────────────────────────────────────────
+// Core Types
 
 export { SparkSession } from "./spark-session.js";
 export { DataFrame } from "./data-frame.js";
@@ -71,7 +68,7 @@ export type {
 } from "./plan/logical-plan.js";
 export { PlanBuilder } from "./plan/plan-builder.js";
 
-// ─── Functions ───────────────────────────────────────────────────────────────
+// Functions
 export {
   // Conditional / Predicate
   when,

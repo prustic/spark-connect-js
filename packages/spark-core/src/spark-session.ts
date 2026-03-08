@@ -1,27 +1,16 @@
 /**
- * ─── SparkSession ───────────────────────────────────────────────────────────
+ * Thin client handle for a Spark Connect session.
  *
- * The SparkSession is the single entry point for all DataFrame operations,
- * mirroring `org.apache.spark.sql.SparkSession` in the JVM.
+ * @see sql/core/src/main/scala/org/apache/spark/sql/SparkSession.scala
+ * @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
  *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/SparkSession.scala
- * @see Spark Connect: connector/connect/common/src/main/protobuf/spark/connect/base.proto
- * @see Spark Connect service: connector/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectService.scala
- *
- * In the Scala world, SparkSession owns:
- *   • The SparkContext (cluster connection, task scheduler, DAG scheduler)
- *   • The SQLContext / Catalog (schema metadata, temp views)
- *   • The SessionState (Catalyst analyzer, optimizer, physical planner)
- *
- * In Spark Connect, we do NOT own any of that.  The JVM-side server owns the
- * real session state.  Our SparkSession is a **thin client handle** that:
+ * The JVM-side server owns the real session state (SparkContext, Catalog,
+ * SessionState). Our SparkSession is a thin client that:
  *   1. Holds a session ID (UUID) to correlate requests on the server.
  *   2. Provides the builder-pattern entry for creating DataFrames.
- *   3. Delegates actual plan execution to a `Transport` injected by the
- *      runtime adapter (e.g. @spark-connect-js/node injects a gRPC transport).
+ *   3. Delegates plan execution to a Transport injected by the runtime adapter.
  *
- * The Transport interface is intentionally defined here in core so that this
- * package has no dependency on Node, Deno, or browser APIs.
+ * Transport is defined here in core so this package stays platform-agnostic.
  */
 
 import { DataFrame } from "./data-frame.js";
@@ -35,57 +24,32 @@ import type { Row } from "./types/row.js";
 // to keep spark-core free of @types/node or DOM lib dependencies.
 declare const crypto: { randomUUID(): string };
 
-// ─── Transport Abstraction ──────────────────────────────────────────────────
+// Transport
 // Runtime adapters implement this to provide actual network I/O.
-// spark-core never imports gRPC, fetch, or any I/O primitive directly.
 
 export interface Transport {
-  /**
-   * Execute a logical plan on the Spark Connect server and return raw Arrow
-   * IPC buffers.  The caller (DataFrame.collect) will decode the Arrow data
-   * into JS rows.
-   *
-   * The Uint8Array is used instead of Node Buffer to keep this interface
-   * platform-agnostic.  Node's Buffer extends Uint8Array so it satisfies
-   * this type automatically.
-   */
+  /** Execute a plan and return raw Arrow IPC buffers. */
   executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array>;
 
-  /**
-   * Execute a command (write, createView, etc.) on the server.
-   * Commands don't return Arrow data — they run side effects.
-   */
+  /** Execute a command (write, createView, etc.) — no Arrow data returned. */
   executeCommand?(sessionId: string, command: Record<string, unknown>): Promise<void>;
 
-  /**
-   * Send an analyze plan request (schema, explain, etc.) and return
-   * the raw response as a plain object.
-   */
+  /** Send an AnalyzePlan request (schema, explain, etc.). */
   analyzePlan?(
     sessionId: string,
     request: Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
 
-  /**
-   * Release the server-side session, freeing temp views, cached data, etc.
-   * Optional — transports that don't support it simply skip the RPC.
-   */
+  /** Release the server-side session. */
   releaseSession?(sessionId: string): Promise<void>;
 
-  /**
-   * Close the underlying connection (e.g. gRPC channel).
-   * Optional — some transports may not have persistent connections.
-   */
+  /** Close the underlying connection. */
   close?(): void;
 }
 
-// ─── Configuration ──────────────────────────────────────────────────────────
+// Configuration
 
-/**
- * Decodes concatenated Arrow IPC bytes into Row objects.
- * Injected by the runtime adapter (e.g. @spark-connect-js/node provides an
- * apache-arrow based implementation).
- */
+/** Decodes Arrow IPC bytes into Row objects. Injected by the runtime adapter. */
 export type ArrowDecoderFn = (chunks: Uint8Array[]) => Promise<Row[]>;
 
 export interface SparkSessionConfig {
@@ -94,8 +58,6 @@ export interface SparkSessionConfig {
 
   /**
    * Transport implementation injected by the runtime adapter.
-   * spark-core never instantiates a transport itself — this is the
-   * dependency-inversion seam that keeps the package platform-agnostic.
    */
   transport: Transport;
 
@@ -109,7 +71,7 @@ export interface SparkSessionConfig {
   sessionId?: string;
 }
 
-// ─── SparkSession ───────────────────────────────────────────────────────────
+// SparkSession
 
 export class SparkSession {
   readonly sessionId: string;
@@ -130,38 +92,21 @@ export class SparkSession {
     this._arrowDecoder = config.arrowDecoder;
   }
 
-  // ── Builder pattern (mirrors SparkSession.builder().remote().getOrCreate()) ──
+  // Builder
 
   static builder(): SparkSessionBuilder {
     return new SparkSessionBuilder();
   }
 
-  // ── DataFrame entry points ────────────────────────────────────────────────
+  // DataFrame entry points
 
-  /**
-   * Access the session catalog for inspecting databases, tables, and columns.
-   *
-   * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/catalog/Catalog.scala
-   */
+  /** Access the session catalog for inspecting databases, tables, and columns. */
   readonly catalog: Catalog = new Catalog(this);
 
-  /**
-   * Read a data source.  Returns a DataFrameReader which builds the
-   * Read logical plan node.
-   *
-   * Equivalent to:
-   *   spark.read.format("parquet").load("s3://bucket/data")
-   *
-   * Under the hood this produces a `Relation.Read` protobuf with a
-   * `ReadType.DataSource` payload.
-   */
+  /** Returns a DataFrameReader for building Read plans. */
   read = new DataFrameReader(this);
 
-  /**
-   * Execute a SQL string.  The server will parse, analyse, optimise, and
-   * execute the query using Spark's full Catalyst pipeline — the client
-   * is uninvolved in planning.
-   */
+  /** Execute a SQL query. */
   sql(query: string): DataFrame {
     return DataFrame._fromPlan(this, {
       type: "sql",
@@ -232,12 +177,7 @@ export class SparkSession {
   }
 
   /**
-   * Stop the SparkSession: releases the server-side session and closes
-   * the underlying transport connection.
-   *
-   * After calling stop(), the session should not be used again.
-   *
-   * @see Spark source: SparkSession.stop() in sql/core/.../SparkSession.scala
+   * Stop the session: releases server-side state and closes the transport.
    */
   async stop(): Promise<void> {
     if (this.transport.releaseSession) {
@@ -249,7 +189,7 @@ export class SparkSession {
   }
 }
 
-// ─── Builder ────────────────────────────────────────────────────────────────
+// Builder
 
 class SparkSessionBuilder {
   private config: Partial<SparkSessionConfig> = {};
@@ -290,7 +230,7 @@ class SparkSessionBuilder {
   }
 }
 
-// ─── DataFrameReader ────────────────────────────────────────────────────────
+// DataFrameReader
 // @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/DataFrameReader.scala
 
 class DataFrameReader {

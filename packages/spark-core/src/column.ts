@@ -1,5 +1,5 @@
 /**
- * ─── Column ─────────────────────────────────────────────────────────────────
+ * Column
  *
  * Represents a column expression in Spark's expression tree.
  *
@@ -28,7 +28,7 @@ export class Column {
     this._expr = expr;
   }
 
-  // ── Comparison operators ──────────────────────────────────────────────────
+  // Comparison operators
   // Each returns a new Column wrapping a comparison expression node.
 
   gt(other: Column): Column {
@@ -55,7 +55,7 @@ export class Column {
     return new Column({ type: "lte", left: this._expr, right: other._expr });
   }
 
-  // ── Logical operators ─────────────────────────────────────────────────────
+  // Logical operators
 
   and(other: Column): Column {
     return new Column({ type: "and", left: this._expr, right: other._expr });
@@ -65,7 +65,7 @@ export class Column {
     return new Column({ type: "or", left: this._expr, right: other._expr });
   }
 
-  // ── Arithmetic ────────────────────────────────────────────────────────────
+  // Arithmetic
 
   plus(other: Column): Column {
     return new Column({ type: "add", left: this._expr, right: other._expr });
@@ -83,7 +83,7 @@ export class Column {
     return new Column({ type: "divide", left: this._expr, right: other._expr });
   }
 
-  // ── Aliasing ──────────────────────────────────────────────────────────────
+  // Aliasing
 
   /**
    * Rename this column expression.  Maps to Catalyst's `Alias(expr, name)`.
@@ -96,14 +96,14 @@ export class Column {
     return this.alias(name);
   }
 
-  // ── Cast ──────────────────────────────────────────────────────────────────
+  // Cast
 
   /** Cast this column to the given type string (e.g. "string", "int", "double"). */
   cast(targetType: string): Column {
     return new Column({ type: "cast", inner: this._expr, targetType });
   }
 
-  // ── Sort ordering ──────────────────────────────────────────────────────────
+  // Sort ordering
 
   /** Mark this column as ascending sort order. */
   asc(): Column {
@@ -155,7 +155,7 @@ export class Column {
     return this.desc();
   }
 
-  // ── Null checks ───────────────────────────────────────────────────────────
+  // Null checks
 
   /** Test whether this column is null. */
   isNull(): Column {
@@ -172,7 +172,7 @@ export class Column {
     return new Column({ type: "unresolvedFunction", name: "isnan", arguments: [this._expr] });
   }
 
-  // ── Null-safe equality ────────────────────────────────────────────────────
+  // Null-safe equality
 
   /** Null-safe equality comparison (returns true when both sides are null). */
   eqNullSafe(other: Column): Column {
@@ -183,7 +183,7 @@ export class Column {
     });
   }
 
-  // ── Bitwise operators ─────────────────────────────────────────────────────
+  // Bitwise operators
 
   /** Bitwise AND. */
   bitwiseAND(other: Column): Column {
@@ -212,7 +212,7 @@ export class Column {
     });
   }
 
-  // ── Substring ─────────────────────────────────────────────────────────────
+  // Substring
 
   /** Extract a substring (1-based position). */
   substr(startPos: number, length: number): Column {
@@ -227,7 +227,7 @@ export class Column {
     });
   }
 
-  // ── Struct / Map / Array field access ─────────────────────────────────────
+  // Struct / Map / Array field access
 
   /** Access a field in a StructType column by name. */
   getField(fieldName: string): Column {
@@ -269,7 +269,7 @@ export class Column {
     });
   }
 
-  // ── Membership / range ────────────────────────────────────────────────────
+  // Membership / range
 
   /** Test whether this column's value is in the given list. */
   isin(...values: Array<string | number | boolean | bigint | null>): Column {
@@ -285,7 +285,7 @@ export class Column {
     return this.gte(lower).and(this.lte(upper));
   }
 
-  // ── String matching ───────────────────────────────────────────────────────
+  // String matching
 
   /** SQL LIKE pattern match. */
   like(pattern: string): Column {
@@ -341,7 +341,7 @@ export class Column {
     });
   }
 
-  // ── Window ────────────────────────────────────────────────────────────────
+  // Window
 
   /** Apply a window specification to this (window function) column. */
   over(windowSpec: WindowSpec): Column {
@@ -355,7 +355,7 @@ export class Column {
   }
 }
 
-// ─── Convenience factories ──────────────────────────────────────────────────
+// Convenience factories
 // These mirror PySpark's `from pyspark.sql.functions import col, lit`
 
 /**

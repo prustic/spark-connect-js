@@ -4,13 +4,13 @@
 
 import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js";
 
-// ─── Struct ─────────────────────────────────────────────────────────────────
+// Struct
 
 export function struct(...columns: ColOrName[]): Column {
   return fn("struct", ...columns);
 }
 
-// ─── Array functions ────────────────────────────────────────────────────────
+// Array functions
 
 export function array(...columns: ColOrName[]): Column {
   return fn("array", ...columns);
@@ -103,7 +103,7 @@ export function slice(column: ColOrName, start: number, length: number): Column 
   return new Column(fnExpr("slice", toExpr(column), _lit(start)._expr, _lit(length)._expr));
 }
 
-// ─── Explode variants ───────────────────────────────────────────────────────
+// Explode variants
 
 export function explode(column: ColOrName): Column {
   return fn("explode", column);
@@ -133,13 +133,13 @@ export function stack(n: number, ...columns: ColOrName[]): Column {
   return new Column(fnExpr("stack", _lit(n)._expr, ...columns.map(toExpr)));
 }
 
-// ─── Size ───────────────────────────────────────────────────────────────────
+// Size
 
 export function size(column: ColOrName): Column {
   return fn("size", column);
 }
 
-// ─── Map functions ──────────────────────────────────────────────────────────
+// Map functions
 
 export function create_map(...columns: ColOrName[]): Column {
   return fn("map", ...columns);

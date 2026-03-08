@@ -1,5 +1,5 @@
 /**
- * ─── PlanBuilder ────────────────────────────────────────────────────────────
+ * PlanBuilder
  *
  * Serialises the TypeScript LogicalPlan tree into the wire format expected by
  * Spark Connect's protobuf schema.

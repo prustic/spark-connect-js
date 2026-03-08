@@ -1,5 +1,5 @@
 /**
- * ─── GroupedData ─────────────────────────────────────────────────────────────
+ * GroupedData
  *
  * Returned by DataFrame.groupBy().  Mirrors `RelationalGroupedDataset` in the
  * JVM Spark API.

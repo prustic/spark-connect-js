@@ -1,5 +1,5 @@
 /**
- * ─── GrpcTransport ──────────────────────────────────────────────────────────
+ * GrpcTransport
  *
  * Concrete implementation of @spark-connect-js/core's Transport interface using
  * @grpc/grpc-js to communicate with the Spark Connect gRPC service.
@@ -75,19 +75,7 @@ export class GrpcTransport implements Transport {
     this.credentials = credentials ?? grpc.credentials.createInsecure();
   }
 
-  /**
-   * Send a logical plan to Spark Connect and yield Arrow IPC batches.
-   *
-   * The flow:
-   *   1. Convert LogicalPlan tree → Spark Connect Relation protobuf
-   *   2. Wrap in ExecutePlanRequest with session_id and user_context
-   *   3. Call SparkConnectService.ExecutePlan (server-streaming RPC)
-   *   4. For each ExecutePlanResponse in the stream:
-   *      - If it contains arrow_batch.data → yield the Uint8Array
-   *      - If it contains result_complete → break
-   *
-   * @yields Uint8Array chunks of Arrow IPC stream data
-   */
+  /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
   async *executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array> {
     const client = this._getClient();
 
@@ -147,10 +135,7 @@ export class GrpcTransport implements Transport {
     }
   }
 
-  /**
-   * Execute a command (write, createView, etc.) via ExecutePlan RPC.
-   * Commands use Plan.command instead of Plan.root.
-   */
+  /** Execute a command (write, createView, etc.) via ExecutePlan RPC. */
   async executeCommand(sessionId: string, command: Record<string, unknown>): Promise<void> {
     const client = this._getClient();
 
@@ -190,11 +175,7 @@ export class GrpcTransport implements Transport {
     }
   }
 
-  /**
-   * Release the session on the server (frees server-side state like temp views).
-   *
-   * @see Spark Connect: SparkConnectService.ReleaseSession RPC
-   */
+  /** Release the session on the server. */
   releaseSession(sessionId: string): Promise<void> {
     const client = this._getClient();
 
@@ -228,14 +209,7 @@ export class GrpcTransport implements Transport {
     });
   }
 
-  /**
-   * Send an AnalyzePlan request (unary RPC).
-   *
-   * Accepts a plain descriptor from spark-core and builds the proper
-   * AnalyzePlanRequest protobuf message.
-   *
-   * @see Spark Connect: SparkConnectService.AnalyzePlan RPC
-   */
+  /** Send an AnalyzePlan request (unary RPC). */
   analyzePlan(
     sessionId: string,
     request: Record<string, unknown>,
@@ -274,7 +248,7 @@ export class GrpcTransport implements Transport {
   }
 }
 
-// ─── Error wrapping ─────────────────────────────────────────────────────────
+// Error wrapping
 
 /** Human-readable gRPC status code names. */
 const STATUS_NAMES: Record<number, string> = {
@@ -308,7 +282,7 @@ function wrapGrpcError(err: unknown): SparkConnectError {
   });
 }
 
-// ─── Command building ───────────────────────────────────────────────────────
+// Command building
 
 import type { Command } from "@spark-connect-js/connect";
 
@@ -383,7 +357,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
   throw new Error(`Unsupported command type: ${type}`);
 }
 
-// ─── AnalyzePlan request/response building ──────────────────────────────────
+// AnalyzePlan request/response building
 
 function buildAnalyzePlanRequest(
   sessionId: string,

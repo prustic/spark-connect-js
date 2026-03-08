@@ -1,5 +1,5 @@
 /**
- * ─── StructType / StructField ───────────────────────────────────────────────
+ * StructType / StructField
  *
  * Mirrors Spark's StructType and StructField for schema inspection.
  *

@@ -1,5 +1,5 @@
 /**
- * ─── Schema ─────────────────────────────────────────────────────────────────
+ * Schema
  *
  * Represents the schema (StructType) of a DataFrame.
  *

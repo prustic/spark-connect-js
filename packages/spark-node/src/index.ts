@@ -1,82 +1,27 @@
 /**
- * ════════════════════════════════════════════════════════════════════════════════
- * @spark-connect-js/node  —  Node.js Spark Connect Runtime Adapter
- * ════════════════════════════════════════════════════════════════════════════════
+ * @spark-connect-js/node — Node.js runtime adapter for Spark Connect.
  *
- * This package bridges @spark-connect-js/core's platform-agnostic DataFrame API with
- * the real world of Node.js I/O.  It is responsible for everything that
- * requires a Node.js runtime:
+ * Bridges @spark-connect-js/core's platform-agnostic DataFrame API with Node.js:
+ *   - gRPC transport via @grpc/grpc-js (HTTP/2, protobuf on the wire)
+ *   - Arrow IPC decoding via apache-arrow
+ *   - Optional child_process management for local Spark servers
  *
- *   1. **gRPC Transport** — Opens a persistent HTTP/2 connection to the Spark
- *      Connect server (default port 15002) using @grpc/grpc-js.  Sends
- *      serialised protobuf plans, receives streaming Arrow-encoded responses.
+ * @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
+ * @see https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format
  *
- *   2. **Apache Arrow Decoding** — Converts Arrow IPC record batches into
- *      JS-native Row objects using the `apache-arrow` npm package.  Arrow's
- *      columnar format enables zero-copy reads when the server uses
- *      shared-memory transport, and efficient batch decoding otherwise.
+ * @example
+ *   import { SparkSession, col, lit } from "@spark-connect-js/node";
  *
- *   3. **Node Buffer Management** — gRPC delivers response chunks as Node
- *      Buffers (backed by V8's ArrayBuffer / off-heap memory depending on
- *      size).  We must handle Buffer lifecycle carefully to avoid:
- *        • Memory leaks from retained Buffer references in long-running streams
- *        • Excessive GC pauses from large short-lived allocations
- *        • Detached ArrayBuffer issues when Buffers cross async boundaries
+ *   const spark = SparkSession.builder()
+ *     .remote("sc://localhost:15002")
+ *     .getOrCreate();
  *
- *   4. **Async Streaming** — Spark Connect returns results as a gRPC server
- *      stream (ExecutePlanResponse).  We wrap this as an AsyncIterable so
- *      DataFrame.collect() can consume it with `for await...of`.  For large
- *      result sets, callers can process rows incrementally without buffering
- *      the entire dataset in memory.
- *
- *   5. **child_process Integration** (optional) — For local development,
- *      we can spawn a Spark Connect server as a child process, managing its
- *      lifecycle (start, health-check, graceful shutdown) from Node.js.
- *      This uses Node's child_process.spawn with proper signal handling
- *      (SIGTERM → SIGKILL escalation) and stdout/stderr piping.
- *
- * ─── Required Knowledge ─────────────────────────────────────────────────────
- *
- * Working on this package requires understanding:
- *
- *   • **Spark Connect Protocol**: The gRPC service definition
- *     (SparkConnectService), ExecutePlan RPC, the Relation/Expression protobuf
- *     schema, and how the server manages sessions.
- *     @see connector/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectService.scala
- *     @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
- *
- *   • **Apache Arrow IPC**: The streaming IPC format (0xFFFFFFFF continuation
- *     bytes, schema messages, record batch messages), dictionary encoding,
- *     and how Arrow's columnar layout maps to Spark's row-oriented DataTypes.
- *
- *   • **Node.js Internals**: The event loop, libuv thread pool (gRPC I/O),
- *     Buffer pooling (Buffer.allocUnsafe vs Buffer.alloc), stream backpressure,
- *     and async_hooks for debugging resource leaks.
- *
- *   • **gRPC/HTTP2**: Connection multiplexing, flow control, keepalive pings,
- *     deadline propagation, and error codes (UNAVAILABLE, DEADLINE_EXCEEDED).
- *
- * ─── Relationship to @spark-connect-js/core ─────────────────────────────────────────
- *
- *   @spark-connect-js/core defines the Transport interface.  This package provides
- *   `GrpcTransport` — the concrete implementation that satisfies it.
- *
- *   Usage:
- *     import { SparkSession } from "@spark-connect-js/core";
- *     import { GrpcTransport } from "@spark-connect-js/node";
- *
- *     const spark = SparkSession.builder()
- *       .remote("sc://localhost:15002")
- *       .transport(new GrpcTransport("localhost:15002"))
- *       .getOrCreate();
- *
- *     const df = spark.read.format("parquet").load("s3://bucket/data");
- *     const rows = await df.filter(col("age").gt(lit(30))).collect();
- *
- * ════════════════════════════════════════════════════════════════════════════════
+ *   const rows = await spark.table("people")
+ *     .filter(col("age").gt(lit(30)))
+ *     .collect();
  */
 
-// ─── Public API ─────────────────────────────────────────────────────────────
+// Public API
 
 export { GrpcTransport } from "./transport/grpc-transport.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
@@ -376,7 +321,7 @@ export type {
   FrameBoundary,
 } from "@spark-connect-js/core";
 
-// ─── Convenience: fully-wired session factory ───────────────────────────────
+// Convenience: fully-wired session factory
 
 import { SparkSession } from "@spark-connect-js/core";
 import { GrpcTransport } from "./transport/grpc-transport.js";

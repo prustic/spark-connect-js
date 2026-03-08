@@ -5,10 +5,10 @@
  * Consumer packages import from here rather than reaching into gen/ directly.
  */
 
-// ─── Service ────────────────────────────────────────────────────────────────
+// Service
 export { SparkConnectService } from "./gen/spark/connect/base_pb.js";
 
-// ─── Core request/response messages ─────────────────────────────────────────
+// Core request/response messages
 export {
   type Plan,
   PlanSchema,
@@ -47,7 +47,7 @@ export {
   AnalyzePlanRequest_ExplainSchema,
 } from "./gen/spark/connect/base_pb.js";
 
-// ─── Relation (logical plan) messages ───────────────────────────────────────
+// Relation (logical plan) messages
 export {
   type Relation,
   RelationSchema,
@@ -116,7 +116,7 @@ export {
   WithColumnsRenamed_RenameSchema,
 } from "./gen/spark/connect/relations_pb.js";
 
-// ─── Expression messages ────────────────────────────────────────────────────
+// Expression messages
 export {
   type Expression,
   ExpressionSchema,
@@ -134,7 +134,7 @@ export {
   Expression_SortOrder_NullOrdering,
 } from "./gen/spark/connect/expressions_pb.js";
 
-// ─── Window expression messages ─────────────────────────────────────────────
+// Window expression messages
 export {
   type Expression_Window,
   Expression_WindowSchema,
@@ -145,10 +145,10 @@ export {
   Expression_Window_WindowFrame_FrameBoundarySchema,
 } from "./gen/spark/connect/expressions_pb.js";
 
-// ─── Type messages ──────────────────────────────────────────────────────────
+// Type messages
 export { type DataType, DataTypeSchema } from "./gen/spark/connect/types_pb.js";
 
-// ─── Catalog messages ───────────────────────────────────────────────────────
+// Catalog messages
 export {
   type Catalog,
   CatalogSchema,
@@ -176,20 +176,20 @@ export {
   FunctionExistsSchema,
 } from "./gen/spark/connect/catalog_pb.js";
 
-// ─── Expression.ExpressionString ────────────────────────────────────────────
+// Expression.ExpressionString
 export {
   type Expression_ExpressionString,
   Expression_ExpressionStringSchema,
 } from "./gen/spark/connect/expressions_pb.js";
 
-// ─── Expression.Cast messages ───────────────────────────────────────────────
+// Expression.Cast messages
 export {
   type Expression_Cast,
   Expression_CastSchema,
   Expression_Cast_EvalMode,
 } from "./gen/spark/connect/expressions_pb.js";
 
-// ─── Command messages (for write operations) ────────────────────────────────
+// Command messages (for write operations)
 export {
   type Command,
   CommandSchema,

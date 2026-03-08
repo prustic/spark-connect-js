@@ -4,7 +4,7 @@
 
 import { Column, fnExpr, toExpr, type ColOrName, fn } from "./_helpers.js";
 
-// ─── when / otherwise ───────────────────────────────────────────────────────
+// when / otherwise
 
 import type { Expression } from "../plan/logical-plan.js";
 
@@ -51,7 +51,7 @@ export class WhenBuilder {
   }
 }
 
-// ─── Cast ───────────────────────────────────────────────────────────────────
+// Cast
 
 /**
  * Cast a column to the given data type string (e.g. "string", "int", "double").
@@ -62,7 +62,7 @@ export function cast(column: ColOrName, targetType: string): Column {
   return new Column({ type: "cast", inner: toExpr(column), targetType });
 }
 
-// ─── Null-handling ──────────────────────────────────────────────────────────
+// Null-handling
 
 export function coalesce(...columns: ColOrName[]): Column {
   return fn("coalesce", ...columns);
@@ -98,7 +98,7 @@ export function nullif(col1: ColOrName, col2: ColOrName): Column {
   return fn("nullif", col1, col2);
 }
 
-// ─── Expression / misc predicates ───────────────────────────────────────────
+// Expression / misc predicates
 
 /** Parses a SQL expression string into a Column. */
 export function expr(expression: string): Column {

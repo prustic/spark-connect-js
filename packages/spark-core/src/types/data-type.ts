@@ -1,5 +1,5 @@
 /**
- * ─── DataType ───────────────────────────────────────────────────────────────
+ * DataType
  *
  * Mirrors Spark's DataType hierarchy for type-safe schema operations.
  *

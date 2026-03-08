@@ -1,5 +1,5 @@
 /**
- * ─── Catalog ────────────────────────────────────────────────────────────────
+ * Catalog
  *
  * Provides access to Spark's catalog API for inspecting databases, tables,
  * functions, and columns.
