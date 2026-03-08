@@ -11,6 +11,7 @@
     "@spark-connect-js/eslint-config",
     "@spark-connect-js/prettier-config",
     "@spark-connect-js/typescript-config",
-    "@spark-connect-js/example-node-quickstart"
+    "@spark-connect-js/example-node-quickstart",
+    "@spark-connect-js/integration-tests"
   ]
 }
