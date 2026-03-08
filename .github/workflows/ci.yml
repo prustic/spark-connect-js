@@ -28,6 +28,7 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test:coverage
+      - run: pnpm test:integration
 
       - uses: codecov/codecov-action@v5
         if: always()

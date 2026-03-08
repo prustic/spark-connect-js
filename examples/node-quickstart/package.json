@@ -1,0 +1,28 @@
+{
+  "name": "@spark-connect-js/example-node-quickstart",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Quick start: connect to Spark, query data, collect results",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "start": "node dist/main.js",
+    "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
+    "lint": "eslint",
+    "spark:up": "docker compose up -d --wait",
+    "spark:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@spark-connect-js/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@spark-connect-js/eslint-config": "workspace:*",
+    "@spark-connect-js/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

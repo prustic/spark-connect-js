@@ -2,6 +2,7 @@ packages:
   - "packages/*"
   - "tooling/*"
   - "examples/*"
+  - "tests/*"
 
 catalog:
   typescript: ^5.7.0

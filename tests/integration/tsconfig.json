@@ -1,0 +1,11 @@
+{
+  "extends": "@spark-connect-js/typescript-config/base",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": false,
+    "incremental": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/spark-node" }]
+}

@@ -1,17 +1,16 @@
 {
-  "name": "@spark-connect-js/example-basic-query",
+  "name": "@spark-connect-js/integration-tests",
   "version": "0.0.0",
   "private": true,
-  "description": "Basic example: connect to Spark Connect, run SQL, collect results",
+  "description": "Integration tests against a live Spark Connect server",
   "type": "module",
   "scripts": {
     "build": "tsc --build",
-    "dev": "tsc --build --watch",
-    "start": "node dist/main.js",
     "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
-    "lint": "eslint",
     "spark:up": "docker compose up -d --wait",
-    "spark:down": "docker compose down"
+    "spark:down": "docker compose down",
+    "test:integration": "pnpm spark:up && node --test $(find dist -name '*.test.js') && pnpm spark:down",
+    "lint": "eslint"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -22,6 +21,7 @@
   "devDependencies": {
     "@spark-connect-js/eslint-config": "workspace:*",
     "@spark-connect-js/typescript-config": "workspace:*",
+    "@types/node": "^22.19.15",
     "eslint": "catalog:",
     "typescript": "catalog:"
   }
