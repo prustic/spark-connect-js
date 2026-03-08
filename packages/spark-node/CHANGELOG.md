@@ -4,17 +4,12 @@
 
 ### Minor Changes
 
-- [#10](https://github.com/prustic/spark-connect-js/pull/10) [`895f389`](https://github.com/prustic/spark-connect-js/commit/895f389d703182ed149c4a634f48b894aa7d5131) Thanks [@prustic](https://github.com/prustic)! - Initial release. TypeScript client for Apache Spark Connect.
-  - **SparkSession**: connect via `sc://` URL, execute SQL, read tables, create DataFrames from local data
-  - **DataFrame**: 30+ transformations (select, filter, join, groupBy, sort, union, intersect, sample, fillna, dropna, and more), actions (collect, show, count, head, tail, toLocalIterator), properties (schema, columns, dtypes, isEmpty, printSchema, explain)
-  - **Column**: comparisons, arithmetic, logical ops, cast, alias, null checks, pattern matching, bitwise ops, window support
-  - **GroupedData**: agg, count, sum, avg, mean, min, max
-  - **Window**: partitionBy, orderBy, rowsBetween, rangeBetween
-  - **DataFrameReader**: format, option, options, load, table
-  - **DataFrameWriter**: format, mode, option, options, partitionBy, sortBy, save, saveAsTable
-  - **Catalog**: currentDatabase, setCurrentDatabase, listDatabases, listTables, listColumns, databaseExists, tableExists
-  - **248 built-in functions** across 12 categories: aggregate, math, string, date/timestamp, window, collection, conditional, hash, JSON, CSV, bitwise, sort
-  - Zero runtime dependencies in `@spark-connect-js/core`
+- [#10](https://github.com/prustic/spark-connect-js/pull/10) [`895f389`](https://github.com/prustic/spark-connect-js/commit/895f389d703182ed149c4a634f48b894aa7d5131) Thanks [@prustic](https://github.com/prustic)! - Initial release. Node.js runtime adapter for Spark Connect with gRPC transport, Arrow decoding, and convenience re-exports of the full core API.
+  - **GrpcTransport**: connects to Spark Connect over gRPC, streams ExecutePlan responses, handles metadata and session management
+  - **ArrowDecoder**: deserializes Arrow IPC batches into JavaScript row objects
+  - **SparkProcessManager**: launches and manages local `spark-connect` server processes for development
+  - **buildRelation / buildExpression**: serializes logical plan nodes and expressions to protobuf wire format
+  - Re-exports the entire `@spark-connect-js/core` public API (SparkSession, DataFrame, Column, functions, etc.) for single-package convenience
 
 ### Patch Changes
 
