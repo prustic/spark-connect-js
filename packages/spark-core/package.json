@@ -1,6 +1,6 @@
 {
   "name": "@spark-connect-js/core",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Pure TypeScript core: logical DataFrame API and Spark Connect plan builder — no runtime dependencies",
   "license": "Apache-2.0",
   "repository": {

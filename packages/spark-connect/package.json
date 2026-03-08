@@ -1,6 +1,6 @@
 {
   "name": "@spark-connect-js/connect",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Generated TypeScript types and service stubs from Spark Connect protobuf definitions",
   "license": "Apache-2.0",
   "repository": {
