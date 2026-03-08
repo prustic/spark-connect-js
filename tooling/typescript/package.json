@@ -11,7 +11,7 @@
     "base.json"
   ],
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.3.5",
     "typescript": "catalog:"
   }
 }
