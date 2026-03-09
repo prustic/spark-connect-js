@@ -124,7 +124,9 @@ export type LogicalPlan =
   | WithColumnsRenamedPlan
   | SubqueryAliasPlan
   | HintPlan
-  | TailPlan;
+  | TailPlan
+  | RepartitionPlan
+  | RepartitionByExpressionPlan;
 
 /**
  * Read from a data source.
@@ -433,4 +435,28 @@ export interface TailPlan {
   type: "tail";
   child: LogicalPlan;
   limit: number;
+}
+
+/**
+ * Repartition a DataFrame.
+ * → Spark Connect: Relation.Repartition
+ *
+ * When shuffle=true, this is repartition(). When shuffle=false, this is coalesce().
+ */
+export interface RepartitionPlan {
+  type: "repartition";
+  child: LogicalPlan;
+  numPartitions: number;
+  shuffle: boolean;
+}
+
+/**
+ * Repartition by expression (range-based partitioning).
+ * → Spark Connect: Relation.RepartitionByExpression
+ */
+export interface RepartitionByExpressionPlan {
+  type: "repartitionByExpression";
+  child: LogicalPlan;
+  partitionExprs: Expression[];
+  numPartitions?: number;
 }

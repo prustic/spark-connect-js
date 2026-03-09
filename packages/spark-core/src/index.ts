@@ -58,6 +58,21 @@ export { DataType } from "./types/data-type.js";
 export { StructType, StructField } from "./types/struct.js";
 export { Catalog } from "./catalog.js";
 export { WindowSpec, Window } from "./window.js";
+export type { StorageLevel } from "./storage-level.js";
+export {
+  NONE as StorageLevel_NONE,
+  MEMORY_ONLY,
+  MEMORY_ONLY_SER,
+  MEMORY_AND_DISK,
+  MEMORY_AND_DISK_SER,
+  DISK_ONLY,
+  MEMORY_ONLY_2,
+  MEMORY_ONLY_SER_2,
+  MEMORY_AND_DISK_2,
+  MEMORY_AND_DISK_SER_2,
+  DISK_ONLY_2,
+  OFF_HEAP,
+} from "./storage-level.js";
 export type {
   LogicalPlan,
   Expression,

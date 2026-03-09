@@ -1,6 +1,13 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { col, lit, type DataFrame } from "@spark-connect-js/node";
+import {
+  col,
+  lit,
+  MEMORY_ONLY,
+  DISK_ONLY,
+  MEMORY_AND_DISK,
+  type DataFrame,
+} from "@spark-connect-js/node";
 import { spark, stopSession } from "./setup.js";
 
 describe("DataFrame basics", () => {
@@ -272,5 +279,96 @@ describe("DataFrame basics", () => {
     assert.equal(rows[0]["and_3"], 0 & 3);
     assert.equal(rows[0]["or_4"], 0 | 4);
     assert.equal(rows[0]["xor_5"], 0 ^ 5);
+  });
+});
+
+describe("DataFrame repartitioning", () => {
+  after(stopSession);
+
+  it("repartition(n) collects correctly", async () => {
+    const rows = await spark().range(20).repartition(4).sort(col("id").asc()).collect();
+    assert.equal(rows.length, 20);
+    assert.equal(rows[0]["id"], 0);
+    assert.equal(rows[19]["id"], 19);
+  });
+
+  it("repartition(n, cols) partitions by column", async () => {
+    const rows = await spark().range(10).repartition(3, "id").sort(col("id").asc()).collect();
+    assert.equal(rows.length, 10);
+  });
+
+  it("coalesce(n) reduces partitions without shuffle", async () => {
+    const rows = await spark().range(20).coalesce(1).sort(col("id").asc()).collect();
+    assert.equal(rows.length, 20);
+    assert.equal(rows[0]["id"], 0);
+  });
+
+  it("repartitionByRange(n, cols) range-partitions data", async () => {
+    const rows = await spark()
+      .range(20)
+      .repartitionByRange(4, "id")
+      .sort(col("id").asc())
+      .collect();
+    assert.equal(rows.length, 20);
+    assert.equal(rows[0]["id"], 0);
+    assert.equal(rows[19]["id"], 19);
+  });
+
+  it("repartitionByRange respects descending order", async () => {
+    const rows = await spark()
+      .range(10)
+      .repartitionByRange(2, col("id").desc())
+      .sort(col("id").asc())
+      .collect();
+    assert.equal(rows.length, 10);
+  });
+});
+
+describe("DataFrame caching", () => {
+  after(stopSession);
+
+  it("cache() and unpersist() round-trip", async () => {
+    const df = spark().range(10);
+    const cached = await df.cache();
+    // Force materialization so the cache is populated
+    await cached.collect();
+
+    const level = await cached.getStorageLevel();
+    assert.equal(level.useMemory, true);
+    assert.equal(level.useDisk, true);
+
+    await cached.unpersist();
+  });
+
+  it("persist(MEMORY_ONLY) sets storage level", async () => {
+    const df = spark().range(5);
+    await df.persist(MEMORY_ONLY);
+    await df.collect();
+
+    const level = await df.getStorageLevel();
+    assert.equal(level.useMemory, true);
+    assert.equal(level.useDisk, false);
+
+    await df.unpersist();
+  });
+
+  it("persist(DISK_ONLY) sets storage level", async () => {
+    const df = spark().range(5);
+    await df.persist(DISK_ONLY);
+    await df.collect();
+
+    const level = await df.getStorageLevel();
+    assert.equal(level.useDisk, true);
+    assert.equal(level.useMemory, false);
+
+    await df.unpersist();
+  });
+
+  it("unpersist(blocking=true) blocks until complete", async () => {
+    const df = spark().range(5);
+    await df.persist(MEMORY_AND_DISK);
+    await df.collect();
+    await df.unpersist(true);
+    // No error means success
   });
 });

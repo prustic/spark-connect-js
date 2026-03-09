@@ -18,6 +18,8 @@ import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { StructType } from "./types/struct.js";
+import type { StorageLevel } from "./storage-level.js";
+import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
 
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
@@ -435,6 +437,76 @@ export class DataFrame {
     });
   }
 
+  // Repartitioning
+
+  /**
+   * Return a new DataFrame partitioned by the given number of partitions.
+   * This results in a full shuffle of the data.
+   *
+   * @param numPartitions - Target number of partitions
+   * @param columns - Optional partitioning columns
+   */
+  repartition(numPartitions: number, ...columns: Array<Column | string>): DataFrame {
+    if (columns.length > 0) {
+      const exprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
+      return DataFrame._fromPlan(this._session, {
+        type: "repartitionByExpression",
+        child: this._plan,
+        partitionExprs: exprs,
+        numPartitions,
+      });
+    }
+    return DataFrame._fromPlan(this._session, {
+      type: "repartition",
+      child: this._plan,
+      numPartitions,
+      shuffle: true,
+    });
+  }
+
+  /**
+   * Return a new DataFrame that is reduced to the given number of partitions.
+   * Unlike repartition(), coalesce avoids a full shuffle and tries to
+   * combine existing partitions.
+   *
+   * @param numPartitions - Target number of partitions
+   */
+  coalesce(numPartitions: number): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "repartition",
+      child: this._plan,
+      numPartitions,
+      shuffle: false,
+    });
+  }
+
+  /**
+   * Return a new DataFrame partitioned by the given columns using range partitioning.
+   *
+   * @param numPartitions - Target number of partitions
+   * @param columns - Partitioning columns
+   */
+  repartitionByRange(numPartitions: number, ...columns: Array<Column | string>): DataFrame {
+    const exprs = columns.map((c) => {
+      const expr = typeof c === "string" ? col(c)._expr : c._expr;
+      if (expr.type === "sortOrder") {
+        return expr;
+      }
+      return {
+        type: "sortOrder" as const,
+        inner: expr,
+        direction: "ascending" as const,
+        nullOrdering: "nulls_last" as const,
+      };
+    });
+    return DataFrame._fromPlan(this._session, {
+      type: "repartitionByExpression",
+      child: this._plan,
+      partitionExprs: exprs,
+      numPartitions,
+    });
+  }
+
   // Statistics
 
   /** Compute summary statistics (count, mean, stddev, min, max) for columns. */
@@ -451,6 +523,58 @@ export class DataFrame {
   /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
   get write(): DataFrameWriter {
     return new DataFrameWriter(this);
+  }
+
+  // Caching & Persistence
+
+  /**
+   * Persist this DataFrame with the default storage level (MEMORY_AND_DISK).
+   * Returns this DataFrame for method chaining.
+   */
+  async cache(): Promise<DataFrame> {
+    return this.persist(MEMORY_AND_DISK);
+  }
+
+  /**
+   * Persist this DataFrame with the given storage level.
+   * Returns this DataFrame for method chaining.
+   *
+   * @param storageLevel - How to store the cached data
+   */
+  async persist(storageLevel: StorageLevel = MEMORY_AND_DISK): Promise<DataFrame> {
+    await this._session._analyzePlan({
+      type: "persist",
+      plan: this._plan,
+      storageLevel,
+    });
+    return this;
+  }
+
+  /**
+   * Remove this DataFrame from the cache.
+   *
+   * @param blocking - Whether to block until the operation completes
+   */
+  async unpersist(blocking = false): Promise<DataFrame> {
+    await this._session._analyzePlan({
+      type: "unpersist",
+      plan: this._plan,
+      blocking,
+    });
+    return this;
+  }
+
+  /**
+   * Get the storage level used for caching this DataFrame.
+   * Returns the StorageLevel if cached, or NONE if not cached.
+   */
+  async getStorageLevel(): Promise<StorageLevel> {
+    const result = await this._session._analyzePlan({
+      type: "getStorageLevel",
+      plan: this._plan,
+    });
+    const level = result.storageLevel as StorageLevel | undefined;
+    return level ?? NONE;
   }
 
   /**
