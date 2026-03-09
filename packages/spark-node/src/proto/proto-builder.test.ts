@@ -502,8 +502,6 @@ describe("buildRelation() — localRelation", () => {
   });
 });
 
-// ── M1: New plan types ──────────────────────────────────────────────────────
-
 describe("buildRelation() — range", () => {
   it("builds a Range relation", () => {
     const result = buildRelation({
@@ -609,6 +607,333 @@ describe("buildRelation() — tail", () => {
     if (result.relType.case === "tail") {
       assert.ok(result.relType.value.input);
       assert.equal(result.relType.value.limit, 5);
+    }
+  });
+});
+
+describe("buildRelation() — repartition", () => {
+  it("builds a Repartition relation with shuffle", () => {
+    const result = buildRelation({
+      type: "repartition",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      numPartitions: 10,
+      shuffle: true,
+    });
+    assert.equal(result.relType.case, "repartition");
+    if (result.relType.case === "repartition") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.numPartitions, 10);
+      assert.equal(result.relType.value.shuffle, true);
+    }
+  });
+
+  it("builds a coalesce (shuffle=false)", () => {
+    const result = buildRelation({
+      type: "repartition",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      numPartitions: 1,
+      shuffle: false,
+    });
+    if (result.relType.case === "repartition") {
+      assert.equal(result.relType.value.shuffle, false);
+    }
+  });
+});
+
+describe("buildRelation() — repartitionByExpression", () => {
+  it("builds a RepartitionByExpression relation", () => {
+    const result = buildRelation({
+      type: "repartitionByExpression",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      partitionExprs: [{ type: "unresolvedAttribute", name: "dept" }],
+      numPartitions: 8,
+    });
+    assert.equal(result.relType.case, "repartitionByExpression");
+    if (result.relType.case === "repartitionByExpression") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.partitionExprs.length, 1);
+      assert.equal(result.relType.value.numPartitions, 8);
+    }
+  });
+});
+
+describe("buildRelation() — summary", () => {
+  it("builds a StatSummary relation", () => {
+    const result = buildRelation({
+      type: "summary",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      statistics: ["count", "mean", "stddev"],
+    });
+    assert.equal(result.relType.case, "summary");
+    if (result.relType.case === "summary") {
+      assert.ok(result.relType.value.input);
+      assert.deepStrictEqual(result.relType.value.statistics, ["count", "mean", "stddev"]);
+    }
+  });
+});
+
+describe("buildRelation() — naReplace", () => {
+  it("builds a NAReplace relation", () => {
+    const result = buildRelation({
+      type: "naReplace",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["salary"],
+      replacements: [
+        { oldValue: 0, newValue: 100 },
+        { oldValue: "unknown", newValue: "N/A" },
+      ],
+    });
+    assert.equal(result.relType.case, "replace");
+    if (result.relType.case === "replace") {
+      assert.ok(result.relType.value.input);
+      assert.deepStrictEqual(result.relType.value.cols, ["salary"]);
+      assert.equal(result.relType.value.replacements.length, 2);
+    }
+  });
+
+  it("uses double (not integer) for numeric replace values", () => {
+    const result = buildRelation({
+      type: "naReplace",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: [],
+      replacements: [{ oldValue: 42, newValue: 99 }],
+    });
+    if (result.relType.case === "replace") {
+      const rep = result.relType.value.replacements[0];
+      assert.equal(rep.oldValue?.literalType.case, "double");
+      assert.equal(rep.newValue?.literalType.case, "double");
+    }
+  });
+});
+
+describe("buildRelation() — unpivot", () => {
+  it("builds an Unpivot relation with explicit values", () => {
+    const result = buildRelation({
+      type: "unpivot",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      ids: [{ type: "unresolvedAttribute", name: "id" }],
+      values: [
+        { type: "unresolvedAttribute", name: "q1" },
+        { type: "unresolvedAttribute", name: "q2" },
+      ],
+      variableColumnName: "quarter",
+      valueColumnName: "revenue",
+    });
+    assert.equal(result.relType.case, "unpivot");
+    if (result.relType.case === "unpivot") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.ids.length, 1);
+      assert.ok(result.relType.value.values);
+      assert.equal(result.relType.value.values.values.length, 2);
+      assert.equal(result.relType.value.variableColumnName, "quarter");
+      assert.equal(result.relType.value.valueColumnName, "revenue");
+    }
+  });
+
+  it("builds an Unpivot relation without explicit values", () => {
+    const result = buildRelation({
+      type: "unpivot",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      ids: [{ type: "unresolvedAttribute", name: "id" }],
+      variableColumnName: "var",
+      valueColumnName: "val",
+    });
+    if (result.relType.case === "unpivot") {
+      assert.equal(result.relType.value.values, undefined);
+    }
+  });
+});
+
+describe("buildRelation() — stat functions", () => {
+  it("builds a StatCorr relation", () => {
+    const result = buildRelation({
+      type: "statCorr",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      col1: "height",
+      col2: "weight",
+      method: "pearson",
+    });
+    assert.equal(result.relType.case, "corr");
+    if (result.relType.case === "corr") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.col1, "height");
+      assert.equal(result.relType.value.col2, "weight");
+      assert.equal(result.relType.value.method, "pearson");
+    }
+  });
+
+  it("builds a StatCov relation", () => {
+    const result = buildRelation({
+      type: "statCov",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      col1: "x",
+      col2: "y",
+    });
+    assert.equal(result.relType.case, "cov");
+    if (result.relType.case === "cov") {
+      assert.equal(result.relType.value.col1, "x");
+      assert.equal(result.relType.value.col2, "y");
+    }
+  });
+
+  it("builds a StatCrosstab relation", () => {
+    const result = buildRelation({
+      type: "statCrosstab",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      col1: "dept",
+      col2: "status",
+    });
+    assert.equal(result.relType.case, "crosstab");
+    if (result.relType.case === "crosstab") {
+      assert.equal(result.relType.value.col1, "dept");
+      assert.equal(result.relType.value.col2, "status");
+    }
+  });
+
+  it("builds a StatFreqItems relation", () => {
+    const result = buildRelation({
+      type: "statFreqItems",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["category", "region"],
+      support: 0.3,
+    });
+    assert.equal(result.relType.case, "freqItems");
+    if (result.relType.case === "freqItems") {
+      assert.deepStrictEqual(result.relType.value.cols, ["category", "region"]);
+      assert.equal(result.relType.value.support, 0.3);
+    }
+  });
+
+  it("builds a StatApproxQuantile relation", () => {
+    const result = buildRelation({
+      type: "statApproxQuantile",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["salary"],
+      probabilities: [0.25, 0.5, 0.75],
+      relativeError: 0.01,
+    });
+    assert.equal(result.relType.case, "approxQuantile");
+    if (result.relType.case === "approxQuantile") {
+      assert.deepStrictEqual(result.relType.value.cols, ["salary"]);
+      assert.deepStrictEqual(result.relType.value.probabilities, [0.25, 0.5, 0.75]);
+      assert.equal(result.relType.value.relativeError, 0.01);
+    }
+  });
+});
+
+describe("buildRelation() — aggregate groupTypes", () => {
+  it("builds a rollup aggregate", () => {
+    const result = buildRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupType: "rollup",
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "dept" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "salary" }],
+        },
+      ],
+    });
+    assert.equal(result.relType.case, "aggregate");
+    if (result.relType.case === "aggregate") {
+      assert.equal(result.relType.value.groupType, 2); // ROLLUP
+    }
+  });
+
+  it("builds a cube aggregate", () => {
+    const result = buildRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupType: "cube",
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "dept" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "count",
+          arguments: [{ type: "unresolvedAttribute", name: "id" }],
+        },
+      ],
+    });
+    if (result.relType.case === "aggregate") {
+      assert.equal(result.relType.value.groupType, 3); // CUBE
+    }
+  });
+
+  it("builds a pivot aggregate", () => {
+    const result = buildRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupType: "pivot",
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "dept" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "salary" }],
+        },
+      ],
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "year" },
+        values: [2023, 2024, 2025],
+      },
+    });
+    if (result.relType.case === "aggregate") {
+      assert.equal(result.relType.value.groupType, 4); // PIVOT
+      assert.ok(result.relType.value.pivot);
+      assert.equal(result.relType.value.pivot.values.length, 3);
+    }
+  });
+});
+
+describe("buildRelation() — sort", () => {
+  it("builds a Sort relation", () => {
+    const result = buildRelation({
+      type: "sort",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      order: [
+        {
+          expression: { type: "unresolvedAttribute", name: "age" },
+          direction: "descending",
+          nullOrdering: "nulls_last",
+        },
+      ],
+      isGlobal: true,
+    });
+    assert.equal(result.relType.case, "sort");
+    if (result.relType.case === "sort") {
+      assert.ok(result.relType.value.input);
+      assert.equal(result.relType.value.order.length, 1);
+      assert.equal(result.relType.value.isGlobal, true);
+    }
+  });
+});
+
+describe("buildExpression() — expressionString", () => {
+  it("builds an expressionString expression", () => {
+    const result = buildExpression({
+      type: "expressionString",
+      expression: "col1 + col2",
+    });
+    assert.equal(result.exprType.case, "expressionString");
+    if (result.exprType.case === "expressionString") {
+      assert.equal(result.exprType.value.expression, "col1 + col2");
+    }
+  });
+});
+
+describe("buildExpression() — sortOrder", () => {
+  it("sortOrder delegates to inner expression", () => {
+    const result = buildExpression({
+      type: "sortOrder",
+      inner: { type: "unresolvedAttribute", name: "x" },
+      direction: "ascending",
+      nullOrdering: "nulls_first",
+    });
+    assert.equal(result.exprType.case, "unresolvedAttribute");
+    if (result.exprType.case === "unresolvedAttribute") {
+      assert.equal(result.exprType.value.unparsedIdentifier, "x");
     }
   });
 });
