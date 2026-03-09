@@ -560,8 +560,8 @@ export function buildRelation(plan: LogicalPlan): Relation {
             cols: plan.cols,
             replacements: plan.replacements.map((r) =>
               create(NAReplace_ReplacementSchema, {
-                oldValue: r.oldValue != null ? buildLiteral(r.oldValue) : undefined,
-                newValue: r.newValue != null ? buildLiteral(r.newValue) : undefined,
+                oldValue: r.oldValue != null ? buildReplaceLiteral(r.oldValue) : undefined,
+                newValue: r.newValue != null ? buildReplaceLiteral(r.newValue) : undefined,
               }),
             ),
           }),
@@ -671,6 +671,23 @@ function buildLiteral(value: string | number | boolean | null) {
   if (Number.isInteger(value) && Number.isSafeInteger(value)) {
     return create(Expression_LiteralSchema, {
       literalType: { case: "integer", value },
+    });
+  }
+  return create(Expression_LiteralSchema, {
+    literalType: { case: "double", value },
+  });
+}
+
+/** NAReplace only supports null, bool, double, and string literals. */
+function buildReplaceLiteral(value: string | number | boolean) {
+  if (typeof value === "string") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "string", value },
+    });
+  }
+  if (typeof value === "boolean") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "boolean", value },
     });
   }
   return create(Expression_LiteralSchema, {

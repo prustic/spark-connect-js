@@ -36,6 +36,7 @@ export {
   col,
   lit,
   GroupedData,
+  DataFrameStat,
   DataType,
   PlanBuilder,
   SparkConnectError,
