@@ -126,7 +126,15 @@ export type LogicalPlan =
   | HintPlan
   | TailPlan
   | RepartitionPlan
-  | RepartitionByExpressionPlan;
+  | RepartitionByExpressionPlan
+  | UnpivotPlan
+  | SummaryPlan
+  | NAReplacePlan
+  | StatCorrPlan
+  | StatCovPlan
+  | StatCrosstabPlan
+  | StatFreqItemsPlan
+  | StatApproxQuantilePlan;
 
 /**
  * Read from a data source.
@@ -200,6 +208,11 @@ export interface AggregatePlan {
   child: LogicalPlan;
   groupingExpressions: Expression[];
   aggregateExpressions: Expression[];
+  groupType?: "groupby" | "rollup" | "cube" | "pivot";
+  pivot?: {
+    col: Expression;
+    values: Array<string | number | boolean>;
+  };
 }
 
 /**
@@ -459,4 +472,99 @@ export interface RepartitionByExpressionPlan {
   child: LogicalPlan;
   partitionExprs: Expression[];
   numPartitions?: number;
+}
+
+/**
+ * Unpivot a DataFrame from wide format to long format.
+ * → Spark Connect: Relation.Unpivot
+ * → Catalyst: Unpivot(ids, values, variableColumnName, valueColumnName)
+ */
+export interface UnpivotPlan {
+  type: "unpivot";
+  child: LogicalPlan;
+  ids: Expression[];
+  values?: Expression[];
+  variableColumnName: string;
+  valueColumnName: string;
+}
+
+/**
+ * Compute summary statistics.
+ * → Spark Connect: Relation.Summary (StatSummary)
+ */
+export interface SummaryPlan {
+  type: "summary";
+  child: LogicalPlan;
+  statistics: string[];
+}
+
+/**
+ * Replace values matching old with new.
+ * → Spark Connect: Relation.Replace (NAReplace)
+ */
+export interface NAReplacePlan {
+  type: "naReplace";
+  child: LogicalPlan;
+  cols: string[];
+  replacements: Array<{
+    oldValue: string | number | boolean | null;
+    newValue: string | number | boolean | null;
+  }>;
+}
+
+/**
+ * Compute Pearson correlation between two columns.
+ * → Spark Connect: Relation.Corr (StatCorr)
+ */
+export interface StatCorrPlan {
+  type: "statCorr";
+  child: LogicalPlan;
+  col1: string;
+  col2: string;
+  method?: string;
+}
+
+/**
+ * Compute sample covariance between two columns.
+ * → Spark Connect: Relation.Cov (StatCov)
+ */
+export interface StatCovPlan {
+  type: "statCov";
+  child: LogicalPlan;
+  col1: string;
+  col2: string;
+}
+
+/**
+ * Compute a pair-wise frequency table (contingency table).
+ * → Spark Connect: Relation.Crosstab (StatCrosstab)
+ */
+export interface StatCrosstabPlan {
+  type: "statCrosstab";
+  child: LogicalPlan;
+  col1: string;
+  col2: string;
+}
+
+/**
+ * Find frequent items in columns.
+ * → Spark Connect: Relation.FreqItems (StatFreqItems)
+ */
+export interface StatFreqItemsPlan {
+  type: "statFreqItems";
+  child: LogicalPlan;
+  cols: string[];
+  support?: number;
+}
+
+/**
+ * Compute approximate quantiles of numerical columns.
+ * → Spark Connect: Relation.ApproxQuantile (StatApproxQuantile)
+ */
+export interface StatApproxQuantilePlan {
+  type: "statApproxQuantile";
+  child: LogicalPlan;
+  cols: string[];
+  probabilities: number[];
+  relativeError: number;
 }

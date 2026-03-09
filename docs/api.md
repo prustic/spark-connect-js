@@ -24,6 +24,7 @@ const spark = connect("sc://localhost:15002");
 | ------------------------------- | ---------------------------------------------- |
 | `sql(query)`                    | Execute a SQL query, returns a DataFrame       |
 | `table(name)`                   | Read a table by name                           |
+| `range(start, end?, step?)`     | Create a DataFrame with a single `id` column   |
 | `read`                          | Returns a DataFrameReader                      |
 | `createDataFrame(data, schema)` | Create a DataFrame from local data             |
 | `catalog`                       | Access the Catalog API                         |
@@ -74,20 +75,29 @@ const spark = connect("sc://localhost:15002");
 | `repartition(numPartitions, ...cols?)`       | Repartition with optional columns       |
 | `repartitionByRange(numPartitions, ...cols)` | Range-partition by columns              |
 | `coalesce(numPartitions)`                    | Reduce partitions without shuffle       |
+| `cube(...cols)`                              | Cube aggregation (all subtotals)        |
+| `rollup(...cols)`                            | Rollup aggregation (hierarchical)       |
+| `unpivot(ids, values, varCol, valCol)`       | Reshape wide to long format             |
+| `melt(ids, values, varCol, valCol)`          | Alias for `unpivot`                     |
+| `summary(...statistics)`                     | Descriptive stats (count, mean, etc.)   |
+| `replace(to, subset?)`                       | Replace values in columns               |
+| `randomSplit(weights, seed?)`                | Split into multiple DataFrames          |
 
 ### Actions
 
-| Method                           | Description                  |
-| -------------------------------- | ---------------------------- |
-| `collect()`                      | Return all rows as an array  |
-| `show(n?, truncate?, vertical?)` | Print rows to console        |
-| `count()`                        | Number of rows               |
-| `first()`                        | First row                    |
-| `head(n?)`                       | First n rows                 |
-| `take(n)`                        | Alias for `head`             |
-| `tail(n)`                        | Last n rows                  |
-| `toLocalIterator()`              | Async iterator over rows     |
-| `forEach(fn)`                    | Apply a function to each row |
+| Method                           | Description                       |
+| -------------------------------- | --------------------------------- |
+| `collect()`                      | Return all rows as an array       |
+| `show(n?, truncate?, vertical?)` | Print rows to console             |
+| `count()`                        | Number of rows                    |
+| `first()`                        | First row                         |
+| `head(n?)`                       | First n rows                      |
+| `take(n)`                        | Alias for `head`                  |
+| `tail(n)`                        | Last n rows                       |
+| `toLocalIterator()`              | Async iterator over rows          |
+| `forEach(fn)`                    | Apply a function to each row      |
+| `sameSemantics(other)`           | Check if two plans are equivalent |
+| `semanticHash()`                 | Hash of the logical plan          |
 
 ### Caching & Persistence
 
@@ -100,16 +110,20 @@ const spark = connect("sc://localhost:15002");
 
 ### Properties
 
-| Property                        | Description                       |
-| ------------------------------- | --------------------------------- |
-| `schema`                        | StructType schema                 |
-| `columns`                       | Column names                      |
-| `dtypes`                        | Column name/type pairs            |
-| `isEmpty()`                     | Whether the DataFrame has no rows |
-| `printSchema(level?)`           | Print the schema tree             |
-| `explain(extended?, mode?)`     | Show the execution plan           |
-| `write`                         | Returns a DataFrameWriter         |
-| `createOrReplaceTempView(name)` | Register as a temp view           |
+| Property                              | Description                               |
+| ------------------------------------- | ----------------------------------------- |
+| `schema`                              | StructType schema                         |
+| `columns`                             | Column names                              |
+| `dtypes`                              | Column name/type pairs                    |
+| `isEmpty()`                           | Whether the DataFrame has no rows         |
+| `printSchema(level?)`                 | Print the schema tree                     |
+| `explain(extended?, mode?)`           | Show the execution plan                   |
+| `write`                               | Returns a DataFrameWriter                 |
+| `stat`                                | Returns DataFrameStat                     |
+| `createTempView(name)`                | Register as a temp view (fails if exists) |
+| `createOrReplaceTempView(name)`       | Register as a temp view                   |
+| `createGlobalTempView(name)`          | Register as a global temp view            |
+| `createOrReplaceGlobalTempView(name)` | Register/replace global temp view         |
 
 ---
 
@@ -160,6 +174,21 @@ Returned by `df.groupBy(...)`.
 | `avg(...cols)` / `mean(...cols)` | Average per group          |
 | `min(...cols)`                   | Min per group              |
 | `max(...cols)`                   | Max per group              |
+| `pivot(col, values?)`            | Pivot rows into columns    |
+
+---
+
+## DataFrameStat
+
+Accessed via `df.stat`.
+
+| Method                                          | Description           |
+| ----------------------------------------------- | --------------------- |
+| `corr(col1, col2, method?)`                     | Pearson correlation   |
+| `cov(col1, col2)`                               | Sample covariance     |
+| `crosstab(col1, col2)`                          | Contingency table     |
+| `freqItems(cols, support?)`                     | Frequent items        |
+| `approxQuantile(cols, probabilities, relError)` | Approximate quantiles |
 
 ---
 

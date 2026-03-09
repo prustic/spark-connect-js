@@ -53,6 +53,7 @@ export { DataFrame } from "./data-frame.js";
 export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
+export { DataFrameStat as DataFrameStatFunctions } from "./data-frame-stat.js";
 export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
 export { StructType, StructField } from "./types/struct.js";

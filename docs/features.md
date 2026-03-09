@@ -15,7 +15,7 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `createDataFrame(data, schema)`        | ✅     |
 | `catalog`                              | ✅     |
 | `stop()`                               | ✅     |
-| `range(start, end, step)`              | -      |
+| `range(start, end, step)`              | ✅     |
 | `conf` (RuntimeConfig)                 | -      |
 | `readStream` (Structured Streaming)    | -      |
 | `newSession()`                         | -      |
@@ -51,9 +51,10 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `repartitionByRange`                       | ✅     |
 | `cache` / `persist` / `unpersist`          | ✅     |
 | `getStorageLevel`                          | ✅     |
-| `cube` / `rollup` / `pivot`                | -      |
-| `melt` / `unpivot`                         | -      |
-| `summary` / `replace`                      | -      |
+| `cube` / `rollup`                          | ✅     |
+| `melt` / `unpivot`                         | ✅     |
+| `summary` / `replace`                      | ✅     |
+| `randomSplit(weights, seed?)`              | ✅     |
 
 ### Actions
 
@@ -67,7 +68,12 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `forEach`                            | ✅     |
 | `schema` / `printSchema` / `explain` | ✅     |
 | `columns` / `dtypes` / `isEmpty`     | ✅     |
+| `createTempView`                     | ✅     |
 | `createOrReplaceTempView`            | ✅     |
+| `createGlobalTempView`               | ✅     |
+| `createOrReplaceGlobalTempView`      | ✅     |
+| `sameSemantics(other)`               | ✅     |
+| `semanticHash()`                     | ✅     |
 | `write` (DataFrameWriter)            | ✅     |
 
 ## Column
@@ -94,7 +100,7 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `agg`                            | ✅     |
 | `count` / `sum` / `avg` / `mean` | ✅     |
 | `min` / `max`                    | ✅     |
-| `pivot`                          | -      |
+| `pivot(col, values?)`            | ✅     |
 
 ## Window
 
@@ -153,12 +159,22 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | Bitwise        | 7     | `bitwise_not`, `bit_count`, `shiftleft`, `shiftright`                                     |
 | Sort           | 6     | `asc`, `desc`, `asc_nulls_first`, `desc_nulls_last`                                       |
 
+## DataFrameStat
+
+Accessed via `df.stat`.
+
+| Feature                                      | Status |
+| -------------------------------------------- | ------ |
+| `corr(col1, col2, method?)`                  | ✅     |
+| `cov(col1, col2)`                            | ✅     |
+| `crosstab(col1, col2)`                       | ✅     |
+| `freqItems(cols, support?)`                  | ✅     |
+| `approxQuantile(cols, probabilities, error)` | ✅     |
+
 ## Not Yet Implemented
 
 These are planned but not available in the current release:
 
-- **Advanced grouping**: `cube()`, `rollup()`, `pivot()`, `melt()`/`unpivot()`
-- **Stat functions**: `.stat.corr()`, `.stat.cov()`, `.stat.crosstab()`
 - **I/O shortcuts**: `read.csv()`, `read.parquet()`, `write.json()`, etc.
 - **DataFrameWriterV2**: `writeTo()`, `create()`, `replace()`, `append()`
 - **Catalog expansion**: `dropTempView()`, `cacheTable()`, `listFunctions()`

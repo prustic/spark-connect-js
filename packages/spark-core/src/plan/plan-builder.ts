@@ -313,6 +313,86 @@ export class PlanBuilder {
             numPartitions: plan.numPartitions,
           },
         };
+
+      case "summary":
+        return {
+          summary: {
+            input: PlanBuilder.toRelation(plan.child),
+            statistics: plan.statistics,
+          },
+        };
+
+      case "naReplace":
+        return {
+          replace: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+            replacements: plan.replacements.map((r) => ({
+              oldValue: r.oldValue != null ? { literal: toLiteral(r.oldValue) } : undefined,
+              newValue: r.newValue != null ? { literal: toLiteral(r.newValue) } : undefined,
+            })),
+          },
+        };
+
+      case "unpivot":
+        return {
+          unpivot: {
+            input: PlanBuilder.toRelation(plan.child),
+            ids: plan.ids.map((e) => PlanBuilder.toExpression(e)),
+            values: plan.values
+              ? { values: plan.values.map((e) => PlanBuilder.toExpression(e)) }
+              : undefined,
+            variableColumnName: plan.variableColumnName,
+            valueColumnName: plan.valueColumnName,
+          },
+        };
+
+      case "statCorr":
+        return {
+          corr: {
+            input: PlanBuilder.toRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+            method: plan.method,
+          },
+        };
+
+      case "statCov":
+        return {
+          cov: {
+            input: PlanBuilder.toRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+          },
+        };
+
+      case "statCrosstab":
+        return {
+          crosstab: {
+            input: PlanBuilder.toRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+          },
+        };
+
+      case "statFreqItems":
+        return {
+          freqItems: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+            support: plan.support,
+          },
+        };
+
+      case "statApproxQuantile":
+        return {
+          approxQuantile: {
+            input: PlanBuilder.toRelation(plan.child),
+            cols: plan.cols,
+            probabilities: plan.probabilities,
+            relativeError: plan.relativeError,
+          },
+        };
     }
   }
 
@@ -445,3 +525,10 @@ const OPERATOR_FUNCTION_MAP: Record<string, string> = {
   multiply: "*",
   divide: "/",
 };
+
+/** Convert a JS primitive to a literal object shape for proto serialization. */
+function toLiteral(v: string | number | boolean): Record<string, unknown> {
+  if (typeof v === "string") return { string: v };
+  if (typeof v === "boolean") return { boolean: v };
+  return { double: v };
+}

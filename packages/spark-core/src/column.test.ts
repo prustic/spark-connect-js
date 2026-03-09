@@ -232,8 +232,6 @@ describe("Column.over()", () => {
   });
 });
 
-// ── M1: New Column methods ──────────────────────────────────────────────────
-
 describe("Column sort ordering variants", () => {
   it("asc_nulls_first()", () => {
     const expr = col("x").asc_nulls_first()._expr;
