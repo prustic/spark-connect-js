@@ -64,36 +64,45 @@ export function cast(column: ColOrName, targetType: string): Column {
 
 // Null-handling
 
+/** Returns the first column that is not null, or null if all inputs are null. */
 export function coalesce(...columns: ColOrName[]): Column {
   return fn("coalesce", ...columns);
 }
 
+/** Returns true if the column is null. */
 export function isnull(column: ColOrName): Column {
   return fn("isnull", column);
 }
 
+/** Returns true if the column is NaN. */
 export function isnan(column: ColOrName): Column {
   return fn("isnan", column);
 }
 
+/** Returns true if the column is not null. */
 export function isnotnull(column: ColOrName): Column {
   return fn("isnotnull", column);
 }
 
+/** Returns col1 if it is not NaN, or col2 if col1 is NaN. */
 export function nanvl(col1: ColOrName, col2: ColOrName): Column {
   return fn("nanvl", col1, col2);
 }
 
+/** Returns col2 if col1 is null, or col1 otherwise. */
 export function ifnull(col1: ColOrName, col2: ColOrName): Column {
   return fn("ifnull", col1, col2);
 }
 
+/** Alias for {@link ifnull}. */
 export const nvl = ifnull;
 
+/** Returns col2 if col1 is not null, or col3 if col1 is null. */
 export function nvl2(col1: ColOrName, col2: ColOrName, col3: ColOrName): Column {
   return fn("nvl2", col1, col2, col3);
 }
 
+/** Returns null if col1 equals col2, or col1 otherwise. */
 export function nullif(col1: ColOrName, col2: ColOrName): Column {
   return fn("nullif", col1, col2);
 }
@@ -105,22 +114,27 @@ export function expr(expression: string): Column {
   return new Column({ type: "expressionString", expression });
 }
 
+/** Returns a monotonically increasing 64-bit integer. Not consecutive across partitions. */
 export function monotonically_increasing_id(): Column {
   return new Column(fnExpr("monotonically_increasing_id"));
 }
 
+/** Returns the partition ID for each row. */
 export function spark_partition_id(): Column {
   return new Column(fnExpr("spark_partition_id"));
 }
 
+/** Returns the runtime data type of the column as a string. */
 export function typeof_(column: ColOrName): Column {
   return fn("typeof", column);
 }
 
+/** Returns a universally unique identifier (UUID) string. */
 export function uuid(): Column {
   return new Column(fnExpr("uuid"));
 }
 
+/** Marks a DataFrame as small enough for a broadcast join. */
 export function broadcast(df: Column): Column {
   // broadcast is typically used at the DataFrame level via hint("broadcast"),
   // but as a function it just passes through the column

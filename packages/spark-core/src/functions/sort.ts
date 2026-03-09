@@ -5,6 +5,7 @@
 
 import { Column, toExpr, type ColOrName } from "./_helpers.js";
 
+/** Returns a sort expression based on the ascending order of the given column. */
 export function asc(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
@@ -14,6 +15,7 @@ export function asc(column: ColOrName): Column {
   });
 }
 
+/** Returns a sort expression based on the descending order of the given column. */
 export function desc(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
@@ -23,6 +25,7 @@ export function desc(column: ColOrName): Column {
   });
 }
 
+/** Returns a sort expression based on ascending order, with null values returned before non-null values. */
 export function asc_nulls_first(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
@@ -32,6 +35,7 @@ export function asc_nulls_first(column: ColOrName): Column {
   });
 }
 
+/** Returns a sort expression based on ascending order, with null values returned after non-null values. */
 export function asc_nulls_last(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
@@ -41,6 +45,7 @@ export function asc_nulls_last(column: ColOrName): Column {
   });
 }
 
+/** Returns a sort expression based on descending order, with null values returned before non-null values. */
 export function desc_nulls_first(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
@@ -50,6 +55,7 @@ export function desc_nulls_first(column: ColOrName): Column {
   });
 }
 
+/** Returns a sort expression based on descending order, with null values returned after non-null values. */
 export function desc_nulls_last(column: ColOrName): Column {
   return new Column({
     type: "sortOrder",
