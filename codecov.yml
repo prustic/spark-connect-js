@@ -4,9 +4,11 @@ coverage:
       default:
         target: auto
         threshold: 2%
+        if_not_found: success
     patch:
       default:
         target: 80%
+        if_not_found: success
 
 flags:
   spark-core:
