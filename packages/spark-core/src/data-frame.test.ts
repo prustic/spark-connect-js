@@ -574,8 +574,6 @@ describe("DataFrameReader shortcuts", () => {
   });
 });
 
-// ── M1: New features ────────────────────────────────────────────────────────
-
 describe("SparkSession.range()", () => {
   it("range(end) defaults start=0, step=1", () => {
     const { spark } = createSession();
@@ -986,5 +984,257 @@ describe("DataFrame caching", () => {
     assert.equal(level.useDisk, false);
     assert.equal(level.useMemory, false);
     assert.equal(level.replication, 1);
+  });
+});
+
+describe("DataFrame.cube()", () => {
+  it("returns GroupedData with groupType cube", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").cube("a", "b").count();
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupType, "cube");
+      assert.equal(df._plan.groupingExpressions.length, 2);
+    }
+  });
+});
+
+describe("DataFrame.rollup()", () => {
+  it("returns GroupedData with groupType rollup", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").rollup("a", "b").count();
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupType, "rollup");
+    }
+  });
+});
+
+describe("GroupedData.pivot()", () => {
+  it("returns GroupedData with pivot metadata", () => {
+    const { spark } = createSession();
+    const df = spark
+      .sql("SELECT * FROM t")
+      .groupBy("dept")
+      .pivot("year", [2020, 2021])
+      .agg(col("salary").alias("total"));
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupType, "pivot");
+      assert.ok(df._plan.pivot);
+      assert.deepStrictEqual(df._plan.pivot?.values, [2020, 2021]);
+    }
+  });
+});
+
+describe("DataFrame.unpivot()", () => {
+  it("builds an unpivot plan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").unpivot(["id"], ["val1", "val2"], "variable", "value");
+    assert.equal(df._plan.type, "unpivot");
+    if (df._plan.type === "unpivot") {
+      assert.equal(df._plan.ids.length, 1);
+      assert.equal(df._plan.values!.length, 2);
+      assert.equal(df._plan.variableColumnName, "variable");
+      assert.equal(df._plan.valueColumnName, "value");
+    }
+  });
+
+  it("melt() is an alias for unpivot()", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").melt(["id"], undefined, "var", "val");
+    assert.equal(df._plan.type, "unpivot");
+    if (df._plan.type === "unpivot") {
+      assert.equal(df._plan.values, undefined);
+    }
+  });
+});
+
+describe("DataFrame.summary()", () => {
+  it("builds a summary plan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").summary("count", "mean");
+    assert.equal(df._plan.type, "summary");
+    if (df._plan.type === "summary") {
+      assert.deepStrictEqual(df._plan.statistics, ["count", "mean"]);
+    }
+  });
+});
+
+describe("DataFrame.replace()", () => {
+  it("builds a naReplace plan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").replace({ foo: "bar", baz: "qux" }, ["name"]);
+    assert.equal(df._plan.type, "naReplace");
+    if (df._plan.type === "naReplace") {
+      assert.deepStrictEqual(df._plan.cols, ["name"]);
+      assert.equal(df._plan.replacements.length, 2);
+      assert.equal(df._plan.replacements[0].oldValue, "foo");
+      assert.equal(df._plan.replacements[0].newValue, "bar");
+      assert.equal(df._plan.replacements[1].oldValue, "baz");
+      assert.equal(df._plan.replacements[1].newValue, "qux");
+    }
+  });
+
+  it("infers numeric keys from string Record keys", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").replace({ "1": 2, null: null });
+    if (df._plan.type === "naReplace") {
+      // "1" is parsed to number 1 by inferLiteralValue
+      const numReplacement = df._plan.replacements.find((r) => r.oldValue === 1);
+      assert.ok(numReplacement);
+      assert.equal(numReplacement?.newValue, 2);
+      // "null" is parsed to null
+      const nullReplacement = df._plan.replacements.find((r) => r.oldValue === null);
+      assert.ok(nullReplacement);
+      assert.equal(nullReplacement?.newValue, null);
+    }
+  });
+});
+
+describe("DataFrame.randomSplit()", () => {
+  it("returns multiple DataFrames with sample plans", () => {
+    const { spark } = createSession();
+    const splits = spark.sql("SELECT * FROM t").randomSplit([0.7, 0.3]);
+    assert.equal(splits.length, 2);
+    assert.equal(splits[0]._plan.type, "sample");
+    assert.equal(splits[1]._plan.type, "sample");
+    if (splits[0]._plan.type === "sample" && splits[1]._plan.type === "sample") {
+      assert.equal(splits[0]._plan.lowerBound, 0);
+      assert.ok(Math.abs(splits[0]._plan.upperBound - 0.7) < 0.001);
+      assert.ok(Math.abs(splits[1]._plan.lowerBound - 0.7) < 0.001);
+      assert.ok(Math.abs(splits[1]._plan.upperBound - 1.0) < 0.001);
+    }
+  });
+});
+
+describe("DataFrame view commands", () => {
+  function mockCommandTransport() {
+    const commandCalls: Record<string, unknown>[] = [];
+    const transport: Transport & { commandCalls: Record<string, unknown>[] } = {
+      commandCalls,
+      async *executePlan(): AsyncIterable<Uint8Array> {},
+      async executeCommand(_sid: string, cmd: Record<string, unknown>): Promise<void> {
+        commandCalls.push(cmd);
+      },
+    };
+    return transport;
+  }
+
+  it("createTempView() sends command with replace=false", async () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.createTempView("my_view");
+    const cmd = transport.commandCalls[0];
+    assert.equal(cmd.type, "createDataframeView");
+    assert.equal(cmd.replace, false);
+    assert.equal(cmd.isGlobal, false);
+    assert.equal(cmd.name, "my_view");
+  });
+
+  it("createOrReplaceTempView() sends command with replace=true", async () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.createOrReplaceTempView("my_view");
+    const cmd = transport.commandCalls[0];
+    assert.equal(cmd.replace, true);
+    assert.equal(cmd.isGlobal, false);
+  });
+
+  it("createGlobalTempView() sends command with isGlobal=true, replace=false", async () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.createGlobalTempView("global_view");
+    const cmd = transport.commandCalls[0];
+    assert.equal(cmd.isGlobal, true);
+    assert.equal(cmd.replace, false);
+  });
+
+  it("createOrReplaceGlobalTempView() sends command with isGlobal=true, replace=true", async () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    await df.createOrReplaceGlobalTempView("global_view");
+    const cmd = transport.commandCalls[0];
+    assert.equal(cmd.isGlobal, true);
+    assert.equal(cmd.replace, true);
+  });
+});
+
+describe("DataFrame.sameSemantics()", () => {
+  function mockAnalyzeTransport2(
+    handler: (req: Record<string, unknown>) => Record<string, unknown>,
+  ) {
+    const analyzeCalls: Record<string, unknown>[] = [];
+    const transport: Transport & { analyzeCalls: Record<string, unknown>[] } = {
+      analyzeCalls,
+      async *executePlan(): AsyncIterable<Uint8Array> {},
+      async analyzePlan(
+        _sid: string,
+        req: Record<string, unknown>,
+      ): Promise<Record<string, unknown>> {
+        analyzeCalls.push(req);
+        return handler(req);
+      },
+    };
+    return transport;
+  }
+
+  it("returns true when plans match", async () => {
+    const transport = mockAnalyzeTransport2(() => ({ result: true }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df1 = spark.sql("SELECT * FROM t");
+    const df2 = spark.sql("SELECT * FROM t");
+    const result = await df1.sameSemantics(df2);
+    assert.equal(result, true);
+    assert.equal(transport.analyzeCalls[0].type, "sameSemantics");
+  });
+});
+
+describe("DataFrame.semanticHash()", () => {
+  function mockAnalyzeTransport3(
+    handler: (req: Record<string, unknown>) => Record<string, unknown>,
+  ) {
+    return {
+      analyzeCalls: [] as Record<string, unknown>[],
+      async *executePlan(): AsyncIterable<Uint8Array> {},
+      async analyzePlan(
+        _sid: string,
+        req: Record<string, unknown>,
+      ): Promise<Record<string, unknown>> {
+        this.analyzeCalls.push(req);
+        return handler(req);
+      },
+    };
+  }
+
+  it("returns a hash number", async () => {
+    const transport = mockAnalyzeTransport3(() => ({ result: 42 }));
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT * FROM t");
+    const hash = await df.semanticHash();
+    assert.equal(hash, 42);
+    assert.equal(transport.analyzeCalls[0].type, "semanticHash");
   });
 });

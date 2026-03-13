@@ -29,6 +29,8 @@ import {
   AnalyzePlanRequest_PersistSchema,
   AnalyzePlanRequest_UnpersistSchema,
   AnalyzePlanRequest_GetStorageLevelSchema,
+  AnalyzePlanRequest_SameSemanticsSchema,
+  AnalyzePlanRequest_SemanticHashSchema,
   StorageLevelSchema,
   CommandSchema,
   WriteOperationSchema,
@@ -471,6 +473,39 @@ function buildAnalyzePlanRequest(
     });
   }
 
+  if (type === "sameSemantics") {
+    const otherPlan = request.otherPlan as import("@spark-connect-js/core").LogicalPlan;
+    const otherRelation = buildRelation(otherPlan);
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "sameSemantics",
+        value: create(AnalyzePlanRequest_SameSemanticsSchema, {
+          targetPlan: create(PlanSchema, {
+            opType: { case: "root", value: relation! },
+          }),
+          otherPlan: create(PlanSchema, {
+            opType: { case: "root", value: otherRelation },
+          }),
+        }),
+      },
+    });
+  }
+
+  if (type === "semanticHash") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "semanticHash",
+        value: create(AnalyzePlanRequest_SemanticHashSchema, {
+          plan: create(PlanSchema, {
+            opType: { case: "root", value: relation! },
+          }),
+        }),
+      },
+    });
+  }
+
   throw new Error(`Unsupported analyze type: ${type}`);
 }
 
@@ -504,6 +539,10 @@ function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unk
           : undefined,
       };
     }
+    case "sameSemantics":
+      return { type: "sameSemantics", result: result.value.result };
+    case "semanticHash":
+      return { type: "semanticHash", result: result.value.result };
     default:
       return { type: result.case };
   }

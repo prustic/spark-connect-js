@@ -17,9 +17,20 @@ import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
+import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
 import type { StorageLevel } from "./storage-level.js";
 import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
+
+/** Parse a string key into its actual typed value (for replace() Record keys). */
+function inferLiteralValue(s: string): string | number | boolean | null {
+  if (s === "null") return null;
+  if (s === "true") return true;
+  if (s === "false") return false;
+  const n = Number(s);
+  if (!Number.isNaN(n) && s.trim() !== "") return n;
+  return s;
+}
 
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
@@ -42,12 +53,7 @@ export class DataFrame {
 
   // Transformations
 
-  /**
-   * Filter rows by a boolean Column expression.
-   *
-   * @example
-   *   df.filter(col("age").gt(lit(30)))
-   */
+  /** Filter rows by a boolean Column expression. */
   filter(condition: Column): DataFrame {
     return DataFrame._fromPlan(this._session, {
       type: "filter",
@@ -56,9 +62,7 @@ export class DataFrame {
     });
   }
 
-  /**
-   * Alias for filter() — matches PySpark's .where() method.
-   */
+  /** Alias for filter(). */
   where(condition: Column): DataFrame {
     return this.filter(condition);
   }
@@ -77,6 +81,18 @@ export class DataFrame {
   groupBy(...columns: Array<Column | string>): GroupedData {
     const groupExprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
     return new GroupedData(this, groupExprs);
+  }
+
+  /** Multi-dimensional cube aggregation (all grouping-column combinations). */
+  cube(...columns: Array<Column | string>): GroupedData {
+    const groupExprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
+    return new GroupedData(this, groupExprs, "cube");
+  }
+
+  /** Multi-dimensional rollup aggregation (hierarchical subtotals). */
+  rollup(...columns: Array<Column | string>): GroupedData {
+    const groupExprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
+    return new GroupedData(this, groupExprs, "rollup");
   }
 
   /** Limit the number of rows. */
@@ -518,6 +534,85 @@ export class DataFrame {
     });
   }
 
+  /** Compute specified statistics for numeric and string columns. */
+  summary(...statistics: string[]): DataFrame {
+    return DataFrame._fromPlan(this._session, {
+      type: "summary",
+      child: this._plan,
+      statistics,
+    });
+  }
+
+  /** Replace values matching old with new, optionally restricted to a column subset. */
+  replace(to: Record<string, string | number | boolean | null>, subset: string[] = []): DataFrame {
+    const replacements = Object.entries(to).map(([k, v]) => ({
+      oldValue: inferLiteralValue(k),
+      newValue: v,
+    }));
+    return DataFrame._fromPlan(this._session, {
+      type: "naReplace",
+      child: this._plan,
+      cols: subset,
+      replacements,
+    });
+  }
+
+  /** Randomly split this DataFrame into multiple DataFrames by weight. */
+  randomSplit(weights: number[], seed?: number): DataFrame[] {
+    const total = weights.reduce((a, b) => a + b, 0);
+    const normalized = weights.map((w) => w / total);
+    const result: DataFrame[] = [];
+    let cumulativeLower = 0;
+    for (const w of normalized) {
+      result.push(
+        DataFrame._fromPlan(this._session, {
+          type: "sample",
+          child: this._plan,
+          lowerBound: cumulativeLower,
+          upperBound: cumulativeLower + w,
+          withReplacement: false,
+          seed,
+        }),
+      );
+      cumulativeLower += w;
+    }
+    return result;
+  }
+
+  /** Unpivot from wide format to long format. */
+  unpivot(
+    ids: Array<Column | string>,
+    values: Array<Column | string> | undefined,
+    variableColumnName: string,
+    valueColumnName: string,
+  ): DataFrame {
+    const idExprs = ids.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
+    const valExprs = values?.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
+    return DataFrame._fromPlan(this._session, {
+      type: "unpivot",
+      child: this._plan,
+      ids: idExprs,
+      values: valExprs,
+      variableColumnName,
+      valueColumnName,
+    });
+  }
+
+  /** Alias for unpivot(). */
+  melt(
+    ids: Array<Column | string>,
+    values: Array<Column | string> | undefined,
+    variableColumnName: string,
+    valueColumnName: string,
+  ): DataFrame {
+    return this.unpivot(ids, values, variableColumnName, valueColumnName);
+  }
+
+  /** Access statistical functions (corr, cov, crosstab, etc.). */
+  get stat(): DataFrameStat {
+    return new DataFrameStat(this);
+  }
+
   // Writer
 
   /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
@@ -589,6 +684,58 @@ export class DataFrame {
       isGlobal: false,
       replace: true,
     });
+  }
+
+  /** Register as a temporary view. Throws if the view already exists. */
+  async createTempView(viewName: string): Promise<void> {
+    await this._session._executeCommand({
+      type: "createDataframeView",
+      plan: this._plan,
+      name: viewName,
+      isGlobal: false,
+      replace: false,
+    });
+  }
+
+  /** Register as a global temporary view, replacing if it already exists. */
+  async createOrReplaceGlobalTempView(viewName: string): Promise<void> {
+    await this._session._executeCommand({
+      type: "createDataframeView",
+      plan: this._plan,
+      name: viewName,
+      isGlobal: true,
+      replace: true,
+    });
+  }
+
+  /** Register as a global temporary view. Throws if the view already exists. */
+  async createGlobalTempView(viewName: string): Promise<void> {
+    await this._session._executeCommand({
+      type: "createDataframeView",
+      plan: this._plan,
+      name: viewName,
+      isGlobal: true,
+      replace: false,
+    });
+  }
+
+  /** Returns true if both DataFrames have the same logical plan. */
+  async sameSemantics(other: DataFrame): Promise<boolean> {
+    const result = await this._session._analyzePlan({
+      type: "sameSemantics",
+      plan: this._plan,
+      otherPlan: other._plan,
+    });
+    return (result.result as boolean) ?? false;
+  }
+
+  /** Returns a hash code of the logical plan. */
+  async semanticHash(): Promise<number> {
+    const result = await this._session._analyzePlan({
+      type: "semanticHash",
+      plan: this._plan,
+    });
+    return (result.result as number) ?? 0;
   }
 
   // Actions

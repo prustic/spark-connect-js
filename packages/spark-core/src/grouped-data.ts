@@ -23,16 +23,25 @@
  */
 
 import { DataFrame } from "./data-frame.js";
-import { Column } from "./column.js";
+import { Column, col } from "./column.js";
 import type { Expression } from "./plan/logical-plan.js";
 
 export class GroupedData {
   private readonly _df: DataFrame;
   private readonly _groupExprs: Expression[];
+  private readonly _groupType: "groupby" | "rollup" | "cube" | "pivot";
+  private readonly _pivot?: { col: Expression; values: Array<string | number | boolean> };
 
-  constructor(df: DataFrame, groupExprs: Expression[]) {
+  constructor(
+    df: DataFrame,
+    groupExprs: Expression[],
+    groupType: "groupby" | "rollup" | "cube" | "pivot" = "groupby",
+    pivot?: { col: Expression; values: Array<string | number | boolean> },
+  ) {
     this._df = df;
     this._groupExprs = groupExprs;
+    this._groupType = groupType;
+    this._pivot = pivot;
   }
 
   /**
@@ -54,6 +63,8 @@ export class GroupedData {
       child: this._df._plan,
       groupingExpressions: this._groupExprs,
       aggregateExpressions: aggExprs,
+      groupType: this._groupType,
+      pivot: this._pivot,
     });
   }
 
@@ -114,5 +125,14 @@ export class GroupedData {
       }).alias(`max(${name})`),
     );
     return this.agg(...maxExprs);
+  }
+
+  /** Pivot a column for aggregation. */
+  pivot(pivotCol: Column | string, values: Array<string | number | boolean> = []): GroupedData {
+    const pivotExpr = typeof pivotCol === "string" ? col(pivotCol)._expr : pivotCol._expr;
+    return new GroupedData(this._df, this._groupExprs, "pivot", {
+      col: pivotExpr,
+      values,
+    });
   }
 }

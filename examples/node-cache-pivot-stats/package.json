@@ -1,0 +1,28 @@
+{
+  "name": "@spark-connect-js/example-node-cache-pivot-stats",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Caching, repartitioning, pivot/unpivot, stat functions, and more",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "start": "node dist/main.js",
+    "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules",
+    "lint": "eslint",
+    "spark:up": "docker compose up -d --wait",
+    "spark:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@spark-connect-js/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@spark-connect-js/eslint-config": "workspace:*",
+    "@spark-connect-js/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

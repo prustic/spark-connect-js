@@ -51,9 +51,15 @@ export {
   AnalyzePlanRequest_UnpersistSchema,
   type AnalyzePlanRequest_GetStorageLevel,
   AnalyzePlanRequest_GetStorageLevelSchema,
+  type AnalyzePlanRequest_SameSemantics,
+  AnalyzePlanRequest_SameSemanticsSchema,
+  type AnalyzePlanRequest_SemanticHash,
+  AnalyzePlanRequest_SemanticHashSchema,
   type AnalyzePlanResponse_Persist,
   type AnalyzePlanResponse_Unpersist,
   type AnalyzePlanResponse_GetStorageLevel,
+  type AnalyzePlanResponse_SameSemantics,
+  type AnalyzePlanResponse_SemanticHash,
 } from "./gen/spark/connect/base_pb.js";
 
 // Relation (logical plan) messages
@@ -127,6 +133,24 @@ export {
   RepartitionSchema,
   type RepartitionByExpression,
   RepartitionByExpressionSchema,
+  type Unpivot,
+  UnpivotSchema,
+  type Unpivot_Values,
+  Unpivot_ValuesSchema,
+  type StatCorr,
+  StatCorrSchema,
+  type StatCov,
+  StatCovSchema,
+  type StatCrosstab,
+  StatCrosstabSchema,
+  type StatFreqItems,
+  StatFreqItemsSchema,
+  type StatApproxQuantile,
+  StatApproxQuantileSchema,
+  type NAReplace_Replacement,
+  NAReplace_ReplacementSchema,
+  type Aggregate_Pivot,
+  Aggregate_PivotSchema,
 } from "./gen/spark/connect/relations_pb.js";
 
 // Expression messages

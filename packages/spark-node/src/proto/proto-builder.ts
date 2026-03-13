@@ -78,6 +78,17 @@ import {
   TailSchema,
   RepartitionSchema,
   RepartitionByExpressionSchema,
+  StatSummarySchema,
+  NAReplaceSchema,
+  NAReplace_ReplacementSchema,
+  StatCorrSchema,
+  StatCovSchema,
+  StatCrosstabSchema,
+  StatFreqItemsSchema,
+  StatApproxQuantileSchema,
+  UnpivotSchema,
+  Unpivot_ValuesSchema,
+  Aggregate_PivotSchema,
 } from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -176,18 +187,29 @@ export function buildRelation(plan: LogicalPlan): Relation {
         },
       });
 
-    case "aggregate":
-      return create(RelationSchema, {
-        relType: {
-          case: "aggregate",
-          value: create(AggregateSchema, {
-            input: buildRelation(plan.child),
-            groupType: Aggregate_GroupType.GROUPBY,
-            groupingExpressions: plan.groupingExpressions.map(buildExpression),
-            aggregateExpressions: plan.aggregateExpressions.map(buildExpression),
-          }),
-        },
+    case "aggregate": {
+      const groupTypeMap: Record<string, Aggregate_GroupType> = {
+        groupby: Aggregate_GroupType.GROUPBY,
+        rollup: Aggregate_GroupType.ROLLUP,
+        cube: Aggregate_GroupType.CUBE,
+        pivot: Aggregate_GroupType.PIVOT,
+      };
+      const aggValue = create(AggregateSchema, {
+        input: buildRelation(plan.child),
+        groupType: groupTypeMap[plan.groupType ?? "groupby"] ?? Aggregate_GroupType.GROUPBY,
+        groupingExpressions: plan.groupingExpressions.map(buildExpression),
+        aggregateExpressions: plan.aggregateExpressions.map(buildExpression),
       });
+      if (plan.pivot) {
+        aggValue.pivot = create(Aggregate_PivotSchema, {
+          col: buildExpression(plan.pivot.col),
+          values: plan.pivot.values.map((v) => buildLiteral(v)),
+        });
+      }
+      return create(RelationSchema, {
+        relType: { case: "aggregate", value: aggValue },
+      });
+    }
 
     case "limit":
       return create(RelationSchema, {
@@ -517,7 +539,160 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    case "summary":
+      return create(RelationSchema, {
+        relType: {
+          case: "summary",
+          value: create(StatSummarySchema, {
+            input: buildRelation(plan.child),
+            statistics: plan.statistics,
+          }),
+        },
+      });
+
+    case "naReplace":
+      return create(RelationSchema, {
+        relType: {
+          case: "replace",
+          value: create(NAReplaceSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+            replacements: plan.replacements.map((r) =>
+              create(NAReplace_ReplacementSchema, {
+                oldValue: r.oldValue != null ? buildReplaceLiteral(r.oldValue) : undefined,
+                newValue: r.newValue != null ? buildReplaceLiteral(r.newValue) : undefined,
+              }),
+            ),
+          }),
+        },
+      });
+
+    case "unpivot": {
+      const unpivotValue = create(UnpivotSchema, {
+        input: buildRelation(plan.child),
+        ids: plan.ids.map(buildExpression),
+        variableColumnName: plan.variableColumnName,
+        valueColumnName: plan.valueColumnName,
+      });
+      if (plan.values) {
+        unpivotValue.values = create(Unpivot_ValuesSchema, {
+          values: plan.values.map(buildExpression),
+        });
+      }
+      return create(RelationSchema, {
+        relType: { case: "unpivot", value: unpivotValue },
+      });
+    }
+
+    case "statCorr":
+      return create(RelationSchema, {
+        relType: {
+          case: "corr",
+          value: create(StatCorrSchema, {
+            input: buildRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+            method: plan.method,
+          }),
+        },
+      });
+
+    case "statCov":
+      return create(RelationSchema, {
+        relType: {
+          case: "cov",
+          value: create(StatCovSchema, {
+            input: buildRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+          }),
+        },
+      });
+
+    case "statCrosstab":
+      return create(RelationSchema, {
+        relType: {
+          case: "crosstab",
+          value: create(StatCrosstabSchema, {
+            input: buildRelation(plan.child),
+            col1: plan.col1,
+            col2: plan.col2,
+          }),
+        },
+      });
+
+    case "statFreqItems":
+      return create(RelationSchema, {
+        relType: {
+          case: "freqItems",
+          value: create(StatFreqItemsSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+            support: plan.support,
+          }),
+        },
+      });
+
+    case "statApproxQuantile":
+      return create(RelationSchema, {
+        relType: {
+          case: "approxQuantile",
+          value: create(StatApproxQuantileSchema, {
+            input: buildRelation(plan.child),
+            cols: plan.cols,
+            probabilities: plan.probabilities,
+            relativeError: plan.relativeError,
+          }),
+        },
+      });
   }
+}
+
+/**
+ * Convert a JS primitive to an Expression_Literal proto message.
+ */
+function buildLiteral(value: string | number | boolean | null) {
+  if (value === null) {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: undefined, value: undefined },
+    });
+  }
+  if (typeof value === "string") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "string", value },
+    });
+  }
+  if (typeof value === "boolean") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "boolean", value },
+    });
+  }
+  if (Number.isInteger(value) && Number.isSafeInteger(value)) {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "integer", value },
+    });
+  }
+  return create(Expression_LiteralSchema, {
+    literalType: { case: "double", value },
+  });
+}
+
+/** NAReplace only supports null, bool, double, and string literals. */
+function buildReplaceLiteral(value: string | number | boolean) {
+  if (typeof value === "string") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "string", value },
+    });
+  }
+  if (typeof value === "boolean") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "boolean", value },
+    });
+  }
+  return create(Expression_LiteralSchema, {
+    literalType: { case: "double", value },
+  });
 }
 
 /**
