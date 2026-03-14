@@ -19,10 +19,10 @@
 ### @spark-connect-js/node
 
 - Proto serialization for `StatSummary`, `NAReplace`, `Unpivot`, `StatCorr`, `StatCov`, `StatCrosstab`, `StatFreqItems`, `StatApproxQuantile`, and `Aggregate_Pivot`
-- `sameSemantics` and `semanticHash` analyze plan request/response handling
+- Added analyze-plan request/response handling for `sameSemantics` and `semanticHash`
 - Re-exported `DataFrameStat` from package index
 
 ### @spark-connect-js/connect
 
 - Re-exported proto schemas: `StatSummarySchema`, `NAReplaceSchema`, `NAReplace_ReplacementSchema`, `StatCorrSchema`, `StatCovSchema`, `StatCrosstabSchema`, `StatFreqItemsSchema`, `StatApproxQuantileSchema`, `UnpivotSchema`, `Unpivot_ValuesSchema`, `Aggregate_PivotSchema`
-- Re-exported `SameSemantics` and `SemanticHash` analyze plan schemas
+- Re-exported analyze-plan schemas for `SameSemantics` and `SemanticHash`
