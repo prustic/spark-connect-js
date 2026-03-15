@@ -1,5 +1,20 @@
 # @spark-connect-js/node
 
+## 0.2.0
+
+### Minor Changes
+
+- [#18](https://github.com/prustic/spark-connect-js/pull/18) [`924ea50`](https://github.com/prustic/spark-connect-js/commit/924ea50d700711733cef96857a48c900dc8d7f4b) Thanks [@prustic](https://github.com/prustic)!
+  - Proto serialization for `StatSummary`, `NAReplace`, `Unpivot`, `StatCorr`, `StatCov`, `StatCrosstab`, `StatFreqItems`, `StatApproxQuantile`, and `Aggregate_Pivot`
+  - Added analyze-plan request/response handling for `sameSemantics` and `semanticHash`
+  - Re-exported `DataFrameStat` from package index
+
+### Patch Changes
+
+- Updated dependencies [[`924ea50`](https://github.com/prustic/spark-connect-js/commit/924ea50d700711733cef96857a48c900dc8d7f4b)]:
+  - @spark-connect-js/core@0.2.0
+  - @spark-connect-js/connect@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

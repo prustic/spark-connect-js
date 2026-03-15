@@ -1,5 +1,13 @@
 # @spark-connect-js/connect
 
+## 0.2.0
+
+### Minor Changes
+
+- [#18](https://github.com/prustic/spark-connect-js/pull/18) [`924ea50`](https://github.com/prustic/spark-connect-js/commit/924ea50d700711733cef96857a48c900dc8d7f4b) Thanks [@prustic](https://github.com/prustic)!
+  - Re-exported proto schemas: `StatSummarySchema`, `NAReplaceSchema`, `NAReplace_ReplacementSchema`, `StatCorrSchema`, `StatCovSchema`, `StatCrosstabSchema`, `StatFreqItemsSchema`, `StatApproxQuantileSchema`, `UnpivotSchema`, `Unpivot_ValuesSchema`, `Aggregate_PivotSchema`
+  - Re-exported analyze-plan schemas for `SameSemantics` and `SemanticHash`
+
 ## 0.1.0
 
 ### Minor Changes
