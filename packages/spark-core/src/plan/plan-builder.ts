@@ -88,15 +88,27 @@ export class PlanBuilder {
           },
         };
 
-      case "aggregate":
-        return {
-          aggregate: {
-            input: PlanBuilder.toRelation(plan.child),
-            groupType: "GROUP_TYPE_GROUPBY",
-            groupingExpressions: plan.groupingExpressions.map((e) => PlanBuilder.toExpression(e)),
-            aggregateExpressions: plan.aggregateExpressions.map((e) => PlanBuilder.toExpression(e)),
-          },
+      case "aggregate": {
+        const groupTypeMap: Record<string, string> = {
+          groupby: "GROUP_TYPE_GROUPBY",
+          rollup: "GROUP_TYPE_ROLLUP",
+          cube: "GROUP_TYPE_CUBE",
+          pivot: "GROUP_TYPE_PIVOT",
         };
+        const aggregate: Record<string, unknown> = {
+          input: PlanBuilder.toRelation(plan.child),
+          groupType: groupTypeMap[plan.groupType ?? "groupby"] ?? "GROUP_TYPE_GROUPBY",
+          groupingExpressions: plan.groupingExpressions.map((e) => PlanBuilder.toExpression(e)),
+          aggregateExpressions: plan.aggregateExpressions.map((e) => PlanBuilder.toExpression(e)),
+        };
+        if (plan.pivot) {
+          aggregate.pivot = {
+            col: PlanBuilder.toExpression(plan.pivot.col),
+            values: plan.pivot.values.map((v) => ({ literal: toLiteral(v) })),
+          };
+        }
+        return { aggregate };
+      }
 
       case "limit":
         return {
