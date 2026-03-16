@@ -37,6 +37,7 @@ import {
   WriteOperation_SaveMode,
   WriteOperation_SaveTableSchema,
   WriteOperation_SaveTable_TableSaveMethod,
+  WriteOperation_BucketBySchema,
   CreateDataFrameViewCommandSchema,
   type WriteOperation,
   type ExecutePlanRequest,
@@ -328,18 +329,28 @@ function buildCommandProto(command: Record<string, unknown>): Command {
       saveTypeProto = { case: undefined, value: undefined };
     }
 
+    const writeOp = create(WriteOperationSchema, {
+      input: relation,
+      source: command.source as string,
+      mode,
+      saveType: saveTypeProto,
+      options: (command.options as Record<string, string>) ?? {},
+      partitioningColumns: (command.partitioningColumns as string[]) ?? [],
+      sortColumnNames: (command.sortColumnNames as string[]) ?? [],
+    });
+
+    const bucket = command.bucketBy as { numBuckets: number; columnNames: string[] } | undefined;
+    if (bucket) {
+      writeOp.bucketBy = create(WriteOperation_BucketBySchema, {
+        numBuckets: bucket.numBuckets,
+        bucketColumnNames: bucket.columnNames,
+      });
+    }
+
     return create(CommandSchema, {
       commandType: {
         case: "writeOperation",
-        value: create(WriteOperationSchema, {
-          input: relation,
-          source: command.source as string,
-          mode,
-          saveType: saveTypeProto,
-          options: (command.options as Record<string, string>) ?? {},
-          partitioningColumns: (command.partitioningColumns as string[]) ?? [],
-          sortColumnNames: (command.sortColumnNames as string[]) ?? [],
-        }),
+        value: writeOp,
       },
     });
   }

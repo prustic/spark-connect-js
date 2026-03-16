@@ -236,10 +236,31 @@ class SparkSessionBuilder {
 class DataFrameReader {
   private session: SparkSession;
   private _format: string = "parquet";
+  private _schema: string | undefined;
   private _options: Record<string, string> = {};
 
   constructor(session: SparkSession) {
     this.session = session;
+  }
+
+  /**
+   * Set the schema for the data source.
+   * Accepts a DDL-formatted string (e.g. "name STRING, age INT")
+   * or a StructType whose DDL representation will be used.
+   */
+  schema(schema: string | { toDDL?: () => string; simpleString?: () => string }): this {
+    if (typeof schema === "string") {
+      this._schema = schema;
+    } else if (typeof schema === "object" && schema !== null) {
+      if (typeof schema.toDDL === "function") {
+        this._schema = schema.toDDL();
+      } else if (typeof schema.simpleString === "function") {
+        this._schema = schema.simpleString();
+      } else {
+        this._schema = String(schema);
+      }
+    }
+    return this;
   }
 
   format(fmt: string): this {
@@ -270,6 +291,7 @@ class DataFrameReader {
       format: this._format,
       path,
       options: { ...this._options },
+      ...(this._schema != null && { schema: this._schema }),
     });
   }
 
@@ -300,5 +322,10 @@ class DataFrameReader {
   /** Shortcut for .format("orc").load(path). */
   orc(path: string): DataFrame {
     return this.format("orc").load(path);
+  }
+
+  /** Shortcut for .format("text").load(path). */
+  text(path: string): DataFrame {
+    return this.format("text").load(path);
   }
 }
