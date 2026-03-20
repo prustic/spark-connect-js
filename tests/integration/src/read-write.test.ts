@@ -137,11 +137,7 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("overwrite() with condition replaces matching rows", async () => {
     const table = "spark_v2_overwrite_test";
-    await spark()
-      .range(10)
-      .selectExpr("id", "id % 2 AS category")
-      .writeTo(table)
-      .createOrReplace();
+    await spark().range(10).selectExpr("id", "id % 2 AS category").writeTo(table).createOrReplace();
 
     // Overwrite rows where category = 0 with 2 new rows
     await spark()
@@ -156,17 +152,10 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("overwritePartitions() replaces partitions dynamically", async () => {
     const table = "spark_v2_overwrite_parts_test";
-    await spark()
-      .range(6)
-      .selectExpr("id", "id % 2 AS part")
-      .writeTo(table)
-      .createOrReplace();
+    await spark().range(6).selectExpr("id", "id % 2 AS part").writeTo(table).createOrReplace();
 
     // Overwrite only partition part=0 with 1 row
-    await spark()
-      .sql("SELECT 99 AS id, 0 AS part")
-      .writeTo(table)
-      .overwritePartitions();
+    await spark().sql("SELECT 99 AS id, 0 AS part").writeTo(table).overwritePartitions();
 
     const rows = await spark().read.table(table).collect();
     // 3 rows with part=1 kept + 1 new row with part=0 = 4

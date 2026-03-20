@@ -16,10 +16,7 @@ function mockCommandTransport() {
 }
 
 function makeSession(transport: Transport) {
-  return SparkSession.builder()
-    .remote("sc://localhost:15002")
-    .transport(transport)
-    .getOrCreate();
+  return SparkSession.builder().remote("sc://localhost:15002").transport(transport).getOrCreate();
 }
 
 describe("DataFrameWriterV2", () => {
@@ -115,10 +112,7 @@ describe("DataFrameWriterV2", () => {
     const transport = mockCommandTransport();
     const spark = makeSession(transport);
     const df = spark.sql("SELECT 1");
-    await df
-      .writeTo("my_table")
-      .tableProperty("write.format.default", "parquet")
-      .create();
+    await df.writeTo("my_table").tableProperty("write.format.default", "parquet").create();
     const cmd = transport.commandCalls[0];
     const props = cmd.tableProperties as Record<string, string>;
     assert.equal(props["write.format.default"], "parquet");
@@ -171,10 +165,7 @@ describe("DataFrameWriterV2", () => {
     assert.equal(cmd.provider, "iceberg");
     assert.equal(cmd.mode, "createOrReplace");
     assert.equal((cmd.options as Record<string, string>)["fanout-enabled"], "true");
-    assert.equal(
-      (cmd.tableProperties as Record<string, string>)["format-version"],
-      "2",
-    );
+    assert.equal((cmd.tableProperties as Record<string, string>)["format-version"], "2");
     assert.equal((cmd.partitioningColumns as unknown[]).length, 1);
   });
 });
