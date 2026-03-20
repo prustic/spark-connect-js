@@ -113,21 +113,22 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("createOrReplace() creates a table", async () => {
     const table = tempTable("v2_create");
-    await spark().range(5).writeTo(table).createOrReplace();
+    await spark().range(5).writeTo(table).using("delta").createOrReplace();
     const rows = await spark().read.table(table).collect();
     assert.equal(rows.length, 5);
   });
 
   it("append() adds rows to existing table", async () => {
     const table = tempTable("v2_append");
-    await spark().range(3).writeTo(table).createOrReplace();
+    await spark().range(3).writeTo(table).using("delta").createOrReplace();
     await spark().range(2).writeTo(table).append();
     const rows = await spark().read.table(table).collect();
     assert.equal(rows.length, 5);
   });
 
   it("replace() replaces table contents", async () => {
-    const table = tempTable("v2_replace");
+    // replace() requires REPLACE TABLE AS SELECT, which Iceberg supports but Delta does not
+    const table = `iceberg.db.test_${Date.now()}_v2_replace`;
     await spark().range(10).writeTo(table).createOrReplace();
     await spark().range(3).writeTo(table).replace();
     const rows = await spark().read.table(table).collect();
@@ -136,10 +137,15 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("overwrite() with condition replaces matching rows", async () => {
     const table = tempTable("v2_overwrite");
-    await spark().range(10).selectExpr("id", "id % 2 AS category").writeTo(table).createOrReplace();
+    await spark()
+      .range(10)
+      .selectExpr("id", "id % 2 AS category")
+      .writeTo(table)
+      .using("delta")
+      .createOrReplace();
 
     await spark()
-      .sql("SELECT 100 AS id, 0 AS category UNION ALL SELECT 101 AS id, 0 AS category")
+      .sql("SELECT CAST(100 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category UNION ALL SELECT CAST(101 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category")
       .writeTo(table)
       .overwrite(col("category").eq(lit(0)));
 
@@ -150,9 +156,15 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("overwritePartitions() replaces partitions dynamically", async () => {
     const table = tempTable("v2_overwrite_parts");
-    await spark().range(6).selectExpr("id", "id % 2 AS part").writeTo(table).createOrReplace();
+    await spark()
+      .range(6)
+      .selectExpr("id", "id % 2 AS part")
+      .writeTo(table)
+      .using("delta")
+      .partitionedBy(col("part"))
+      .createOrReplace();
 
-    await spark().sql("SELECT 99 AS id, 0 AS part").writeTo(table).overwritePartitions();
+    await spark().sql("SELECT CAST(99 AS BIGINT) AS id, CAST(0 AS BIGINT) AS part").writeTo(table).overwritePartitions();
 
     const rows = await spark().read.table(table).collect();
     // 3 rows with part=1 kept + 1 new row with part=0 = 4

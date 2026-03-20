@@ -248,19 +248,17 @@ class DataFrameReader {
   /**
    * Set the schema for the data source.
    * Accepts a DDL-formatted string (e.g. "name STRING, age INT")
-   * or a StructType whose DDL representation will be used.
+   * or a StructType with a toDDL() method.
    */
-  schema(schema: string | { toDDL?: () => string; simpleString?: () => string }): this {
+  schema(schema: string | { toDDL(): string }): this {
     if (typeof schema === "string") {
       this._schema = schema;
-    } else if (typeof schema === "object" && schema !== null) {
-      if (typeof schema.toDDL === "function") {
-        this._schema = schema.toDDL();
-      } else if (typeof schema.simpleString === "function") {
-        this._schema = schema.simpleString();
-      } else {
-        throw new Error("schema object must have a toDDL() or simpleString() method");
-      }
+    } else if (typeof schema === "object" && schema !== null && typeof schema.toDDL === "function") {
+      this._schema = schema.toDDL();
+    } else {
+      throw new Error(
+        "schema must be a DDL string (e.g. 'id INT, name STRING') or an object with a toDDL() method",
+      );
     }
     return this;
   }

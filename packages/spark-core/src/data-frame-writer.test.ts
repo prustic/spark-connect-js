@@ -102,6 +102,48 @@ describe("DataFrameWriter.bucketBy()", () => {
     const cmd = transport.commandCalls[0];
     assert.equal(cmd.bucketBy, undefined);
   });
+
+  it("save() strips bucketBy from path writes", async () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    await df.write.bucketBy(4, "id").save("/output");
+    const cmd = transport.commandCalls[0];
+    assert.equal(cmd.bucketBy, undefined);
+  });
+
+  it("bucketBy() throws on zero", () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    assert.throws(() => df.write.bucketBy(0, "id"), { message: /positive integer/ });
+  });
+
+  it("bucketBy() throws on negative", () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    assert.throws(() => df.write.bucketBy(-1, "id"), { message: /positive integer/ });
+  });
+
+  it("bucketBy() throws on non-integer", () => {
+    const transport = mockCommandTransport();
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+    assert.throws(() => df.write.bucketBy(3.5, "id"), { message: /positive integer/ });
+  });
 });
 
 describe("DataFrameWriter.insertInto()", () => {

@@ -80,6 +80,11 @@ export class DataFrameWriter {
    * Only applicable when saving to a table (saveAsTable).
    */
   bucketBy(numBuckets: number, col: string, ...cols: string[]): this {
+    if (!Number.isInteger(numBuckets) || numBuckets <= 0) {
+      throw new Error(
+        `bucketBy requires numBuckets to be a positive integer, but got: ${numBuckets}`,
+      );
+    }
     this._bucketBy = { numBuckets, columnNames: [col, ...cols] };
     return this;
   }
@@ -104,8 +109,9 @@ export class DataFrameWriter {
    * Sends a WriteOperation command through the Spark Connect RPC.
    */
   async save(path: string): Promise<void> {
+    const { bucketBy: _, ...fields } = this._commandFields();
     await this._df._session._executeCommand({
-      ...this._commandFields(),
+      ...fields,
       saveType: { case: "path", value: path },
     });
   }

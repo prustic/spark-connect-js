@@ -1259,6 +1259,14 @@ describe("DataFrameReader.schema()", () => {
     }
   });
 
+  it("schema() throws on object without toDDL()", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.read.schema({} as { toDDL(): string }).csv("/data"),
+      { message: /toDDL/ },
+    );
+  });
+
   it("load() without schema does not include schema field", () => {
     const { spark } = createSession();
     const df = spark.read.format("parquet").load("/data/file.parquet");

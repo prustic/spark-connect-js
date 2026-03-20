@@ -386,10 +386,13 @@ function buildCommandProto(command: Record<string, unknown>): Command {
     const plan = command.plan as import("@spark-connect-js/core").LogicalPlan;
     const relation = buildRelation(plan);
     const modeStr = command.mode as string;
-    const mode = WRITE_V2_MODE_MAP[modeStr] ?? WriteOperationV2_Mode.UNSPECIFIED;
+    const mode = WRITE_V2_MODE_MAP[modeStr];
+    if (mode === undefined) {
+      throw new Error(`Unknown writeOperationV2 mode: ${modeStr}`);
+    }
 
     const partitioningExprs = (
-      command.partitioningColumns as import("@spark-connect-js/core").Expression[]
+      (command.partitioningColumns as import("@spark-connect-js/core").Expression[]) ?? []
     ).map((e) => buildExpression(e));
 
     const writeV2 = create(WriteOperationV2Schema, {
