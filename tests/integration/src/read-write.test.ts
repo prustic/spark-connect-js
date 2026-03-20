@@ -145,7 +145,9 @@ describe("writeTo (DataFrameWriterV2)", () => {
       .createOrReplace();
 
     await spark()
-      .sql("SELECT CAST(100 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category UNION ALL SELECT CAST(101 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category")
+      .sql(
+        "SELECT CAST(100 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category UNION ALL SELECT CAST(101 AS BIGINT) AS id, CAST(0 AS BIGINT) AS category",
+      )
       .writeTo(table)
       .overwrite(col("category").eq(lit(0)));
 
@@ -164,7 +166,10 @@ describe("writeTo (DataFrameWriterV2)", () => {
       .partitionedBy(col("part"))
       .createOrReplace();
 
-    await spark().sql("SELECT CAST(99 AS BIGINT) AS id, CAST(0 AS BIGINT) AS part").writeTo(table).overwritePartitions();
+    await spark()
+      .sql("SELECT CAST(99 AS BIGINT) AS id, CAST(0 AS BIGINT) AS part")
+      .writeTo(table)
+      .overwritePartitions();
 
     const rows = await spark().read.table(table).collect();
     // 3 rows with part=1 kept + 1 new row with part=0 = 4

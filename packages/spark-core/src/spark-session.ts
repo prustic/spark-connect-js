@@ -253,7 +253,11 @@ class DataFrameReader {
   schema(schema: string | { toDDL(): string }): this {
     if (typeof schema === "string") {
       this._schema = schema;
-    } else if (typeof schema === "object" && schema !== null && typeof schema.toDDL === "function") {
+    } else if (
+      typeof schema === "object" &&
+      schema !== null &&
+      typeof schema.toDDL === "function"
+    ) {
       this._schema = schema.toDDL();
     } else {
       throw new Error(
