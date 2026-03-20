@@ -119,6 +119,7 @@ const spark = connect("sc://localhost:15002");
 | `printSchema(level?)`                 | Print the schema tree                     |
 | `explain(extended?, mode?)`           | Show the execution plan                   |
 | `write`                               | Returns a DataFrameWriter                 |
+| `writeTo(tableName)`                  | Returns a DataFrameWriterV2               |
 | `stat`                                | Returns DataFrameStat                     |
 | `createTempView(name)`                | Register as a temp view (fails if exists) |
 | `createOrReplaceTempView(name)`       | Register as a temp view                   |
@@ -216,15 +217,22 @@ Constants: `Window.unboundedPreceding`, `Window.unboundedFollowing`, `Window.cur
 
 ```typescript
 spark.read.format("parquet").option("mergeSchema", "true").load("/data/events");
+spark.read.schema("id BIGINT, name STRING").csv("/data/people.csv");
 ```
 
-| Method               | Description            |
-| -------------------- | ---------------------- |
-| `format(source)`     | Set data source format |
-| `option(key, value)` | Set a read option      |
-| `options(opts)`      | Set multiple options   |
-| `load(path?)`        | Read from path         |
-| `table(name)`        | Read a named table     |
+| Method               | Description                      |
+| -------------------- | -------------------------------- |
+| `format(source)`     | Set data source format           |
+| `schema(schema)`     | Set schema (DDL string)          |
+| `option(key, value)` | Set a read option                |
+| `options(opts)`      | Set multiple options             |
+| `load(path?)`        | Read from path                   |
+| `table(name)`        | Read a named table               |
+| `csv(path)`          | Read CSV files                   |
+| `json(path)`         | Read JSON files                  |
+| `parquet(path)`      | Read Parquet files               |
+| `orc(path)`          | Read ORC files                   |
+| `text(path)`         | Read text files (single column)  |
 
 ---
 
@@ -232,18 +240,51 @@ spark.read.format("parquet").option("mergeSchema", "true").load("/data/events");
 
 ```typescript
 df.write.format("parquet").mode("overwrite").partitionBy("year").save("/output");
+df.write.mode("overwrite").bucketBy(4, "category").saveAsTable("bucketed");
 ```
 
-| Method                 | Description                                      |
-| ---------------------- | ------------------------------------------------ |
-| `format(source)`       | Set data source format                           |
-| `mode(saveMode)`       | `"append"`, `"overwrite"`, `"ignore"`, `"error"` |
-| `option(key, value)`   | Set a write option                               |
-| `options(opts)`        | Set multiple options                             |
-| `partitionBy(...cols)` | Partition output by columns                      |
-| `sortBy(...cols)`      | Sort within partitions                           |
-| `save(path?)`          | Write to path                                    |
-| `saveAsTable(name)`    | Write to a table                                 |
+| Method                        | Description                                      |
+| ----------------------------- | ------------------------------------------------ |
+| `format(source)`              | Set data source format                           |
+| `mode(saveMode)`              | `"append"`, `"overwrite"`, `"ignore"`, `"error"` |
+| `option(key, value)`          | Set a write option                               |
+| `options(opts)`               | Set multiple options                             |
+| `partitionBy(...cols)`        | Partition output by columns                      |
+| `sortBy(...cols)`             | Sort within partitions                           |
+| `bucketBy(n, col, ...cols)`   | Bucket by columns into n buckets                 |
+| `save(path?)`                 | Write to path                                    |
+| `saveAsTable(name)`           | Write to a table                                 |
+| `insertInto(tableName)`       | Insert into an existing table                    |
+| `csv(path)`                   | Write as CSV                                     |
+| `json(path)`                  | Write as JSON                                    |
+| `parquet(path)`               | Write as Parquet                                 |
+| `orc(path)`                   | Write as ORC                                     |
+| `text(path)`                  | Write as text                                    |
+
+---
+
+## DataFrameWriterV2
+
+```typescript
+df.writeTo("catalog.db.table").using("parquet").createOrReplace();
+df.writeTo("events").partitionedBy(col("date")).append();
+df.writeTo("events").overwrite(col("date").eq(lit("2026-01-01")));
+```
+
+| Method                        | Description                                    |
+| ----------------------------- | ---------------------------------------------- |
+| `using(provider)`             | Set the data source provider                   |
+| `option(key, value)`          | Set a write option                             |
+| `options(opts)`               | Set multiple options                           |
+| `tableProperty(prop, value)`  | Set a table property                           |
+| `partitionedBy(...cols)`      | Partition by column expressions                |
+| `clusterBy(...colNames)`      | Cluster by column names                        |
+| `create()`                    | Create a new table                             |
+| `replace()`                   | Replace an existing table                      |
+| `createOrReplace()`           | Create or replace a table                      |
+| `append()`                    | Append rows to the table                       |
+| `overwrite(condition)`        | Overwrite rows matching the condition          |
+| `overwritePartitions()`       | Dynamically overwrite partitions               |
 
 ---
 
