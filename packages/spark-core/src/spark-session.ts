@@ -257,7 +257,7 @@ class DataFrameReader {
       } else if (typeof schema.simpleString === "function") {
         this._schema = schema.simpleString();
       } else {
-        this._schema = String(schema);
+        throw new Error("schema object must have a toDDL() or simpleString() method");
       }
     }
     return this;
