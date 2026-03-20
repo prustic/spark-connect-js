@@ -38,6 +38,8 @@ import {
   WriteOperation_SaveTableSchema,
   WriteOperation_SaveTable_TableSaveMethod,
   WriteOperation_BucketBySchema,
+  WriteOperationV2Schema,
+  WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
   type WriteOperation,
   type ExecutePlanRequest,
@@ -50,7 +52,7 @@ import {
 import type { Transport } from "@spark-connect-js/core";
 import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
-import { buildRelation } from "../proto/proto-builder.js";
+import { buildRelation, buildExpression } from "../proto/proto-builder.js";
 
 /** gRPC channel options tuned for Spark Connect workloads. */
 const CHANNEL_OPTIONS: Record<string, number> = {
@@ -300,6 +302,15 @@ const SAVE_MODE_MAP: Record<string, WriteOperation_SaveMode> = {
   ignore: WriteOperation_SaveMode.IGNORE,
 };
 
+const WRITE_V2_MODE_MAP: Record<string, WriteOperationV2_Mode> = {
+  create: WriteOperationV2_Mode.CREATE,
+  replace: WriteOperationV2_Mode.REPLACE,
+  createOrReplace: WriteOperationV2_Mode.CREATE_OR_REPLACE,
+  append: WriteOperationV2_Mode.APPEND,
+  overwrite: WriteOperationV2_Mode.OVERWRITE,
+  overwritePartitions: WriteOperationV2_Mode.OVERWRITE_PARTITIONS,
+};
+
 function buildCommandProto(command: Record<string, unknown>): Command {
   const type = command.type as string;
 
@@ -367,6 +378,41 @@ function buildCommandProto(command: Record<string, unknown>): Command {
           isGlobal: (command.isGlobal as boolean) ?? false,
           replace: (command.replace as boolean) ?? true,
         }),
+      },
+    });
+  }
+
+  if (type === "writeOperationV2") {
+    const plan = command.plan as import("@spark-connect-js/core").LogicalPlan;
+    const relation = buildRelation(plan);
+    const modeStr = command.mode as string;
+    const mode = WRITE_V2_MODE_MAP[modeStr] ?? WriteOperationV2_Mode.UNSPECIFIED;
+
+    const partitioningExprs = (
+      command.partitioningColumns as import("@spark-connect-js/core").Expression[]
+    ).map((e) => buildExpression(e));
+
+    const writeV2 = create(WriteOperationV2Schema, {
+      input: relation,
+      tableName: command.tableName as string,
+      provider: (command.provider as string) ?? undefined,
+      mode,
+      options: (command.options as Record<string, string>) ?? {},
+      tableProperties: (command.tableProperties as Record<string, string>) ?? {},
+      partitioningColumns: partitioningExprs,
+      clusteringColumns: (command.clusteringColumns as string[]) ?? [],
+    });
+
+    if (command.overwriteCondition) {
+      writeV2.overwriteCondition = buildExpression(
+        command.overwriteCondition as import("@spark-connect-js/core").Expression,
+      );
+    }
+
+    return create(CommandSchema, {
+      commandType: {
+        case: "writeOperationV2",
+        value: writeV2,
       },
     });
   }
