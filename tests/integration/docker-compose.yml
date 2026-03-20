@@ -1,15 +1,23 @@
 services:
   spark-connect:
-    image: apache/spark:4.0.0-preview2
+    image: apache/spark:4.0.0
     ports:
       - "15002:15002"
     command:
       - /opt/spark/sbin/start-connect-server.sh
+      - --packages
+      - io.delta:delta-spark_2.13:4.0.0
+      - --conf
+      - spark.jars.ivy=/tmp/.ivy2
+      - --conf
+      - spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension
+      - --conf
+      - spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
     environment:
       - SPARK_NO_DAEMONIZE=true
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/15002'"]
       interval: 5s
       timeout: 3s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
