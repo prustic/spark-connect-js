@@ -76,7 +76,7 @@ export class StructType {
   }
 
   /**
-   * Return a DDL-formatted schema string, e.g. "name STRING, age INT".
+   * Return a DDL-formatted schema string, e.g. "name string, age integer".
    * Compatible with DataFrameReader.schema().
    */
   toDDL(): string {

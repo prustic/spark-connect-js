@@ -137,8 +137,14 @@ export class DataFrameWriter {
    * it must already exist.
    */
   async insertInto(tableName: string): Promise<void> {
+    const {
+      bucketBy: _b,
+      partitioningColumns: _p,
+      sortColumnNames: _s,
+      ...fields
+    } = this._commandFields();
     await this._df._session._executeCommand({
-      ...this._commandFields(),
+      ...fields,
       saveType: {
         case: "table",
         value: { tableName, saveMethod: "insertInto" },

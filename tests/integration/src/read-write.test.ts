@@ -128,7 +128,8 @@ describe("writeTo (DataFrameWriterV2)", () => {
 
   it("replace() replaces table contents", async () => {
     // replace() requires REPLACE TABLE AS SELECT, which Iceberg supports but Delta does not
-    const table = `iceberg.db.test_${Date.now()}_v2_replace`;
+    await spark().sql("CREATE NAMESPACE IF NOT EXISTS iceberg.db").collect();
+    const table = `iceberg.db.${tempTable("v2_replace")}`;
     await spark().range(10).writeTo(table).createOrReplace();
     await spark().range(3).writeTo(table).replace();
     const rows = await spark().read.table(table).collect();
