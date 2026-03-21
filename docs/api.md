@@ -223,7 +223,7 @@ spark.read.schema("id BIGINT, name STRING").csv("/data/people.csv");
 | Method               | Description                      |
 | -------------------- | -------------------------------- |
 | `format(source)`     | Set data source format           |
-| `schema(schema)`     | Set schema (DDL string)          |
+| `schema(schema)`     | Set schema (DDL string or object with `toDDL()`, e.g. StructType) |
 | `option(key, value)` | Set a read option                |
 | `options(opts)`      | Set multiple options             |
 | `load(path?)`        | Read from path                   |

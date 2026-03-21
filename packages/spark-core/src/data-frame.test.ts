@@ -1266,6 +1266,27 @@ describe("DataFrameReader.schema()", () => {
     });
   });
 
+  it("schema() throws on empty string", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema("").csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
+  it("schema() throws on blank string", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema("   ").csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
+  it("schema() throws on object with empty toDDL()", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema({ toDDL: () => "" }).csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
   it("load() without schema does not include schema field", () => {
     const { spark } = createSession();
     const df = spark.read.format("parquet").load("/data/file.parquet");

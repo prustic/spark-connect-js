@@ -25,7 +25,7 @@ pnpm spark:down
 1. Creates an in-memory sensor readings dataset
 2. Roundtrips data through every format: CSV, JSON, Parquet, ORC, and text
 3. Reads CSV back with an explicit DDL schema
-4. Writes a bucketed table partitioned by `sensor_type`
+4. Writes a table bucketed by `sensor_type`
 5. Appends new rows with `insertInto`
 
 Override the Spark address with `SPARK_REMOTE`:

@@ -251,19 +251,24 @@ class DataFrameReader {
    * or a StructType with a toDDL() method.
    */
   schema(schema: string | { toDDL(): string }): this {
+    let ddl: string;
     if (typeof schema === "string") {
-      this._schema = schema;
+      ddl = schema;
     } else if (
       typeof schema === "object" &&
       schema !== null &&
       typeof schema.toDDL === "function"
     ) {
-      this._schema = schema.toDDL();
+      ddl = schema.toDDL();
     } else {
       throw new Error(
         "schema must be a DDL string (e.g. 'id INT, name STRING') or an object with a toDDL() method",
       );
     }
+    if (!ddl.trim()) {
+      throw new Error("schema must not be empty");
+    }
+    this._schema = ddl;
     return this;
   }
 
