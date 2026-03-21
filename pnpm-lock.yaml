@@ -105,11 +105,11 @@ importers:
   packages/spark-connect:
     dependencies:
       '@bufbuild/protobuf':
-        specifier: ^2.0.0
+        specifier: ^2.11.0
         version: 2.11.0
     devDependencies:
       '@bufbuild/protoc-gen-es':
-        specifier: ^2.0.0
+        specifier: ^2.11.0
         version: 2.11.0(@bufbuild/protobuf@2.11.0)
       '@spark-connect-js/eslint-config':
         specifier: workspace:*
