@@ -1,6 +1,6 @@
 services:
   spark-connect:
-    image: apache/spark:4.0.0-preview2
+    image: apache/spark:4.0.0
     ports:
       - "15002:15002"
     command:
