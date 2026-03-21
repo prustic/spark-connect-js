@@ -3,7 +3,6 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "composite": false,
     "incremental": true
   },
   "include": ["src"],
