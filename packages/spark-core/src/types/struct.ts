@@ -22,7 +22,7 @@ export class StructField {
     this.name = name;
     this.dataType = dataType;
     this.nullable = nullable;
-    this.metadata = metadata;
+    this.metadata = { ...metadata };
   }
 
   toString(): string {

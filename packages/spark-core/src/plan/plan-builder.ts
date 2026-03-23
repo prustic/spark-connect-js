@@ -406,6 +406,11 @@ export class PlanBuilder {
             relativeError: plan.relativeError,
           },
         };
+
+      default: {
+        const _exhaustive: never = plan;
+        throw new Error(`Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`);
+      }
     }
   }
 
@@ -518,6 +523,11 @@ export class PlanBuilder {
           };
         }
         return { window: w };
+      }
+
+      default: {
+        const _exhaustive: never = expr;
+        throw new Error(`Unsupported expression type: ${(_exhaustive as Expression).type}`);
       }
     }
   }

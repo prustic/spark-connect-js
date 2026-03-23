@@ -49,8 +49,8 @@ export class WindowSpec {
     orderSpec: SortOrder[] = [],
     frameSpec?: WindowFrame,
   ) {
-    this._partitionSpec = partitionSpec;
-    this._orderSpec = orderSpec;
+    this._partitionSpec = [...partitionSpec];
+    this._orderSpec = [...orderSpec];
     this._frameSpec = frameSpec;
   }
 

@@ -39,7 +39,7 @@ export class GroupedData {
     pivot?: { col: Expression; values: Array<string | number | boolean> },
   ) {
     this._df = df;
-    this._groupExprs = groupExprs;
+    this._groupExprs = [...groupExprs];
     this._groupType = groupType;
     this._pivot = pivot;
   }
