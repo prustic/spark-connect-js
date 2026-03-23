@@ -8,4 +8,4 @@ catalog:
   "@types/node": ^25.5.0
   typescript: ^5.7.0
   prettier: ^3.4.0
-  eslint: ^9.17.0
+  eslint: ^10.1.0
