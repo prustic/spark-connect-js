@@ -81,6 +81,17 @@ describe("SparkSession.read", () => {
       assert.deepStrictEqual(df._plan.options, { header: "true" });
     }
   });
+
+  it("returns independent instances (no shared mutable state)", () => {
+    const { spark } = createSession();
+    const reader1 = spark.read;
+    reader1.format("csv").option("header", "true");
+    const df = spark.read.load("/data/file");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "parquet");
+      assert.deepStrictEqual(df._plan.options, {});
+    }
+  });
 });
 
 describe("DataFrame transformations (lazy)", () => {

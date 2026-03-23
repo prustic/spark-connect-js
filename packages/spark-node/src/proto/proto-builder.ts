@@ -647,6 +647,11 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    default: {
+      const _exhaustive: never = plan;
+      throw new Error(`Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`);
+    }
   }
 }
 

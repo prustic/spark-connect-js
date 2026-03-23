@@ -103,7 +103,7 @@ export class SparkSession {
   /** Access the session catalog for inspecting databases, tables, and columns. */
   readonly catalog: Catalog = new Catalog(this);
 
-  /** Returns a fresh DataFrameReader for building Read plans. */
+  /** Returns a DataFrameReader for building Read plans. */
   get read(): DataFrameReader {
     return new DataFrameReader(this);
   }

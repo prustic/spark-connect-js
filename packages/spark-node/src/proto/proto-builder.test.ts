@@ -937,3 +937,19 @@ describe("buildExpression() — sortOrder", () => {
     }
   });
 });
+
+describe("exhaustive checks", () => {
+  it("buildRelation throws on unsupported plan type", () => {
+    const bogus = { type: "bogus" } as unknown as LogicalPlan;
+    assert.throws(() => buildRelation(bogus), {
+      message: "Unsupported plan type: bogus",
+    });
+  });
+
+  it("buildExpression throws on unsupported expression type", () => {
+    const bogus = { type: "bogus" } as unknown as CoreExpression;
+    assert.throws(() => buildExpression(bogus), {
+      message: "Unsupported expression type: bogus",
+    });
+  });
+});
