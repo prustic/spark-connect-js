@@ -142,10 +142,10 @@ importers:
   packages/spark-node:
     dependencies:
       '@bufbuild/protobuf':
-        specifier: ^2.0.0
+        specifier: ^2.11.0
         version: 2.11.0
       '@grpc/grpc-js':
-        specifier: ^1.12.0
+        specifier: ^1.14.3
         version: 1.14.3
       '@grpc/proto-loader':
         specifier: ^0.8.0
