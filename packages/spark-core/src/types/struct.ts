@@ -76,6 +76,16 @@ export class StructType {
   }
 
   /**
+   * Return a DDL-formatted schema string, e.g. "name string, age integer".
+   * Compatible with DataFrameReader.schema().
+   */
+  toDDL(): string {
+    return this.fields
+      .map((f) => `${f.name} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
+      .join(", ");
+  }
+
+  /**
    * Build a StructType from a Spark Connect DataType proto (schema response).
    * The proto is a plain object with `struct.fields` array.
    */

@@ -124,6 +124,7 @@ export function buildRelation(plan: LogicalPlan): Relation {
                 format: plan.format,
                 paths: [plan.path],
                 options: plan.options,
+                ...(plan.schema != null && { schema: plan.schema }),
               }),
             },
           }),

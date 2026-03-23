@@ -1238,3 +1238,72 @@ describe("DataFrame.semanticHash()", () => {
     assert.equal(transport.analyzeCalls[0].type, "semanticHash");
   });
 });
+
+describe("DataFrameReader.schema()", () => {
+  it("schema(string) sets DDL schema on read plan", () => {
+    const { spark } = createSession();
+    const df = spark.read.schema("name STRING, age INT").csv("/data/file.csv");
+    assert.equal(df._plan.type, "read");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.schema, "name STRING, age INT");
+      assert.equal(df._plan.format, "csv");
+    }
+  });
+
+  it("schema(object with toDDL) calls toDDL()", () => {
+    const { spark } = createSession();
+    const mockStruct = { toDDL: () => "id BIGINT, value DOUBLE" };
+    const df = spark.read.schema(mockStruct).json("/data/file.json");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.schema, "id BIGINT, value DOUBLE");
+    }
+  });
+
+  it("schema() throws on object without toDDL()", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema({} as { toDDL(): string }).csv("/data"), {
+      message: /toDDL/,
+    });
+  });
+
+  it("schema() throws on empty string", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema("").csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
+  it("schema() throws on blank string", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema("   ").csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
+  it("schema() throws on object with empty toDDL()", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.read.schema({ toDDL: () => "" }).csv("/data"), {
+      message: /must not be empty/,
+    });
+  });
+
+  it("load() without schema does not include schema field", () => {
+    const { spark } = createSession();
+    const df = spark.read.format("parquet").load("/data/file.parquet");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.schema, undefined);
+    }
+  });
+});
+
+describe("DataFrameReader.text()", () => {
+  it("text() builds a read plan with text format", () => {
+    const { spark } = createSession();
+    const df = spark.read.text("/data/file.txt");
+    assert.equal(df._plan.type, "read");
+    if (df._plan.type === "read") {
+      assert.equal(df._plan.format, "text");
+      assert.equal(df._plan.path, "/data/file.txt");
+    }
+  });
+});

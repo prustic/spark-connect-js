@@ -43,6 +43,7 @@ export class PlanBuilder {
               format: plan.format,
               paths: [plan.path],
               options: plan.options,
+              ...(plan.schema != null && { schema: plan.schema }),
             },
           },
         };

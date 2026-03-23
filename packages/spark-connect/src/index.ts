@@ -236,6 +236,11 @@ export {
   type WriteOperation_SaveTable,
   WriteOperation_SaveTableSchema,
   WriteOperation_SaveTable_TableSaveMethod,
+  type WriteOperation_BucketBy,
+  WriteOperation_BucketBySchema,
+  type WriteOperationV2,
+  WriteOperationV2Schema,
+  WriteOperationV2_Mode,
   type CreateDataFrameViewCommand,
   CreateDataFrameViewCommandSchema,
 } from "./gen/spark/connect/commands_pb.js";

@@ -54,6 +54,15 @@ describe("StructType", () => {
     assert.equal(st.treeString(), expected);
   });
 
+  it("toDDL() returns DDL-formatted schema string", () => {
+    const st = new StructType().add("name", "string").add("age", "integer", false);
+    assert.equal(st.toDDL(), "name string, age integer NOT NULL");
+  });
+
+  it("toDDL() returns empty string for empty schema", () => {
+    assert.equal(new StructType().toDDL(), "");
+  });
+
   it("fromProto() parses struct fields from proto response", () => {
     const proto = {
       struct: {

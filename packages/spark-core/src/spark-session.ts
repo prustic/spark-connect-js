@@ -103,8 +103,10 @@ export class SparkSession {
   /** Access the session catalog for inspecting databases, tables, and columns. */
   readonly catalog: Catalog = new Catalog(this);
 
-  /** Returns a DataFrameReader for building Read plans. */
-  read = new DataFrameReader(this);
+  /** Returns a fresh DataFrameReader for building Read plans. */
+  get read(): DataFrameReader {
+    return new DataFrameReader(this);
+  }
 
   /** Execute a SQL query. */
   sql(query: string): DataFrame {
@@ -236,10 +238,38 @@ class SparkSessionBuilder {
 class DataFrameReader {
   private session: SparkSession;
   private _format: string = "parquet";
+  private _schema: string | undefined;
   private _options: Record<string, string> = {};
 
   constructor(session: SparkSession) {
     this.session = session;
+  }
+
+  /**
+   * Set the schema for the data source.
+   * Accepts a DDL-formatted string (e.g. "name STRING, age INT")
+   * or a StructType with a toDDL() method.
+   */
+  schema(schema: string | { toDDL(): string }): this {
+    let ddl: string;
+    if (typeof schema === "string") {
+      ddl = schema;
+    } else if (
+      typeof schema === "object" &&
+      schema !== null &&
+      typeof schema.toDDL === "function"
+    ) {
+      ddl = schema.toDDL();
+    } else {
+      throw new Error(
+        "schema must be a DDL string (e.g. 'id INT, name STRING') or an object with a toDDL() method",
+      );
+    }
+    if (!ddl.trim()) {
+      throw new Error("schema must not be empty");
+    }
+    this._schema = ddl;
+    return this;
   }
 
   format(fmt: string): this {
@@ -270,6 +300,7 @@ class DataFrameReader {
       format: this._format,
       path,
       options: { ...this._options },
+      ...(this._schema != null && { schema: this._schema }),
     });
   }
 
@@ -300,5 +331,10 @@ class DataFrameReader {
   /** Shortcut for .format("orc").load(path). */
   orc(path: string): DataFrame {
     return this.format("orc").load(path);
+  }
+
+  /** Shortcut for .format("text").load(path). */
+  text(path: string): DataFrame {
+    return this.format("text").load(path);
   }
 }

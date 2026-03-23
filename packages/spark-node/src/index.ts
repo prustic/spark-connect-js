@@ -42,6 +42,7 @@ export {
   SparkConnectError,
   GrpcStatusCode,
   DataFrameWriter,
+  DataFrameWriterV2,
   StructType,
   StructField,
   Catalog,

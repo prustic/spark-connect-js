@@ -17,6 +17,7 @@ import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
+import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
 import type { StorageLevel } from "./storage-level.js";
@@ -618,6 +619,14 @@ export class DataFrame {
   /** Returns a DataFrameWriter for persisting the contents of this DataFrame. */
   get write(): DataFrameWriter {
     return new DataFrameWriter(this);
+  }
+
+  /**
+   * Returns a DataFrameWriterV2 for writing to the given table using
+   * the DataSource V2 API (catalog-aware, supports create/replace/append/overwrite).
+   */
+  writeTo(tableName: string): DataFrameWriterV2 {
+    return new DataFrameWriterV2(this, tableName);
   }
 
   // Caching & Persistence

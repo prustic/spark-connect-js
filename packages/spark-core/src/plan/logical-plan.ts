@@ -145,6 +145,7 @@ export interface ReadPlan {
   format: string;
   path: string;
   options: Record<string, string>;
+  schema?: string;
 }
 
 /**
