@@ -26,9 +26,10 @@
 export { GrpcTransport } from "./transport/grpc-transport.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
+/** @internal — used by GrpcTransport; not part of the public API */
 export { buildRelation, buildExpression } from "./proto/proto-builder.js";
 
-// Re-export core for convenience — consumers only need to depend on @spark-connect-js/node
+// Re-export core for convenience
 export {
   SparkSession,
   DataFrame,

@@ -165,7 +165,10 @@ export class SparkSession {
   /** @internal — used by DataFrameWriter to send commands via the injected transport */
   async _executeCommand(command: Record<string, unknown>): Promise<void> {
     if (!this.transport.executeCommand) {
-      throw new Error("Transport does not support command execution.");
+      throw new Error(
+        `Transport ${this.transport.constructor.name} does not support command execution. ` +
+          "Use @spark-connect-js/node's GrpcTransport which supports all operations.",
+      );
     }
     await this.transport.executeCommand(this.sessionId, command);
   }
@@ -173,7 +176,10 @@ export class SparkSession {
   /** @internal — used by DataFrame.schema()/explain() via the injected transport */
   async _analyzePlan(request: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (!this.transport.analyzePlan) {
-      throw new Error("Transport does not support analyzePlan.");
+      throw new Error(
+        `Transport ${this.transport.constructor.name} does not support analyzePlan. ` +
+          "Use @spark-connect-js/node's GrpcTransport which supports all operations.",
+      );
     }
     return this.transport.analyzePlan(this.sessionId, request);
   }
@@ -266,7 +272,10 @@ class DataFrameReader {
       );
     }
     if (!ddl.trim()) {
-      throw new Error("schema must not be empty");
+      throw new Error(
+        "DataFrameReader.schema() received an empty schema string. " +
+          "Provide a DDL string like 'id INT, name STRING'.",
+      );
     }
     this._schema = ddl;
     return this;

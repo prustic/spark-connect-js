@@ -31,10 +31,10 @@ export class StructField {
 }
 
 export class StructType {
-  readonly fields: StructField[];
+  readonly fields: readonly StructField[];
 
   constructor(fields: StructField[] = []) {
-    this.fields = fields;
+    this.fields = [...fields];
   }
 
   /** Add a field and return a new StructType. */

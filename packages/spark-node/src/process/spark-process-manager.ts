@@ -48,7 +48,9 @@ export class SparkProcessManager {
   /** Spawn the server and wait until it accepts gRPC connections. */
   async start(): Promise<void> {
     if (this.process) {
-      throw new Error("Spark Connect server is already running.");
+      throw new Error(
+        `Spark Connect server is already running (pid: ${this.process.pid}, port: ${this.options.port}).`,
+      );
     }
 
     const args = this._buildArgs();

@@ -1280,21 +1280,21 @@ describe("DataFrameReader.schema()", () => {
   it("schema() throws on empty string", () => {
     const { spark } = createSession();
     assert.throws(() => spark.read.schema("").csv("/data"), {
-      message: /must not be empty/,
+      message: /empty schema string/,
     });
   });
 
   it("schema() throws on blank string", () => {
     const { spark } = createSession();
     assert.throws(() => spark.read.schema("   ").csv("/data"), {
-      message: /must not be empty/,
+      message: /empty schema string/,
     });
   });
 
   it("schema() throws on object with empty toDDL()", () => {
     const { spark } = createSession();
     assert.throws(() => spark.read.schema({ toDDL: () => "" }).csv("/data"), {
-      message: /must not be empty/,
+      message: /empty schema string/,
     });
   });
 
