@@ -66,13 +66,13 @@ export class DataFrameWriter {
 
   /** Partition the output by the given column names. */
   partitionBy(...columns: string[]): this {
-    this._partitionBy = [...columns];
+    this._partitionBy = columns;
     return this;
   }
 
   /** Sort the output within each partition by the given column names. */
   sortBy(...columns: string[]): this {
-    this._sortBy = [...columns];
+    this._sortBy = columns;
     return this;
   }
 

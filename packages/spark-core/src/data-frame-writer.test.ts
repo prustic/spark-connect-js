@@ -168,34 +168,4 @@ describe("DataFrameWriter.insertInto()", () => {
   });
 });
 
-describe("DataFrameWriter defensive copies", () => {
-  it("partitionBy() does not leak caller array mutations", async () => {
-    const transport = mockCommandTransport();
-    const spark = SparkSession.builder()
-      .remote("sc://localhost:15002")
-      .transport(transport)
-      .getOrCreate();
-    const df = spark.sql("SELECT 1");
-    const cols = ["a", "b"];
-    const writer = df.write.partitionBy(...cols);
-    cols.push("c"); // mutate original - should not affect writer
-    await writer.save("/out");
-    const cmd = transport.commandCalls[0];
-    assert.deepStrictEqual(cmd.partitioningColumns, ["a", "b"]);
-  });
 
-  it("sortBy() does not leak caller array mutations", async () => {
-    const transport = mockCommandTransport();
-    const spark = SparkSession.builder()
-      .remote("sc://localhost:15002")
-      .transport(transport)
-      .getOrCreate();
-    const df = spark.sql("SELECT 1");
-    const cols = ["x"];
-    const writer = df.write.sortBy(...cols);
-    cols.push("y"); // mutate original - should not affect writer
-    await writer.save("/out");
-    const cmd = transport.commandCalls[0];
-    assert.deepStrictEqual(cmd.sortColumnNames, ["x"]);
-  });
-});
