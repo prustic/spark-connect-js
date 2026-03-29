@@ -22,15 +22,15 @@ pnpm spark:down
 
 ## What it covers
 
-1. **Caching** — `persist(MEMORY_ONLY)`, `getStorageLevel()`, `unpersist()`
-2. **Repartitioning** — `repartition()` by column, `coalesce()`
-3. **Cube / Rollup** — multi-dimensional subtotals
-4. **Pivot / Unpivot** — reshape between wide and long formats
-5. **Summary / Replace** — descriptive stats and value substitution
-6. **Random Split** — partition a DataFrame into train/test sets
-7. **Stat Functions** — `stat.corr()`, `stat.cov()`, `stat.freqItems()`
-8. **Views** — `createTempView()` and SQL queries over views
-9. **Semantic Comparison** — `sameSemantics()` and `semanticHash()`
+1. **Caching** - `persist(MEMORY_ONLY)`, `getStorageLevel()`, `unpersist()`
+2. **Repartitioning** - `repartition()` by column, `coalesce()`
+3. **Cube / Rollup** - multi-dimensional subtotals
+4. **Pivot / Unpivot** - reshape between wide and long formats
+5. **Summary / Replace** - descriptive stats and value substitution
+6. **Random Split** - partition a DataFrame into train/test sets
+7. **Stat Functions** - `stat.corr()`, `stat.cov()`, `stat.freqItems()`
+8. **Views** - `createTempView()` and SQL queries over views
+9. **Semantic Comparison** - `sameSemantics()` and `semanticHash()`
 
 Override the Spark address with `SPARK_REMOTE`:
 

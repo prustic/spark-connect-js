@@ -23,10 +23,11 @@
  */
 
 import type { LogicalPlan, Expression } from "./logical-plan.js";
+import { UnsupportedOperationError } from "../errors.js";
 
 /**
  * Converts a LogicalPlan tree into a plain object that mirrors the Spark
- * Connect proto Relation message.  This is an intermediate representation —
+ * Connect proto Relation message.  This is an intermediate representation -
  * the runtime adapter further encodes it to binary protobuf for the wire.
  */
 export class PlanBuilder {
@@ -409,7 +410,9 @@ export class PlanBuilder {
 
       default: {
         const _exhaustive: never = plan;
-        throw new Error(`Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`);
+        throw new UnsupportedOperationError(
+          `Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`,
+        );
       }
     }
   }
@@ -446,7 +449,7 @@ export class PlanBuilder {
           unresolvedFunction: {
             functionName: expr.name,
             arguments: expr.arguments.map((e) => PlanBuilder.toExpression(e)),
-            isDistinct: false,
+            isDistinct: expr.isDistinct ?? false,
           },
         };
 
@@ -527,7 +530,9 @@ export class PlanBuilder {
 
       default: {
         const _exhaustive: never = expr;
-        throw new Error(`Unsupported expression type: ${(_exhaustive as Expression).type}`);
+        throw new UnsupportedOperationError(
+          `Unsupported expression type: ${(_exhaustive as Expression).type}`,
+        );
       }
     }
   }

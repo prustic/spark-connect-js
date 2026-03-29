@@ -1,3 +1,5 @@
+import { InvalidConfigError } from "@spark-connect-js/core";
+
 /**
  * Spawns and manages a local Spark Connect server process.
  * Useful for local development and testing.
@@ -6,9 +8,9 @@
  * @see core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala
  *
  * child_process notes:
- *   - spawn() over exec() — the server can produce GB of logs.
+ *   - spawn() over exec(): the server can produce GB of logs.
  *   - SIGTERM first for graceful JVM shutdown; SIGKILL only after timeout.
- *   - After spawning, poll the gRPC port before returning — JVM startup
+ *   - After spawning, poll the gRPC port before returning. JVM startup
  *     takes several seconds.
  */
 
@@ -48,7 +50,7 @@ export class SparkProcessManager {
   /** Spawn the server and wait until it accepts gRPC connections. */
   async start(): Promise<void> {
     if (this.process) {
-      throw new Error(
+      throw new InvalidConfigError(
         `Spark Connect server is already running (pid: ${this.process.pid}, port: ${this.options.port}).`,
       );
     }
@@ -145,6 +147,8 @@ export class SparkProcessManager {
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    throw new Error(`Spark Connect server did not start within ${this.options.startupTimeoutMs}ms`);
+    throw new InvalidConfigError(
+      `Spark Connect server did not start within ${this.options.startupTimeoutMs}ms`,
+    );
   }
 }

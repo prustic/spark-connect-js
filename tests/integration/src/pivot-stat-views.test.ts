@@ -48,7 +48,7 @@ describe("cube / rollup", () => {
       .agg(count(col("name")).as("cnt"))
       .sort(col("department").asc_nulls_last(), col("year").asc_nulls_last())
       .collect();
-    // Rollup produces: (dept, year), (dept, null), (null, null) — no (null, year)
+    // Rollup produces: (dept, year), (dept, null), (null, null) - no (null, year)
     assert.ok(rows.length > 2);
     const grandTotal = rows.find((r) => r["department"] === null && r["year"] === null);
     assert.ok(grandTotal);

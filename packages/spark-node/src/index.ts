@@ -1,5 +1,5 @@
 /**
- * @spark-connect-js/node — Node.js runtime adapter for Spark Connect.
+ * @spark-connect-js/node - Node.js runtime adapter for Spark Connect.
  *
  * Bridges @spark-connect-js/core's platform-agnostic DataFrame API with Node.js:
  *   - gRPC transport via @grpc/grpc-js (HTTP/2, protobuf on the wire)
@@ -26,7 +26,7 @@
 export { GrpcTransport } from "./transport/grpc-transport.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
-/** @internal — used by GrpcTransport; not part of the public API */
+/** @internal Used by GrpcTransport; not part of the public API */
 export { buildRelation, buildExpression } from "./proto/proto-builder.js";
 
 // Re-export core for convenience
@@ -41,6 +41,10 @@ export {
   DataType,
   PlanBuilder,
   SparkConnectError,
+  SparkClientError,
+  InvalidConfigError,
+  InvalidInputError,
+  UnsupportedOperationError,
   GrpcStatusCode,
   DataFrameWriter,
   DataFrameWriterV2,

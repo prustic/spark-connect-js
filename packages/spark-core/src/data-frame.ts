@@ -1,12 +1,12 @@
 /**
- * Lazy DataFrame — each transformation returns a new instance wrapping
+ * Lazy DataFrame - each transformation returns a new instance wrapping
  * a logical plan tree. No work happens until an action (collect, count, etc.)
  * triggers execution via Spark Connect.
  *
  * @see sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala
  * @see sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
  *
- * Laziness is a correctness requirement, not a convenience — Catalyst needs
+ * Laziness is a correctness requirement, not a convenience. Catalyst needs
  * the full plan to push predicates, prune columns, reorder joins, and fold
  * constant expressions.
  */
@@ -18,6 +18,7 @@ import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
+import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
 import type { StorageLevel } from "./storage-level.js";
@@ -39,10 +40,10 @@ declare const console: { log(msg: string): void };
 export class DataFrame {
   /** @internal */
   readonly _session: SparkSession;
-  /** @internal — the logical plan tree this DataFrame represents */
+  /** @internal The logical plan tree this DataFrame represents */
   readonly _plan: LogicalPlan;
 
-  /** @internal — factory used by SparkSession.  Users never call `new DataFrame()`. */
+  /** @internal Factory used by SparkSession.  Users never call `new DataFrame()`. */
   static _fromPlan(session: SparkSession, plan: LogicalPlan): DataFrame {
     return new DataFrame(session, plan);
   }
@@ -157,6 +158,12 @@ export class DataFrame {
       | "left_anti"
       | "cross" = "inner",
   ): DataFrame {
+    if (joinType === "cross" && condition != null) {
+      throw new InvalidInputError(
+        "Cannot specify a join condition with cross join. " +
+          "Use crossJoin() or join(other, undefined, 'cross') instead.",
+      );
+    }
     return DataFrame._fromPlan(this._session, {
       type: "join",
       left: this._plan,
@@ -418,7 +425,7 @@ export class DataFrame {
 
   /**
    * Apply a user-defined function to this DataFrame and return the result.
-   * This is purely client-side — it just calls `fn(this)`.
+   * This is purely client-side; it just calls `fn(this)`.
    *
    * Enables fluent pipeline composition:
    * @example df.transform(withDoubledAge).transform(withSalaryBand)
@@ -768,7 +775,7 @@ export class DataFrame {
 
   /**
    * Return the number of rows.
-   * Uses an aggregate count plan — the full dataset is not collected.
+   * Uses an aggregate count plan. The full dataset is not collected.
    */
   async count(): Promise<number> {
     const countPlan: LogicalPlan = {
@@ -833,9 +840,9 @@ export class DataFrame {
   private _ensureDecoder() {
     const decoder = this._session._arrowDecoder;
     if (!decoder) {
-      throw new Error(
+      throw new InvalidConfigError(
         "No Arrow decoder configured. " +
-          "Use @spark-connect-js/node which provides one automatically, " +
+          "Use a runtime adapter that provides one automatically, " +
           "or pass arrowDecoder in SparkSessionConfig.",
       );
     }
@@ -859,7 +866,7 @@ export class DataFrame {
 
   /**
    * Return the first `n` rows as an array.
-   * Alias for head() — matches PySpark's take() semantics.
+   * Alias for head(). Matches PySpark's take() semantics.
    */
   async take(n: number): Promise<Row[]> {
     return this.head(n);
@@ -901,7 +908,7 @@ export class DataFrame {
 
   /**
    * Returns true if the DataFrame has no rows.
-   * Uses head(1) to check — stops after the first row.
+   * Uses head(1) to check and stops after the first row.
    */
   async isEmpty(): Promise<boolean> {
     const rows = await this.head(1);

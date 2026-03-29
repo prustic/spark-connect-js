@@ -1,5 +1,5 @@
 /**
- * Sort functions — standalone sort order wrappers.
+ * Sort functions - standalone sort order wrappers.
  * These complement the Column methods (col.asc(), col.desc(), etc.)
  */
 

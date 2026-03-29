@@ -17,6 +17,7 @@
  */
 
 import type { DataFrame } from "./data-frame.js";
+import { InvalidInputError } from "./errors.js";
 
 export type SaveMode = "append" | "overwrite" | "error" | "ignore";
 
@@ -41,10 +42,10 @@ export class DataFrameWriter {
 
   /**
    * Set the save mode:
-   *   - "append" — Append to existing data
-   *   - "overwrite" — Overwrite existing data
-   *   - "error" (default) — Error if data already exists
-   *   - "ignore" — Silently ignore if data already exists
+   *   - "append" - Append to existing data
+   *   - "overwrite" - Overwrite existing data
+   *   - "error" (default) - Error if data already exists
+   *   - "ignore" - Silently ignore if data already exists
    */
   mode(m: SaveMode): this {
     this._mode = m;
@@ -81,7 +82,7 @@ export class DataFrameWriter {
    */
   bucketBy(numBuckets: number, col: string, ...cols: string[]): this {
     if (!Number.isInteger(numBuckets) || numBuckets <= 0) {
-      throw new Error(
+      throw new InvalidInputError(
         `bucketBy requires numBuckets to be a positive integer, but got: ${numBuckets}`,
       );
     }
@@ -133,7 +134,7 @@ export class DataFrameWriter {
 
   /**
    * Insert the DataFrame's contents into the given table.
-   * Unlike saveAsTable, insertInto does not create the table —
+   * Unlike saveAsTable, insertInto does not create the table;
    * it must already exist.
    */
   async insertInto(tableName: string): Promise<void> {

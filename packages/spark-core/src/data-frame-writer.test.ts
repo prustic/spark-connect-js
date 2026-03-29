@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
+import { InvalidInputError } from "./errors.js";
 
 function mockCommandTransport() {
   const commandCalls: Record<string, unknown>[] = [];
@@ -122,7 +123,7 @@ describe("DataFrameWriter.bucketBy()", () => {
       .transport(transport)
       .getOrCreate();
     const df = spark.sql("SELECT 1");
-    assert.throws(() => df.write.bucketBy(0, "id"), { message: /positive integer/ });
+    assert.throws(() => df.write.bucketBy(0, "id"), InvalidInputError);
   });
 
   it("bucketBy() throws on negative", () => {
@@ -132,7 +133,7 @@ describe("DataFrameWriter.bucketBy()", () => {
       .transport(transport)
       .getOrCreate();
     const df = spark.sql("SELECT 1");
-    assert.throws(() => df.write.bucketBy(-1, "id"), { message: /positive integer/ });
+    assert.throws(() => df.write.bucketBy(-1, "id"), InvalidInputError);
   });
 
   it("bucketBy() throws on non-integer", () => {
@@ -142,7 +143,7 @@ describe("DataFrameWriter.bucketBy()", () => {
       .transport(transport)
       .getOrCreate();
     const df = spark.sql("SELECT 1");
-    assert.throws(() => df.write.bucketBy(3.5, "id"), { message: /positive integer/ });
+    assert.throws(() => df.write.bucketBy(3.5, "id"), InvalidInputError);
   });
 });
 
@@ -177,7 +178,7 @@ describe("DataFrameWriter defensive copies", () => {
     const df = spark.sql("SELECT 1");
     const cols = ["a", "b"];
     const writer = df.write.partitionBy(...cols);
-    cols.push("c"); // mutate original — should not affect writer
+    cols.push("c"); // mutate original - should not affect writer
     await writer.save("/out");
     const cmd = transport.commandCalls[0];
     assert.deepStrictEqual(cmd.partitioningColumns, ["a", "b"]);
@@ -192,7 +193,7 @@ describe("DataFrameWriter defensive copies", () => {
     const df = spark.sql("SELECT 1");
     const cols = ["x"];
     const writer = df.write.sortBy(...cols);
-    cols.push("y"); // mutate original — should not affect writer
+    cols.push("y"); // mutate original - should not affect writer
     await writer.save("/out");
     const cmd = transport.commandCalls[0];
     assert.deepStrictEqual(cmd.sortColumnNames, ["x"]);

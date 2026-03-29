@@ -4,6 +4,7 @@ import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import { col, lit } from "./column.js";
+import { InvalidConfigError, InvalidInputError } from "./errors.js";
 
 /** Minimal mock transport that records calls without doing I/O. */
 function mockTransport(_rows?: Record<string, unknown>[]): Transport & { calls: LogicalPlan[] } {
@@ -12,7 +13,7 @@ function mockTransport(_rows?: Record<string, unknown>[]): Transport & { calls: 
     calls,
     async *executePlan(_sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array> {
       calls.push(plan);
-      // Yield nothing — no Arrow data
+      // Yield nothing - no Arrow data
     },
   };
 }
@@ -33,17 +34,17 @@ describe("SparkSession.builder()", () => {
     assert.equal(typeof spark.sessionId, "string");
   });
 
-  it("throws without remote", () => {
+  it("throws InvalidConfigError without remote", () => {
     const t = mockTransport();
     assert.throws(() => {
       SparkSession.builder().transport(t).getOrCreate();
-    }, /remote URL/);
+    }, InvalidConfigError);
   });
 
-  it("throws without transport", () => {
+  it("throws InvalidConfigError without transport", () => {
     assert.throws(() => {
       SparkSession.builder().remote("sc://localhost:15002").getOrCreate();
-    }, /Transport/);
+    }, InvalidConfigError);
   });
 });
 
@@ -167,10 +168,10 @@ describe("DataFrame transformations (lazy)", () => {
 });
 
 describe("DataFrame.collect()", () => {
-  it("throws without arrow decoder", async () => {
+  it("throws InvalidConfigError without arrow decoder", async () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT 1");
-    await assert.rejects(df.collect(), /Arrow decoder/);
+    await assert.rejects(df.collect(), InvalidConfigError);
   });
 
   it("calls transport with the plan", async () => {
@@ -224,6 +225,52 @@ describe("GroupedData", () => {
     if (df._plan.type === "aggregate") {
       assert.equal(df._plan.aggregateExpressions.length, 2);
     }
+  });
+});
+
+describe("DataFrame.join()", () => {
+  it("builds a join plan", () => {
+    const { spark } = createSession();
+    const df1 = spark.sql("SELECT * FROM a");
+    const df2 = spark.sql("SELECT * FROM b");
+    const result = df1.join(df2, col("a.id").eq(col("b.id")), "inner");
+    assert.equal(result._plan.type, "join");
+    if (result._plan.type === "join") {
+      assert.equal(result._plan.joinType, "inner");
+      assert.ok(result._plan.condition);
+    }
+  });
+
+  it("cross join without condition succeeds", () => {
+    const { spark } = createSession();
+    const df1 = spark.sql("SELECT * FROM a");
+    const df2 = spark.sql("SELECT * FROM b");
+    const result = df1.join(df2, undefined, "cross");
+    assert.equal(result._plan.type, "join");
+    if (result._plan.type === "join") {
+      assert.equal(result._plan.joinType, "cross");
+      assert.equal(result._plan.condition, undefined);
+    }
+  });
+
+  it("crossJoin() builds a cross join plan", () => {
+    const { spark } = createSession();
+    const df1 = spark.sql("SELECT * FROM a");
+    const df2 = spark.sql("SELECT * FROM b");
+    const result = df1.crossJoin(df2);
+    assert.equal(result._plan.type, "join");
+    if (result._plan.type === "join") {
+      assert.equal(result._plan.joinType, "cross");
+    }
+  });
+
+  it("throws InvalidInputError for cross join with condition", () => {
+    const { spark } = createSession();
+    const df1 = spark.sql("SELECT * FROM a");
+    const df2 = spark.sql("SELECT * FROM b");
+    assert.throws(() => {
+      df1.join(df2, col("a.id").eq(col("b.id")), "cross");
+    }, InvalidInputError);
   });
 });
 
@@ -423,10 +470,10 @@ describe("DataFrame.toLocalIterator()", () => {
     assert.deepStrictEqual(rows, [{ id: 1 }, { id: 11 }, { id: 2 }, { id: 12 }]);
   });
 
-  it("throws without arrow decoder", async () => {
+  it("throws InvalidConfigError without arrow decoder", async () => {
     const { spark } = createSession();
     const iter = spark.sql("SELECT 1").toLocalIterator();
-    await assert.rejects(iter.next(), /Arrow decoder/);
+    await assert.rejects(iter.next(), InvalidConfigError);
   });
 });
 
@@ -720,8 +767,8 @@ describe("DataFrame.tail()", () => {
     const t = mockTransport();
     const { spark } = createSession(t);
     const df = spark.sql("SELECT * FROM t");
-    // tail is an action — but without decoder it will throw
-    await assert.rejects(() => df.tail(5), /Arrow decoder/);
+    // tail is an action, but without decoder it will throw
+    await assert.rejects(() => df.tail(5), InvalidConfigError);
   });
 });
 
@@ -1270,32 +1317,27 @@ describe("DataFrameReader.schema()", () => {
     }
   });
 
-  it("schema() throws on object without toDDL()", () => {
+  it("schema() throws InvalidInputError on object without toDDL()", () => {
     const { spark } = createSession();
-    assert.throws(() => spark.read.schema({} as { toDDL(): string }).csv("/data"), {
-      message: /toDDL/,
-    });
+    assert.throws(
+      () => spark.read.schema({} as { toDDL(): string }).csv("/data"),
+      InvalidInputError,
+    );
   });
 
-  it("schema() throws on empty string", () => {
+  it("schema() throws InvalidInputError on empty string", () => {
     const { spark } = createSession();
-    assert.throws(() => spark.read.schema("").csv("/data"), {
-      message: /empty schema string/,
-    });
+    assert.throws(() => spark.read.schema("").csv("/data"), InvalidInputError);
   });
 
-  it("schema() throws on blank string", () => {
+  it("schema() throws InvalidInputError on blank string", () => {
     const { spark } = createSession();
-    assert.throws(() => spark.read.schema("   ").csv("/data"), {
-      message: /empty schema string/,
-    });
+    assert.throws(() => spark.read.schema("   ").csv("/data"), InvalidInputError);
   });
 
-  it("schema() throws on object with empty toDDL()", () => {
+  it("schema() throws InvalidInputError on object with empty toDDL()", () => {
     const { spark } = createSession();
-    assert.throws(() => spark.read.schema({ toDDL: () => "" }).csv("/data"), {
-      message: /empty schema string/,
-    });
+    assert.throws(() => spark.read.schema({ toDDL: () => "" }).csv("/data"), InvalidInputError);
   });
 
   it("load() without schema does not include schema field", () => {
