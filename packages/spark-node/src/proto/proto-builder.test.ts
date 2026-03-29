@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildRelation, buildExpression } from "./proto-builder.js";
 import type { LogicalPlan, Expression as CoreExpression } from "@spark-connect-js/core";
+import { UnsupportedOperationError } from "@spark-connect-js/core";
 
 describe("buildRelation()", () => {
   it("builds a SQL relation", () => {
@@ -196,6 +197,21 @@ describe("buildExpression()", () => {
     if (result.exprType.case === "unresolvedFunction") {
       assert.equal(result.exprType.value.functionName, "sum");
       assert.equal(result.exprType.value.arguments.length, 1);
+      assert.equal(result.exprType.value.isDistinct, false);
+    }
+  });
+
+  it("builds aggregate function with isDistinct", () => {
+    const result = buildExpression({
+      type: "aggregateFunction",
+      name: "count",
+      arguments: [{ type: "unresolvedAttribute", name: "id" }],
+      isDistinct: true,
+    });
+    assert.equal(result.exprType.case, "unresolvedFunction");
+    if (result.exprType.case === "unresolvedFunction") {
+      assert.equal(result.exprType.value.functionName, "count");
+      assert.equal(result.exprType.value.isDistinct, true);
     }
   });
 
@@ -275,7 +291,7 @@ describe("buildExpression()", () => {
   });
 });
 
-describe("buildRelation() — catalog", () => {
+describe("buildRelation() - catalog", () => {
   it("builds a listDatabases catalog relation", () => {
     const plan: LogicalPlan = {
       type: "catalog",
@@ -304,7 +320,7 @@ describe("buildRelation() — catalog", () => {
   });
 });
 
-describe("buildRelation() — setOperation", () => {
+describe("buildRelation() - setOperation", () => {
   it("builds a union relation", () => {
     const plan: LogicalPlan = {
       type: "setOperation",
@@ -348,7 +364,7 @@ describe("buildRelation() — setOperation", () => {
   });
 });
 
-describe("buildRelation() — sample", () => {
+describe("buildRelation() - sample", () => {
   it("builds a sample relation", () => {
     const plan: LogicalPlan = {
       type: "sample",
@@ -363,7 +379,7 @@ describe("buildRelation() — sample", () => {
   });
 });
 
-describe("buildRelation() — fillNa / dropNa", () => {
+describe("buildRelation() - fillNa / dropNa", () => {
   it("builds a fillNa relation", () => {
     const plan: LogicalPlan = {
       type: "fillNa",
@@ -386,7 +402,7 @@ describe("buildRelation() — fillNa / dropNa", () => {
   });
 });
 
-describe("buildRelation() — toDF / describe", () => {
+describe("buildRelation() - toDF / describe", () => {
   it("builds a toDF relation", () => {
     const plan: LogicalPlan = {
       type: "toDF",
@@ -408,7 +424,7 @@ describe("buildRelation() — toDF / describe", () => {
   });
 });
 
-describe("buildExpression() — window", () => {
+describe("buildExpression() - window", () => {
   it("builds a window expression with partition and order", () => {
     const result = buildExpression({
       type: "window",
@@ -454,7 +470,7 @@ describe("buildExpression() — window", () => {
   });
 });
 
-describe("buildRelation() — readTable", () => {
+describe("buildRelation() - readTable", () => {
   it("builds a Read.NamedTable relation", () => {
     const result = buildRelation({
       type: "readTable",
@@ -474,7 +490,7 @@ describe("buildRelation() — readTable", () => {
   });
 });
 
-describe("buildRelation() — localRelation", () => {
+describe("buildRelation() - localRelation", () => {
   it("builds a LocalRelation with data and schema", () => {
     const data = new Uint8Array([1, 2, 3]);
     const result = buildRelation({
@@ -502,7 +518,7 @@ describe("buildRelation() — localRelation", () => {
   });
 });
 
-describe("buildRelation() — range", () => {
+describe("buildRelation() - range", () => {
   it("builds a Range relation", () => {
     const result = buildRelation({
       type: "range",
@@ -532,7 +548,7 @@ describe("buildRelation() — range", () => {
   });
 });
 
-describe("buildRelation() — withColumnsRenamed", () => {
+describe("buildRelation() - withColumnsRenamed", () => {
   it("builds a WithColumnsRenamed relation", () => {
     const result = buildRelation({
       type: "withColumnsRenamed",
@@ -552,7 +568,7 @@ describe("buildRelation() — withColumnsRenamed", () => {
   });
 });
 
-describe("buildRelation() — subqueryAlias", () => {
+describe("buildRelation() - subqueryAlias", () => {
   it("builds a SubqueryAlias relation", () => {
     const result = buildRelation({
       type: "subqueryAlias",
@@ -567,7 +583,7 @@ describe("buildRelation() — subqueryAlias", () => {
   });
 });
 
-describe("buildRelation() — hint", () => {
+describe("buildRelation() - hint", () => {
   it("builds a Hint relation", () => {
     const result = buildRelation({
       type: "hint",
@@ -596,7 +612,7 @@ describe("buildRelation() — hint", () => {
   });
 });
 
-describe("buildRelation() — tail", () => {
+describe("buildRelation() - tail", () => {
   it("builds a Tail relation", () => {
     const result = buildRelation({
       type: "tail",
@@ -611,7 +627,7 @@ describe("buildRelation() — tail", () => {
   });
 });
 
-describe("buildRelation() — repartition", () => {
+describe("buildRelation() - repartition", () => {
   it("builds a Repartition relation with shuffle", () => {
     const result = buildRelation({
       type: "repartition",
@@ -640,7 +656,7 @@ describe("buildRelation() — repartition", () => {
   });
 });
 
-describe("buildRelation() — repartitionByExpression", () => {
+describe("buildRelation() - repartitionByExpression", () => {
   it("builds a RepartitionByExpression relation", () => {
     const result = buildRelation({
       type: "repartitionByExpression",
@@ -657,7 +673,7 @@ describe("buildRelation() — repartitionByExpression", () => {
   });
 });
 
-describe("buildRelation() — summary", () => {
+describe("buildRelation() - summary", () => {
   it("builds a StatSummary relation", () => {
     const result = buildRelation({
       type: "summary",
@@ -672,7 +688,7 @@ describe("buildRelation() — summary", () => {
   });
 });
 
-describe("buildRelation() — naReplace", () => {
+describe("buildRelation() - naReplace", () => {
   it("builds a NAReplace relation", () => {
     const result = buildRelation({
       type: "naReplace",
@@ -706,7 +722,7 @@ describe("buildRelation() — naReplace", () => {
   });
 });
 
-describe("buildRelation() — unpivot", () => {
+describe("buildRelation() - unpivot", () => {
   it("builds an Unpivot relation with explicit values", () => {
     const result = buildRelation({
       type: "unpivot",
@@ -744,7 +760,7 @@ describe("buildRelation() — unpivot", () => {
   });
 });
 
-describe("buildRelation() — stat functions", () => {
+describe("buildRelation() - stat functions", () => {
   it("builds a StatCorr relation", () => {
     const result = buildRelation({
       type: "statCorr",
@@ -821,7 +837,7 @@ describe("buildRelation() — stat functions", () => {
   });
 });
 
-describe("buildRelation() — aggregate groupTypes", () => {
+describe("buildRelation() - aggregate groupTypes", () => {
   it("builds a rollup aggregate", () => {
     const result = buildRelation({
       type: "aggregate",
@@ -887,7 +903,7 @@ describe("buildRelation() — aggregate groupTypes", () => {
   });
 });
 
-describe("buildRelation() — sort", () => {
+describe("buildRelation() - sort", () => {
   it("builds a Sort relation", () => {
     const result = buildRelation({
       type: "sort",
@@ -910,7 +926,7 @@ describe("buildRelation() — sort", () => {
   });
 });
 
-describe("buildExpression() — expressionString", () => {
+describe("buildExpression() - expressionString", () => {
   it("builds an expressionString expression", () => {
     const result = buildExpression({
       type: "expressionString",
@@ -923,7 +939,7 @@ describe("buildExpression() — expressionString", () => {
   });
 });
 
-describe("buildExpression() — sortOrder", () => {
+describe("buildExpression() - sortOrder", () => {
   it("sortOrder delegates to inner expression", () => {
     const result = buildExpression({
       type: "sortOrder",
@@ -939,17 +955,13 @@ describe("buildExpression() — sortOrder", () => {
 });
 
 describe("exhaustive checks", () => {
-  it("buildRelation throws on unsupported plan type", () => {
+  it("buildRelation throws UnsupportedOperationError on unsupported plan type", () => {
     const bogus = { type: "bogus" } as unknown as LogicalPlan;
-    assert.throws(() => buildRelation(bogus), {
-      message: "Unsupported plan type: bogus",
-    });
+    assert.throws(() => buildRelation(bogus), UnsupportedOperationError);
   });
 
-  it("buildExpression throws on unsupported expression type", () => {
+  it("buildExpression throws UnsupportedOperationError on unsupported expression type", () => {
     const bogus = { type: "bogus" } as unknown as CoreExpression;
-    assert.throws(() => buildExpression(bogus), {
-      message: "Unsupported expression type: bogus",
-    });
+    assert.throws(() => buildExpression(bogus), UnsupportedOperationError);
   });
 });

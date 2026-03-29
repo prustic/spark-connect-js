@@ -5,7 +5,7 @@
  * action.  It maps column names to JS values. *
  * @see Spark source: sql/api/src/main/scala/org/apache/spark/sql/Row.scala *
  * When Arrow IPC batches are decoded, each row is materialised as a plain
- * object.  This is intentionally kept as a simple Record type — we don't
+ * object.  This is intentionally kept as a simple Record type because we don't
  * wrap it in a class because:
  *   1. JSON.stringify works out of the box for logging/debugging.
  *   2. Destructuring works naturally: `const { name, age } = row;`

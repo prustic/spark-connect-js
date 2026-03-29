@@ -7,7 +7,7 @@
  * @see Spark source: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/windowExpressions.scala
  *
  * A WindowSpec describes HOW to partition, order, and frame the data for
- * a window function.  It is immutable — every method returns a new WindowSpec.
+ * a window function.  It is immutable; every method returns a new WindowSpec.
  */
 
 import type { Expression, SortOrder, WindowFrame, FrameBoundary } from "./plan/logical-plan.js";

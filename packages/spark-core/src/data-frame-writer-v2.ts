@@ -2,7 +2,7 @@
  * DataFrameWriterV2
  *
  * Provides methods for writing a DataFrame using the DataSource V2 API.
- * Accessed via `df.writeTo(tableName)` — unlike the V1 writer which is
+ * Accessed via `df.writeTo(tableName)`. Unlike the V1 writer which is
  * path-oriented, V2 is catalog-aware and supports atomic table operations
  * (create, replace, createOrReplace) and partition-granularity writes
  * (append, overwrite, overwritePartitions).

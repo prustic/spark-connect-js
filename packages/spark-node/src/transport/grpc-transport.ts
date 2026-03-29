@@ -13,6 +13,7 @@
  * from @spark-connect-js/connect and serialized to binary protobuf on the wire.
  */
 
+import { UnsupportedOperationError } from "@spark-connect-js/core";
 import * as grpc from "@grpc/grpc-js";
 import { create, toBinary, fromBinary } from "@bufbuild/protobuf";
 import {
@@ -388,7 +389,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
     const modeStr = command.mode as string;
     const mode = WRITE_V2_MODE_MAP[modeStr];
     if (mode === undefined) {
-      throw new Error(`Unknown writeOperationV2 mode: ${modeStr}`);
+      throw new UnsupportedOperationError(`Unknown writeOperationV2 mode: ${modeStr}`);
     }
 
     const partitioningExprs = (
@@ -420,7 +421,7 @@ function buildCommandProto(command: Record<string, unknown>): Command {
     });
   }
 
-  throw new Error(`Unsupported command type: ${type}`);
+  throw new UnsupportedOperationError(`Unsupported command type: ${type}`);
 }
 
 // AnalyzePlan request/response building
@@ -566,7 +567,7 @@ function buildAnalyzePlanRequest(
     });
   }
 
-  throw new Error(`Unsupported analyze type: ${type}`);
+  throw new UnsupportedOperationError(`Unsupported analyze type: ${type}`);
 }
 
 function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unknown> {
