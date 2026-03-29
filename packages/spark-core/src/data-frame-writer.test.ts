@@ -167,5 +167,3 @@ describe("DataFrameWriter.insertInto()", () => {
     assert.equal(saveType.value.saveMethod, "insertInto");
   });
 });
-
-

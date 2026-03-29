@@ -1,4 +1,4 @@
-import { InvalidConfigError } from "@spark-connect-js/core";
+import { SparkClientError } from "@spark-connect-js/core";
 
 /**
  * Spawns and manages a local Spark Connect server process.
@@ -50,7 +50,7 @@ export class SparkProcessManager {
   /** Spawn the server and wait until it accepts gRPC connections. */
   async start(): Promise<void> {
     if (this.process) {
-      throw new InvalidConfigError(
+      throw new SparkClientError(
         `Spark Connect server is already running (pid: ${this.process.pid}, port: ${this.options.port}).`,
       );
     }
@@ -147,7 +147,7 @@ export class SparkProcessManager {
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    throw new InvalidConfigError(
+    throw new SparkClientError(
       `Spark Connect server did not start within ${this.options.startupTimeoutMs}ms`,
     );
   }
