@@ -183,7 +183,12 @@ export {
 } from "./gen/spark/connect/expressions_pb.js";
 
 // Type messages
-export { type DataType, DataTypeSchema } from "./gen/spark/connect/types_pb.js";
+export {
+  type DataType,
+  DataTypeSchema,
+  type DataType_Unparsed,
+  DataType_UnparsedSchema,
+} from "./gen/spark/connect/types_pb.js";
 
 // Catalog messages
 export {
@@ -237,6 +242,10 @@ export {
   RefreshByPathSchema,
   type RecoverPartitions,
   RecoverPartitionsSchema,
+  type CreateTable,
+  CreateTableSchema,
+  type CreateExternalTable,
+  CreateExternalTableSchema,
 } from "./gen/spark/connect/catalog_pb.js";
 
 // Expression.ExpressionString

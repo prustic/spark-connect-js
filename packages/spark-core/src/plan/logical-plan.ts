@@ -349,7 +349,24 @@ export type CatalogOperation =
   | { op: "clearCache" }
   | { op: "refreshTable"; tableName: string }
   | { op: "refreshByPath"; path: string }
-  | { op: "recoverPartitions"; tableName: string };
+  | { op: "recoverPartitions"; tableName: string }
+  | {
+      op: "createTable";
+      tableName: string;
+      path?: string;
+      source?: string;
+      description?: string;
+      schema?: string;
+      options?: Record<string, string>;
+    }
+  | {
+      op: "createExternalTable";
+      tableName: string;
+      path?: string;
+      source?: string;
+      schema?: string;
+      options?: Record<string, string>;
+    };
 
 export interface CatalogPlan {
   type: "catalog";

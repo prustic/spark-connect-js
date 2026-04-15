@@ -17,6 +17,7 @@ import { DataFrame } from "./data-frame.js";
 import type { SparkSession } from "./spark-session.js";
 import type { Row } from "./types/row.js";
 import type { CatalogOperation } from "./plan/logical-plan.js";
+import type { StructType } from "./types/struct.js";
 
 export class Catalog {
   /** @internal */
@@ -171,6 +172,59 @@ export class Catalog {
   /** Recover all partitions of the given table and update the catalog. */
   async recoverPartitions(tableName: string): Promise<void> {
     await this._collectCatalog({ op: "recoverPartitions", tableName });
+  }
+
+  /**
+   * Create a table based on the dataset in a data source.
+   *
+   * When `path` is specified, an external table is created from the data at
+   * the given path. Otherwise a managed table is created.
+   *
+   * Returns a DataFrame associated with the new table.
+   */
+  createTable(
+    tableName: string,
+    options?: {
+      path?: string;
+      source?: string;
+      description?: string;
+      schema?: StructType;
+      options?: Record<string, string>;
+    },
+  ): DataFrame {
+    return this._catalogDF({
+      op: "createTable",
+      tableName,
+      path: options?.path,
+      source: options?.source,
+      description: options?.description,
+      schema: options?.schema?.toDDL(),
+      options: options?.options,
+    });
+  }
+
+  /**
+   * Create an external table based on the dataset in a data source.
+   *
+   * Returns a DataFrame associated with the external table.
+   */
+  createExternalTable(
+    tableName: string,
+    options?: {
+      path?: string;
+      source?: string;
+      schema?: StructType;
+      options?: Record<string, string>;
+    },
+  ): DataFrame {
+    return this._catalogDF({
+      op: "createExternalTable",
+      tableName,
+      path: options?.path,
+      source: options?.source,
+      schema: options?.schema?.toDDL(),
+      options: options?.options,
+    });
   }
 
   /** @internal Create a DataFrame from a catalog operation */

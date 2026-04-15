@@ -240,6 +240,35 @@ export class PlanBuilder {
             return { catalog: { refreshByPath: { path: op.path } } };
           case "recoverPartitions":
             return { catalog: { recoverPartitions: { tableName: op.tableName } } };
+          case "createTable":
+            return {
+              catalog: {
+                createTable: {
+                  tableName: op.tableName,
+                  ...(op.path !== undefined ? { path: op.path } : {}),
+                  ...(op.source !== undefined ? { source: op.source } : {}),
+                  ...(op.description !== undefined ? { description: op.description } : {}),
+                  ...(op.schema !== undefined
+                    ? { schema: { unparsed: { dataTypeString: op.schema } } }
+                    : {}),
+                  ...(op.options !== undefined ? { options: op.options } : {}),
+                },
+              },
+            };
+          case "createExternalTable":
+            return {
+              catalog: {
+                createExternalTable: {
+                  tableName: op.tableName,
+                  ...(op.path !== undefined ? { path: op.path } : {}),
+                  ...(op.source !== undefined ? { source: op.source } : {}),
+                  ...(op.schema !== undefined
+                    ? { schema: { unparsed: { dataTypeString: op.schema } } }
+                    : {}),
+                  ...(op.options !== undefined ? { options: op.options } : {}),
+                },
+              },
+            };
         }
         break;
       }

@@ -490,6 +490,57 @@ describe("buildRelation() - catalog", () => {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "catalog");
   });
+
+  it("builds a createTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "createTable", tableName: "new_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a createTable catalog relation with all options", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: {
+        op: "createTable",
+        tableName: "new_table",
+        path: "/data/tables/new_table",
+        source: "parquet",
+        description: "A test table",
+        schema: "name string, age integer",
+        options: { compression: "snappy" },
+      },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a createExternalTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "createExternalTable", tableName: "ext_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a createExternalTable catalog relation with all options", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: {
+        op: "createExternalTable",
+        tableName: "ext_table",
+        path: "/data/external",
+        source: "csv",
+        schema: "id long, value double",
+        options: { header: "true" },
+      },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
 });
 
 describe("buildRelation() - setOperation", () => {
