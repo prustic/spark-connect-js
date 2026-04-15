@@ -119,6 +119,60 @@ export class Catalog {
     await this._collectCatalog({ op: "setCurrentDatabase", dbName });
   }
 
+  /** Get the current default catalog name. */
+  async currentCatalog(): Promise<string> {
+    const rows = await this._collectCatalog({ op: "currentCatalog" });
+    if (rows.length > 0) {
+      const firstVal = Object.values(rows[0])[0];
+      return typeof firstVal === "string" ? firstVal : "spark_catalog";
+    }
+    return "spark_catalog";
+  }
+
+  /** Set the current default catalog. */
+  async setCurrentCatalog(catalogName: string): Promise<void> {
+    await this._collectCatalog({ op: "setCurrentCatalog", catalogName });
+  }
+
+  /** Cache the specified table in-memory with an optional storage level. */
+  async cacheTable(
+    tableName: string,
+    storageLevel?: {
+      useDisk: boolean;
+      useMemory: boolean;
+      useOffHeap: boolean;
+      deserialized: boolean;
+      replication: number;
+    },
+  ): Promise<void> {
+    await this._collectCatalog({ op: "cacheTable", tableName, storageLevel });
+  }
+
+  /** Remove the specified table from the in-memory cache. */
+  async uncacheTable(tableName: string): Promise<void> {
+    await this._collectCatalog({ op: "uncacheTable", tableName });
+  }
+
+  /** Remove all cached tables from the in-memory cache. */
+  async clearCache(): Promise<void> {
+    await this._collectCatalog({ op: "clearCache" });
+  }
+
+  /** Invalidate and refresh all cached data and metadata for the given table. */
+  async refreshTable(tableName: string): Promise<void> {
+    await this._collectCatalog({ op: "refreshTable", tableName });
+  }
+
+  /** Invalidate and refresh cached data for any DataFrame containing the given path. */
+  async refreshByPath(path: string): Promise<void> {
+    await this._collectCatalog({ op: "refreshByPath", path });
+  }
+
+  /** Recover all partitions of the given table and update the catalog. */
+  async recoverPartitions(tableName: string): Promise<void> {
+    await this._collectCatalog({ op: "recoverPartitions", tableName });
+  }
+
   /** @internal Create a DataFrame from a catalog operation */
   private _catalogDF(operation: CatalogOperation): DataFrame {
     return DataFrame._fromPlan(this._session, { type: "catalog", operation });

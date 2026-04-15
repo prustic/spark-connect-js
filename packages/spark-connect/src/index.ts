@@ -221,6 +221,22 @@ export {
   DropTempViewSchema,
   type DropGlobalTempView,
   DropGlobalTempViewSchema,
+  type CurrentCatalog,
+  CurrentCatalogSchema,
+  type SetCurrentCatalog,
+  SetCurrentCatalogSchema,
+  type CacheTable,
+  CacheTableSchema,
+  type UncacheTable,
+  UncacheTableSchema,
+  type ClearCache,
+  ClearCacheSchema,
+  type RefreshTable,
+  RefreshTableSchema,
+  type RefreshByPath,
+  RefreshByPathSchema,
+  type RecoverPartitions,
+  RecoverPartitionsSchema,
 } from "./gen/spark/connect/catalog_pb.js";
 
 // Expression.ExpressionString

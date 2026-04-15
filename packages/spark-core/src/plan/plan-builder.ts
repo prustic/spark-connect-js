@@ -220,6 +220,26 @@ export class PlanBuilder {
             return { catalog: { currentDatabase: {} } };
           case "setCurrentDatabase":
             return { catalog: { setCurrentDatabase: { dbName: op.dbName } } };
+          case "currentCatalog":
+            return { catalog: { currentCatalog: {} } };
+          case "setCurrentCatalog":
+            return { catalog: { setCurrentCatalog: { catalogName: op.catalogName } } };
+          case "cacheTable":
+            return {
+              catalog: {
+                cacheTable: { tableName: op.tableName, storageLevel: op.storageLevel },
+              },
+            };
+          case "uncacheTable":
+            return { catalog: { uncacheTable: { tableName: op.tableName } } };
+          case "clearCache":
+            return { catalog: { clearCache: {} } };
+          case "refreshTable":
+            return { catalog: { refreshTable: { tableName: op.tableName } } };
+          case "refreshByPath":
+            return { catalog: { refreshByPath: { path: op.path } } };
+          case "recoverPartitions":
+            return { catalog: { recoverPartitions: { tableName: op.tableName } } };
         }
         break;
       }

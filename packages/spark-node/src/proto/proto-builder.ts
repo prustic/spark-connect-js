@@ -69,6 +69,15 @@ import {
   IsCachedSchema,
   DropTempViewSchema,
   DropGlobalTempViewSchema,
+  CurrentCatalogSchema,
+  SetCurrentCatalogSchema,
+  CacheTableSchema,
+  UncacheTableSchema,
+  ClearCacheSchema,
+  RefreshTableSchema,
+  RefreshByPathSchema,
+  RecoverPartitionsSchema,
+  StorageLevelSchema,
   SetOperationSchema,
   SetOperation_SetOpType,
   SampleSchema,
@@ -419,6 +428,71 @@ export function buildRelation(plan: LogicalPlan): Relation {
           catValue = {
             case: "dropGlobalTempView",
             value: create(DropGlobalTempViewSchema, { viewName: op.viewName }),
+          };
+          break;
+        case "currentCatalog":
+          catValue = {
+            case: "currentCatalog",
+            value: create(CurrentCatalogSchema, {}),
+          };
+          break;
+        case "setCurrentCatalog":
+          catValue = {
+            case: "setCurrentCatalog",
+            value: create(SetCurrentCatalogSchema, {
+              catalogName: op.catalogName,
+            }),
+          };
+          break;
+        case "cacheTable":
+          catValue = {
+            case: "cacheTable",
+            value: create(CacheTableSchema, {
+              tableName: op.tableName,
+              ...(op.storageLevel
+                ? {
+                    storageLevel: create(StorageLevelSchema, {
+                      useDisk: op.storageLevel.useDisk,
+                      useMemory: op.storageLevel.useMemory,
+                      useOffHeap: op.storageLevel.useOffHeap,
+                      deserialized: op.storageLevel.deserialized,
+                      replication: op.storageLevel.replication,
+                    }),
+                  }
+                : {}),
+            }),
+          };
+          break;
+        case "uncacheTable":
+          catValue = {
+            case: "uncacheTable",
+            value: create(UncacheTableSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "clearCache":
+          catValue = {
+            case: "clearCache",
+            value: create(ClearCacheSchema, {}),
+          };
+          break;
+        case "refreshTable":
+          catValue = {
+            case: "refreshTable",
+            value: create(RefreshTableSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "refreshByPath":
+          catValue = {
+            case: "refreshByPath",
+            value: create(RefreshByPathSchema, { path: op.path }),
+          };
+          break;
+        case "recoverPartitions":
+          catValue = {
+            case: "recoverPartitions",
+            value: create(RecoverPartitionsSchema, {
+              tableName: op.tableName,
+            }),
           };
           break;
       }

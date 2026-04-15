@@ -399,6 +399,97 @@ describe("buildRelation() - catalog", () => {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "catalog");
   });
+
+  it("builds a currentCatalog catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "currentCatalog" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a setCurrentCatalog catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "setCurrentCatalog", catalogName: "my_catalog" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a cacheTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "cacheTable", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a cacheTable catalog relation with storageLevel", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: {
+        op: "cacheTable",
+        tableName: "my_table",
+        storageLevel: {
+          useDisk: true,
+          useMemory: true,
+          useOffHeap: false,
+          deserialized: false,
+          replication: 1,
+        },
+      },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds an uncacheTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "uncacheTable", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a clearCache catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "clearCache" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a refreshTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "refreshTable", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a refreshByPath catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "refreshByPath", path: "/data/my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a recoverPartitions catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "recoverPartitions", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
 });
 
 describe("buildRelation() - setOperation", () => {

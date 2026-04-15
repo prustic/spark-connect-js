@@ -331,7 +331,25 @@ export type CatalogOperation =
   | { op: "dropTempView"; viewName: string }
   | { op: "dropGlobalTempView"; viewName: string }
   | { op: "currentDatabase" }
-  | { op: "setCurrentDatabase"; dbName: string };
+  | { op: "setCurrentDatabase"; dbName: string }
+  | { op: "currentCatalog" }
+  | { op: "setCurrentCatalog"; catalogName: string }
+  | {
+      op: "cacheTable";
+      tableName: string;
+      storageLevel?: {
+        useDisk: boolean;
+        useMemory: boolean;
+        useOffHeap: boolean;
+        deserialized: boolean;
+        replication: number;
+      };
+    }
+  | { op: "uncacheTable"; tableName: string }
+  | { op: "clearCache" }
+  | { op: "refreshTable"; tableName: string }
+  | { op: "refreshByPath"; path: string }
+  | { op: "recoverPartitions"; tableName: string };
 
 export interface CatalogPlan {
   type: "catalog";
