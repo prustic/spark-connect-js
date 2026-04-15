@@ -363,6 +363,42 @@ describe("buildRelation() - catalog", () => {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "catalog");
   });
+
+  it("builds a functionExists catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "functionExists", functionName: "count", dbName: "default" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds an isCached catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "isCached", tableName: "my_table" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a dropTempView catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "dropTempView", viewName: "my_view" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a dropGlobalTempView catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "dropGlobalTempView", viewName: "my_global_view" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
 });
 
 describe("buildRelation() - setOperation", () => {

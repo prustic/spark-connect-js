@@ -326,6 +326,10 @@ export type CatalogOperation =
   | { op: "getFunction"; functionName: string; dbName?: string }
   | { op: "tableExists"; tableName: string; dbName?: string }
   | { op: "databaseExists"; dbName: string }
+  | { op: "functionExists"; functionName: string; dbName?: string }
+  | { op: "isCached"; tableName: string }
+  | { op: "dropTempView"; viewName: string }
+  | { op: "dropGlobalTempView"; viewName: string }
   | { op: "currentDatabase" }
   | { op: "setCurrentDatabase"; dbName: string };
 

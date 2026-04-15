@@ -65,6 +65,10 @@ import {
   GetFunctionSchema,
   TableExistsSchema,
   DatabaseExistsSchema,
+  FunctionExistsSchema,
+  IsCachedSchema,
+  DropTempViewSchema,
+  DropGlobalTempViewSchema,
   SetOperationSchema,
   SetOperation_SetOpType,
   SampleSchema,
@@ -388,6 +392,33 @@ export function buildRelation(plan: LogicalPlan): Relation {
           catValue = {
             case: "databaseExists",
             value: create(DatabaseExistsSchema, { dbName: op.dbName }),
+          };
+          break;
+        case "functionExists":
+          catValue = {
+            case: "functionExists",
+            value: create(FunctionExistsSchema, {
+              functionName: op.functionName,
+              dbName: op.dbName,
+            }),
+          };
+          break;
+        case "isCached":
+          catValue = {
+            case: "isCached",
+            value: create(IsCachedSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "dropTempView":
+          catValue = {
+            case: "dropTempView",
+            value: create(DropTempViewSchema, { viewName: op.viewName }),
+          };
+          break;
+        case "dropGlobalTempView":
+          catValue = {
+            case: "dropGlobalTempView",
+            value: create(DropGlobalTempViewSchema, { viewName: op.viewName }),
           };
           break;
       }

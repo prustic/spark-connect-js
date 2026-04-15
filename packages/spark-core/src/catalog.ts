@@ -79,6 +79,30 @@ export class Catalog {
     return rows.length > 0 && rows[0]["exists"] === true;
   }
 
+  /** Check if a function exists. */
+  async functionExists(functionName: string, dbName?: string): Promise<boolean> {
+    const rows = await this._collectCatalog({ op: "functionExists", functionName, dbName });
+    return rows.length > 0 && rows[0]["exists"] === true;
+  }
+
+  /** Returns true if the table is currently cached in-memory. */
+  async isCached(tableName: string): Promise<boolean> {
+    const rows = await this._collectCatalog({ op: "isCached", tableName });
+    return rows.length > 0 && rows[0]["isCached"] === true;
+  }
+
+  /** Drops the local temporary view. Returns true if the view existed. */
+  async dropTempView(viewName: string): Promise<boolean> {
+    const rows = await this._collectCatalog({ op: "dropTempView", viewName });
+    return rows.length > 0 && Object.values(rows[0])[0] === true;
+  }
+
+  /** Drops the global temporary view. Returns true if the view existed. */
+  async dropGlobalTempView(viewName: string): Promise<boolean> {
+    const rows = await this._collectCatalog({ op: "dropGlobalTempView", viewName });
+    return rows.length > 0 && Object.values(rows[0])[0] === true;
+  }
+
   /** Get the current database name. */
   async currentDatabase(): Promise<string> {
     const rows = await this._collectCatalog({ op: "currentDatabase" });

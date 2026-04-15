@@ -204,6 +204,18 @@ export class PlanBuilder {
             return { catalog: { tableExists: { tableName: op.tableName, dbName: op.dbName } } };
           case "databaseExists":
             return { catalog: { databaseExists: { dbName: op.dbName } } };
+          case "functionExists":
+            return {
+              catalog: {
+                functionExists: { functionName: op.functionName, dbName: op.dbName },
+              },
+            };
+          case "isCached":
+            return { catalog: { isCached: { tableName: op.tableName } } };
+          case "dropTempView":
+            return { catalog: { dropTempView: { viewName: op.viewName } } };
+          case "dropGlobalTempView":
+            return { catalog: { dropGlobalTempView: { viewName: op.viewName } } };
           case "currentDatabase":
             return { catalog: { currentDatabase: {} } };
           case "setCurrentDatabase":

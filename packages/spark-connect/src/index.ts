@@ -215,6 +215,12 @@ export {
   DatabaseExistsSchema,
   type FunctionExists,
   FunctionExistsSchema,
+  type IsCached,
+  IsCachedSchema,
+  type DropTempView,
+  DropTempViewSchema,
+  type DropGlobalTempView,
+  DropGlobalTempViewSchema,
 } from "./gen/spark/connect/catalog_pb.js";
 
 // Expression.ExpressionString
