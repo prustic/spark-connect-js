@@ -269,8 +269,13 @@ export class PlanBuilder {
                 },
               },
             };
+          default: {
+            const _exhaustive: never = op;
+            throw new UnsupportedOperationError(
+              `Unsupported catalog operation: ${(_exhaustive as { op: string }).op}`,
+            );
+          }
         }
-        break;
       }
 
       case "setOperation": {

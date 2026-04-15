@@ -546,6 +546,12 @@ export function buildRelation(plan: LogicalPlan): Relation {
             }),
           };
           break;
+        default: {
+          const _exhaustive: never = op;
+          throw new UnsupportedOperationError(
+            `Unsupported catalog operation: ${(_exhaustive as { op: string }).op}`,
+          );
+        }
       }
       const catalog = create(CatalogSchema, { catType: catValue });
       return create(RelationSchema, {
