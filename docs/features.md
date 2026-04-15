@@ -131,25 +131,30 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 
 ## DataFrameWriterV2
 
-| Feature                                                | Status |
-| ------------------------------------------------------ | ------ |
-| `writeTo(table)` via `df.writeTo()`                    | ✅     |
-| `using` / `option` / `tableProperty`                   | ✅     |
-| `partitionedBy` / `clusterBy`                          | ✅     |
-| `create` / `replace` / `createOrReplace`               | ✅     |
-| `append` / `overwrite` / `overwritePartitions`         | ✅     |
+| Feature                                        | Status |
+| ---------------------------------------------- | ------ |
+| `writeTo(table)` via `df.writeTo()`            | ✅     |
+| `using` / `option` / `tableProperty`           | ✅     |
+| `partitionedBy` / `clusterBy`                  | ✅     |
+| `create` / `replace` / `createOrReplace`       | ✅     |
+| `append` / `overwrite` / `overwritePartitions` | ✅     |
 
 ## Catalog
 
 | Feature                                        | Status |
 | ---------------------------------------------- | ------ |
 | `currentDatabase` / `setCurrentDatabase`       | ✅     |
+| `currentCatalog` / `setCurrentCatalog`         | ✅     |
 | `listDatabases` / `listTables` / `listColumns` | ✅     |
+| `listFunctions` / `listCatalogs`               | ✅     |
 | `databaseExists` / `tableExists`               | ✅     |
-| `listFunctions` / `functionExists`             | -      |
-| `getDatabase` / `getTable`                     | -      |
-| `dropTempView` / `dropGlobalTempView`          | -      |
-| `cacheTable` / `uncacheTable` / `clearCache`   | -      |
+| `functionExists` / `isCached`                  | ✅     |
+| `getDatabase` / `getTable` / `getFunction`     | ✅     |
+| `dropTempView` / `dropGlobalTempView`          | ✅     |
+| `cacheTable` / `uncacheTable` / `clearCache`   | ✅     |
+| `refreshTable` / `refreshByPath`               | ✅     |
+| `recoverPartitions`                            | ✅     |
+| `createTable` / `createExternalTable`          | ✅     |
 
 ## Functions
 
@@ -186,6 +191,5 @@ Accessed via `df.stat`.
 
 These are planned but not available in the current release:
 
-- **Catalog expansion**: `dropTempView()`, `cacheTable()`, `listFunctions()`
 - **RuntimeConfig**: `conf.get()`, `conf.set()`
 - **Structured Streaming**: `readStream`, `writeStream`, `StreamingQuery`
