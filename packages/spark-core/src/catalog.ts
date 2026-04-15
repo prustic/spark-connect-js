@@ -42,6 +42,31 @@ export class Catalog {
     return this._catalogDF({ op: "listColumns", tableName, dbName });
   }
 
+  /** List all functions in a database. Returns a DataFrame with function metadata. */
+  listFunctions(dbName?: string, pattern?: string): DataFrame {
+    return this._catalogDF({ op: "listFunctions", dbName, pattern });
+  }
+
+  /** List all catalogs. Returns a DataFrame with catalog metadata. */
+  listCatalogs(pattern?: string): DataFrame {
+    return this._catalogDF({ op: "listCatalogs", pattern });
+  }
+
+  /** Get the database with the specified name. Returns a single-row DataFrame. */
+  getDatabase(dbName: string): DataFrame {
+    return this._catalogDF({ op: "getDatabase", dbName });
+  }
+
+  /** Get the table or view with the specified name. Returns a single-row DataFrame. */
+  getTable(tableName: string, dbName?: string): DataFrame {
+    return this._catalogDF({ op: "getTable", tableName, dbName });
+  }
+
+  /** Get the function with the specified name. Returns a single-row DataFrame. */
+  getFunction(functionName: string, dbName?: string): DataFrame {
+    return this._catalogDF({ op: "getFunction", functionName, dbName });
+  }
+
   /** Check if a table exists. */
   async tableExists(tableName: string, dbName?: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "tableExists", tableName, dbName });

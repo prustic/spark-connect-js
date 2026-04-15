@@ -188,6 +188,18 @@ export class PlanBuilder {
             return { catalog: { listTables: { dbName: op.dbName, pattern: op.pattern } } };
           case "listColumns":
             return { catalog: { listColumns: { tableName: op.tableName, dbName: op.dbName } } };
+          case "listFunctions":
+            return { catalog: { listFunctions: { dbName: op.dbName, pattern: op.pattern } } };
+          case "listCatalogs":
+            return { catalog: { listCatalogs: { pattern: op.pattern } } };
+          case "getDatabase":
+            return { catalog: { getDatabase: { dbName: op.dbName } } };
+          case "getTable":
+            return { catalog: { getTable: { tableName: op.tableName, dbName: op.dbName } } };
+          case "getFunction":
+            return {
+              catalog: { getFunction: { functionName: op.functionName, dbName: op.dbName } },
+            };
           case "tableExists":
             return { catalog: { tableExists: { tableName: op.tableName, dbName: op.dbName } } };
           case "databaseExists":

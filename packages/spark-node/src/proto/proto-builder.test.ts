@@ -318,6 +318,51 @@ describe("buildRelation() - catalog", () => {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "catalog");
   });
+
+  it("builds a listFunctions catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "listFunctions", dbName: "default", pattern: "count*" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a listCatalogs catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "listCatalogs", pattern: "spark*" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a getDatabase catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "getDatabase", dbName: "default" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a getTable catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "getTable", tableName: "my_table", dbName: "default" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
+
+  it("builds a getFunction catalog relation", () => {
+    const plan: LogicalPlan = {
+      type: "catalog",
+      operation: { op: "getFunction", functionName: "count" },
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "catalog");
+  });
 });
 
 describe("buildRelation() - setOperation", () => {

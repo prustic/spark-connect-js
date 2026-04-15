@@ -319,6 +319,11 @@ export type CatalogOperation =
   | { op: "listDatabases"; pattern?: string }
   | { op: "listTables"; dbName?: string; pattern?: string }
   | { op: "listColumns"; tableName: string; dbName?: string }
+  | { op: "listFunctions"; dbName?: string; pattern?: string }
+  | { op: "listCatalogs"; pattern?: string }
+  | { op: "getDatabase"; dbName: string }
+  | { op: "getTable"; tableName: string; dbName?: string }
+  | { op: "getFunction"; functionName: string; dbName?: string }
   | { op: "tableExists"; tableName: string; dbName?: string }
   | { op: "databaseExists"; dbName: string }
   | { op: "currentDatabase" }

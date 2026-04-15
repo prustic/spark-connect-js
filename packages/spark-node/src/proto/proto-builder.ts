@@ -58,6 +58,11 @@ import {
   ListDatabasesSchema,
   ListTablesSchema,
   ListColumnsSchema,
+  ListFunctionsSchema,
+  ListCatalogsSchema,
+  GetDatabaseSchema,
+  GetTableSchema,
+  GetFunctionSchema,
   TableExistsSchema,
   DatabaseExistsSchema,
   SetOperationSchema,
@@ -338,6 +343,39 @@ export function buildRelation(plan: LogicalPlan): Relation {
           catValue = {
             case: "listColumns",
             value: create(ListColumnsSchema, { tableName: op.tableName, dbName: op.dbName }),
+          };
+          break;
+        case "listFunctions":
+          catValue = {
+            case: "listFunctions",
+            value: create(ListFunctionsSchema, { dbName: op.dbName, pattern: op.pattern }),
+          };
+          break;
+        case "listCatalogs":
+          catValue = {
+            case: "listCatalogs",
+            value: create(ListCatalogsSchema, { pattern: op.pattern }),
+          };
+          break;
+        case "getDatabase":
+          catValue = {
+            case: "getDatabase",
+            value: create(GetDatabaseSchema, { dbName: op.dbName }),
+          };
+          break;
+        case "getTable":
+          catValue = {
+            case: "getTable",
+            value: create(GetTableSchema, { tableName: op.tableName, dbName: op.dbName }),
+          };
+          break;
+        case "getFunction":
+          catValue = {
+            case: "getFunction",
+            value: create(GetFunctionSchema, {
+              functionName: op.functionName,
+              dbName: op.dbName,
+            }),
           };
           break;
         case "tableExists":
