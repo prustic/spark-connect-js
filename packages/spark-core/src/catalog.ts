@@ -71,48 +71,44 @@ export class Catalog {
   /** Check if a table exists. */
   async tableExists(tableName: string, dbName?: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "tableExists", tableName, dbName });
-    return rows.length > 0 && rows[0]["exists"] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Check if a database exists. */
   async databaseExists(dbName: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "databaseExists", dbName });
-    return rows.length > 0 && rows[0]["exists"] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Check if a function exists. */
   async functionExists(functionName: string, dbName?: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "functionExists", functionName, dbName });
-    return rows.length > 0 && rows[0]["exists"] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Returns true if the table is currently cached in-memory. */
   async isCached(tableName: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "isCached", tableName });
-    return rows.length > 0 && rows[0]["isCached"] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Drops the local temporary view. Returns true if the view existed. */
   async dropTempView(viewName: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "dropTempView", viewName });
-    return rows.length > 0 && Object.values(rows[0])[0] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Drops the global temporary view. Returns true if the view existed. */
   async dropGlobalTempView(viewName: string): Promise<boolean> {
     const rows = await this._collectCatalog({ op: "dropGlobalTempView", viewName });
-    return rows.length > 0 && Object.values(rows[0])[0] === true;
+    return this._firstValue(rows) === true;
   }
 
   /** Get the current database name. */
   async currentDatabase(): Promise<string> {
     const rows = await this._collectCatalog({ op: "currentDatabase" });
-    // Spark returns a single row with a "result" or first column
-    if (rows.length > 0) {
-      const firstVal = Object.values(rows[0])[0];
-      return typeof firstVal === "string" ? firstVal : "default";
-    }
-    return "default";
+    const val = this._firstValue(rows);
+    return typeof val === "string" ? val : "default";
   }
 
   /** Set the current database. */
@@ -123,11 +119,8 @@ export class Catalog {
   /** Get the current default catalog name. */
   async currentCatalog(): Promise<string> {
     const rows = await this._collectCatalog({ op: "currentCatalog" });
-    if (rows.length > 0) {
-      const firstVal = Object.values(rows[0])[0];
-      return typeof firstVal === "string" ? firstVal : "spark_catalog";
-    }
-    return "spark_catalog";
+    const val = this._firstValue(rows);
+    return typeof val === "string" ? val : "spark_catalog";
   }
 
   /** Set the current default catalog. */
@@ -235,5 +228,15 @@ export class Catalog {
   /** @internal Execute a catalog operation and collect the result */
   private async _collectCatalog(operation: CatalogOperation): Promise<Row[]> {
     return this._catalogDF(operation).collect();
+  }
+
+  /**
+   * @internal Extract the first column value from the first row.
+   * Spark Connect catalog operations return single-column DataFrames
+   * with varying column names — this avoids hardcoding column names.
+   */
+  private _firstValue(rows: Row[]): unknown {
+    if (rows.length === 0) return undefined;
+    return Object.values(rows[0])[0];
   }
 }
