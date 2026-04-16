@@ -108,8 +108,7 @@ export class Catalog {
   /** Get the current database name. */
   async currentDatabase(): Promise<string> {
     const rows = await this._collectCatalog({ op: "currentDatabase" });
-    const val = this._firstValue(rows);
-    return typeof val === "string" ? val : "default";
+    return this._firstValue(rows) as string;
   }
 
   /** Set the current database. */
@@ -120,8 +119,7 @@ export class Catalog {
   /** Get the current default catalog name. */
   async currentCatalog(): Promise<string> {
     const rows = await this._collectCatalog({ op: "currentCatalog" });
-    const val = this._firstValue(rows);
-    return typeof val === "string" ? val : "spark_catalog";
+    return this._firstValue(rows) as string;
   }
 
   /** Set the current default catalog. */
