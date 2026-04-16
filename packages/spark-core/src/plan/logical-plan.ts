@@ -34,6 +34,8 @@
  * a malformed unresolved plan causes cryptic AnalysisExceptions.
  */
 
+import type { StorageLevel } from "../storage-level.js";
+
 // Expression types
 // These model nodes in the expression tree inside filter, select, and agg.
 
@@ -337,13 +339,7 @@ export type CatalogOperation =
   | {
       op: "cacheTable";
       tableName: string;
-      storageLevel?: {
-        useDisk: boolean;
-        useMemory: boolean;
-        useOffHeap: boolean;
-        deserialized: boolean;
-        replication: number;
-      };
+      storageLevel?: StorageLevel;
     }
   | { op: "uncacheTable"; tableName: string }
   | { op: "clearCache" }

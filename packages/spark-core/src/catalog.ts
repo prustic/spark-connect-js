@@ -18,6 +18,7 @@ import type { SparkSession } from "./spark-session.js";
 import type { Row } from "./types/row.js";
 import type { CatalogOperation } from "./plan/logical-plan.js";
 import type { StructType } from "./types/struct.js";
+import type { StorageLevel } from "./storage-level.js";
 
 export class Catalog {
   /** @internal */
@@ -129,16 +130,7 @@ export class Catalog {
   }
 
   /** Cache the specified table in-memory with an optional storage level. */
-  async cacheTable(
-    tableName: string,
-    storageLevel?: {
-      useDisk: boolean;
-      useMemory: boolean;
-      useOffHeap: boolean;
-      deserialized: boolean;
-      replication: number;
-    },
-  ): Promise<void> {
+  async cacheTable(tableName: string, storageLevel?: StorageLevel): Promise<void> {
     await this._collectCatalog({ op: "cacheTable", tableName, storageLevel });
   }
 
