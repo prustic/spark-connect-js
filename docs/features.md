@@ -154,7 +154,7 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `cacheTable` / `uncacheTable` / `clearCache`   | ✅     |
 | `refreshTable` / `refreshByPath`               | ✅     |
 | `recoverPartitions`                            | ✅     |
-| `createTable` / `createExternalTable`          | ✅     |
+| `createTable` / `createExternalTable` _(deprecated)_ | ✅     |
 
 ## Functions
 

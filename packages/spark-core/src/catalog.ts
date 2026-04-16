@@ -190,6 +190,10 @@ export class Catalog {
    * Create an external table based on the dataset in a data source.
    *
    * Returns a DataFrame associated with the external table.
+   *
+   * @deprecated Use {@link createTable} instead. This method delegates to
+   *   `createTable`, matching PySpark, Scala, and SparkR which all deprecated
+   *   `createExternalTable` in favor of `createTable`.
    */
   createExternalTable(
     tableName: string,
@@ -200,14 +204,7 @@ export class Catalog {
       options?: Record<string, string>;
     },
   ): DataFrame {
-    return this._catalogDF({
-      op: "createExternalTable",
-      tableName,
-      path: options?.path,
-      source: options?.source,
-      schema: options?.schema?.toDDL(),
-      options: options?.options,
-    });
+    return this.createTable(tableName, options);
   }
 
   /** @internal Create a DataFrame from a catalog operation */

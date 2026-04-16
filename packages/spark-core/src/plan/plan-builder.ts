@@ -255,20 +255,6 @@ export class PlanBuilder {
                 },
               },
             };
-          case "createExternalTable":
-            return {
-              catalog: {
-                createExternalTable: {
-                  tableName: op.tableName,
-                  ...(op.path !== undefined ? { path: op.path } : {}),
-                  ...(op.source !== undefined ? { source: op.source } : {}),
-                  ...(op.schema !== undefined
-                    ? { schema: { unparsed: { dataTypeString: op.schema } } }
-                    : {}),
-                  ...(op.options !== undefined ? { options: op.options } : {}),
-                },
-              },
-            };
           default: {
             const _exhaustive: never = op;
             throw new UnsupportedOperationError(

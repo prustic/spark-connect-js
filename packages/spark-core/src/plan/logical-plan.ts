@@ -354,14 +354,6 @@ export type CatalogOperation =
       description?: string;
       schema?: string;
       options?: Record<string, string>;
-    }
-  | {
-      op: "createExternalTable";
-      tableName: string;
-      path?: string;
-      source?: string;
-      schema?: string;
-      options?: Record<string, string>;
     };
 
 export interface CatalogPlan {

@@ -79,7 +79,6 @@ import {
   RecoverPartitionsSchema,
   StorageLevelSchema,
   CreateTableSchema,
-  CreateExternalTableSchema,
   DataTypeSchema,
   DataType_UnparsedSchema,
   SetOperationSchema,
@@ -507,29 +506,6 @@ export function buildRelation(plan: LogicalPlan): Relation {
               ...(op.path !== undefined ? { path: op.path } : {}),
               ...(op.source !== undefined ? { source: op.source } : {}),
               ...(op.description !== undefined ? { description: op.description } : {}),
-              ...(op.schema !== undefined
-                ? {
-                    schema: create(DataTypeSchema, {
-                      kind: {
-                        case: "unparsed",
-                        value: create(DataType_UnparsedSchema, {
-                          dataTypeString: op.schema,
-                        }),
-                      },
-                    }),
-                  }
-                : {}),
-              ...(op.options !== undefined ? { options: op.options } : {}),
-            }),
-          };
-          break;
-        case "createExternalTable":
-          catValue = {
-            case: "createExternalTable",
-            value: create(CreateExternalTableSchema, {
-              tableName: op.tableName,
-              ...(op.path !== undefined ? { path: op.path } : {}),
-              ...(op.source !== undefined ? { source: op.source } : {}),
               ...(op.schema !== undefined
                 ? {
                     schema: create(DataTypeSchema, {

@@ -322,7 +322,7 @@ const tables = await catalog.listTables();
 | `refreshByPath(path)`                       | Invalidate cached metadata for a path              |
 | `recoverPartitions(tableName)`              | Recover partitions of a table                      |
 | `createTable(tableName, options?)`          | Create a managed or external table                 |
-| `createExternalTable(tableName, options?)`  | Create an external table                           |
+| `createExternalTable(tableName, options?)`  | _(Deprecated)_ Delegates to `createTable`          |
 
 ---
 

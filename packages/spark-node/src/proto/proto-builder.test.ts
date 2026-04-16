@@ -566,40 +566,6 @@ describe("buildRelation() - catalog", () => {
     assert.equal(val.description, "A test table");
     assert.equal(val.schema.kind.case, "unparsed");
   });
-
-  it("builds createExternalTable minimal", () => {
-    const cat = catType({
-      type: "catalog",
-      operation: { op: "createExternalTable", tableName: "ext_table" },
-    });
-    assert.equal(cat.case, "createExternalTable");
-    assert.equal((cat.value as { tableName: string }).tableName, "ext_table");
-  });
-
-  it("builds createExternalTable with all options", () => {
-    const cat = catType({
-      type: "catalog",
-      operation: {
-        op: "createExternalTable",
-        tableName: "ext_table",
-        path: "/data/external",
-        source: "csv",
-        schema: "id long, value double",
-        options: { header: "true" },
-      },
-    });
-    assert.equal(cat.case, "createExternalTable");
-    const val = cat.value as {
-      tableName: string;
-      path: string;
-      source: string;
-      schema: { kind: { case: string } };
-    };
-    assert.equal(val.tableName, "ext_table");
-    assert.equal(val.path, "/data/external");
-    assert.equal(val.source, "csv");
-    assert.equal(val.schema.kind.case, "unparsed");
-  });
 });
 
 describe("buildRelation() - setOperation", () => {
