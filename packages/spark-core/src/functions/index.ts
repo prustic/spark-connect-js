@@ -7,7 +7,7 @@
  * @see Spark built-in functions registry: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
  *
  * All functions return Column objects wrapping expression AST nodes.
- * They are NEVER evaluated in JavaScript — the server resolves them.
+ * They are NEVER evaluated in JavaScript; the server resolves them.
  *
  * Split into category files for maintainability; this barrel re-exports
  * everything so consumers still import from a single path.

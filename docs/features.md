@@ -75,6 +75,7 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `sameSemantics(other)`               | ✅     |
 | `semanticHash()`                     | ✅     |
 | `write` (DataFrameWriter)            | ✅     |
+| `writeTo` (DataFrameWriterV2)        | ✅     |
 
 ## Column
 
@@ -115,8 +116,8 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | Feature                                                    | Status |
 | ---------------------------------------------------------- | ------ |
 | `format` / `option` / `options` / `load` / `table`         | ✅     |
-| `schema(schema)`                                           | -      |
-| Format shortcuts (`csv`, `json`, `parquet`, `orc`, `text`) | -      |
+| `schema(schema)`                                           | ✅     |
+| Format shortcuts (`csv`, `json`, `parquet`, `orc`, `text`) | ✅     |
 
 ## DataFrameWriter
 
@@ -125,8 +126,18 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 | `format` / `mode` / `option` / `options`                   | ✅     |
 | `partitionBy` / `sortBy`                                   | ✅     |
 | `save` / `saveAsTable`                                     | ✅     |
-| `bucketBy` / `insertInto`                                  | -      |
-| Format shortcuts (`csv`, `json`, `parquet`, `orc`, `text`) | -      |
+| `bucketBy` / `insertInto`                                  | ✅     |
+| Format shortcuts (`csv`, `json`, `parquet`, `orc`, `text`) | ✅     |
+
+## DataFrameWriterV2
+
+| Feature                                                | Status |
+| ------------------------------------------------------ | ------ |
+| `writeTo(table)` via `df.writeTo()`                    | ✅     |
+| `using` / `option` / `tableProperty`                   | ✅     |
+| `partitionedBy` / `clusterBy`                          | ✅     |
+| `create` / `replace` / `createOrReplace`               | ✅     |
+| `append` / `overwrite` / `overwritePartitions`         | ✅     |
 
 ## Catalog
 
@@ -175,8 +186,6 @@ Accessed via `df.stat`.
 
 These are planned but not available in the current release:
 
-- **I/O shortcuts**: `read.csv()`, `read.parquet()`, `write.json()`, etc.
-- **DataFrameWriterV2**: `writeTo()`, `create()`, `replace()`, `append()`
 - **Catalog expansion**: `dropTempView()`, `cacheTable()`, `listFunctions()`
 - **RuntimeConfig**: `conf.get()`, `conf.set()`
 - **Structured Streaming**: `readStream`, `writeStream`, `StreamingQuery`

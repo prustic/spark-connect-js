@@ -7,7 +7,7 @@
  * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/RelationalGroupedDataset.scala
  * @see Aggregate plan: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/basicLogicalOperators.scala
  *
- * GroupedData is NOT a DataFrame — it's a transient builder that captures
+ * GroupedData is NOT a DataFrame. It's a transient builder that captures
  * grouping expressions and waits for an aggregation call (agg, count, sum, etc.)
  * to produce the final Aggregate logical plan node.
  *
@@ -39,7 +39,7 @@ export class GroupedData {
     pivot?: { col: Expression; values: Array<string | number | boolean> },
   ) {
     this._df = df;
-    this._groupExprs = groupExprs;
+    this._groupExprs = [...groupExprs];
     this._groupType = groupType;
     this._pivot = pivot;
   }

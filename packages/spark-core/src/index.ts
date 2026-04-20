@@ -1,8 +1,8 @@
 /**
- * @spark-connect-js/core  —  Pure TypeScript Logical DataFrame API
+ * @spark-connect-js/core  -  Pure TypeScript Logical DataFrame API
  *
  * This package is the **platform-agnostic** heart of the Spark JS client.
- * It contains ZERO runtime dependencies, no Node APIs, no browser APIs — only
+ * It contains ZERO runtime dependencies, no Node APIs, no browser APIs - only
  * pure TypeScript types and logic that model Spark's query planning layer.
  *
  * What this package does
@@ -10,7 +10,7 @@
  *   1. Provides a fluent DataFrame API (read → filter → groupBy → agg → collect)
  *      that mirrors PySpark / Scala Spark semantics.
  *
- *   2. Builds **logical plans** — tree-structured descriptions of the query the
+ *   2. Builds **logical plans** - tree-structured descriptions of the query the
  *      user wants to run.  These plans are serialised as Spark Connect protocol
  *      buffers and sent to the Spark Connect server by a runtime adapter
  *      (e.g. @spark-connect-js/node).
@@ -33,7 +33,7 @@
  *
  *   • Column expressions must respect Spark's type system (ByteType through
  *     DecimalType, StructType, ArrayType, MapType).  JS `number` is an
- *     IEEE-754 double — mapping it naïvely to Spark's IntegerType or LongType
+ *     IEEE-754 double. Mapping it naïvely to Spark's IntegerType or LongType
  *     causes silent precision loss in aggregation results.
  *
  * Relationship to other packages
@@ -41,8 +41,8 @@
  *   @spark-connect-js/core  ←  imported by every runtime adapter
  *       │
  *       ├── @spark-connect-js/node   (gRPC transport, Arrow decoding, Node Buffers)
- *       ├── @spark-connect-js/deno   (future — Deno-native transport)
- *       └── @spark-connect-js/web    (future — HTTP/2 + browser Arrow)
+ *       ├── @spark-connect-js/deno   (future: Deno-native transport)
+ *       └── @spark-connect-js/web    (future: HTTP/2 + browser Arrow)
  *
  */
 
@@ -53,6 +53,7 @@ export { DataFrame } from "./data-frame.js";
 export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
+export { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
 export { DataFrameStat } from "./data-frame-stat.js";
 export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
@@ -354,5 +355,12 @@ export {
 export type { Row } from "./types/row.js";
 export type { Schema, FieldDescriptor } from "./types/schema.js";
 export type { SparkSessionConfig, Transport, ArrowDecoderFn } from "./spark-session.js";
-export { SparkConnectError, GrpcStatusCode } from "./errors.js";
+export {
+  SparkConnectError,
+  SparkClientError,
+  InvalidConfigError,
+  InvalidInputError,
+  UnsupportedOperationError,
+  GrpcStatusCode,
+} from "./errors.js";
 export type { GrpcStatusCode as GrpcStatusCodeType } from "./errors.js";
