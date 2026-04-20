@@ -1,0 +1,18 @@
+/* spark-js brand customisations for Starlight */
+
+:root {
+  --sl-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #1e3a3a;
+  --sl-color-accent: #2dd4bf;
+  --sl-color-accent-high: #99f6e4;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #ccfbf1;
+  --sl-color-accent: #0d9488;
+  --sl-color-accent-high: #134e4a;
+}

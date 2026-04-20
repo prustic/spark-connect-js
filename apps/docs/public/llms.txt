@@ -1,0 +1,17 @@
+# spark-js
+
+> Apache Spark, meet TypeScript. A first-class Spark Connect client for Node.js — DataFrame API, 248 SQL functions, full catalog.
+
+This project provides idiomatic TypeScript bindings for Apache Spark via the Spark Connect protocol. It is not affiliated with the Apache Software Foundation.
+
+## Docs
+
+- [Getting started](https://prustic.github.io/spark-connect-js/getting-started/): install, connect, first query
+- [PySpark → spark-js](https://prustic.github.io/spark-connect-js/pyspark-to-spark-js/): migration guide with side-by-side examples
+- [Feature matrix](https://prustic.github.io/spark-connect-js/feature-matrix/): honest coverage vs PySpark
+
+## Source
+
+- Repository: https://github.com/prustic/spark-connect-js
+- npm (runtime): https://www.npmjs.com/package/@spark-connect-js/node
+- npm (core): https://www.npmjs.com/package/@spark-connect-js/core

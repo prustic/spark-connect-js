@@ -3,6 +3,7 @@ packages:
   - "tooling/*"
   - "examples/*"
   - "tests/*"
+  - "apps/*"
 
 catalog:
   "@types/node": ^25.6.2

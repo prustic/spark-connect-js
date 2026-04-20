@@ -1,0 +1,30 @@
+{
+  "name": "@spark-connect-js/docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "spark-js documentation site — Starlight/Astro",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "astro dev",
+    "docs:build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "clean": "git clean -xdf .astro .turbo dist node_modules"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.38.3",
+    "astro": "^6.1.8",
+    "sharp": "^0.34.5",
+    "starlight-typedoc": "^0.21.5",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.11.0"
+  },
+  "devDependencies": {
+    "@spark-connect-js/core": "workspace:*",
+    "@spark-connect-js/node": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

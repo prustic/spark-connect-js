@@ -1,0 +1,59 @@
+---
+title: spark-js
+description: Apache Spark, meet TypeScript. A first-class Spark Connect client for Node.js.
+template: splash
+hero:
+  tagline: Apache Spark, meet TypeScript. A first-class Spark Connect client for Node.js — with the DataFrame API, 248 SQL functions, and full catalog you'd expect from PySpark.
+  actions:
+    - text: Get started
+      link: /spark-connect-js/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Migrating from PySpark?
+      link: /spark-connect-js/pyspark-to-spark-js/
+      icon: external
+    - text: View on GitHub
+      link: https://github.com/prustic/spark-connect-js
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## Why spark-js
+
+<CardGrid stagger>
+  <Card title="DataFrame API" icon="pencil">
+    63 methods covering transformations, aggregations, joins, window functions, and I/O.
+  </Card>
+  <Card title="248 SQL functions" icon="seti:config">
+    Full coverage of Spark's built-in functions across 13 categories.
+  </Card>
+  <Card title="Complete catalog" icon="list-format">
+    All 26 catalog methods: databases, tables, functions, temp views, caching.
+  </Card>
+  <Card title="Type-safe, zero-dep core" icon="rocket">
+    `@spark-connect-js/core` has no runtime dependencies. Errors are typed. Plans are lazy.
+  </Card>
+</CardGrid>
+
+## Install
+
+```bash
+npm install @spark-connect-js/node
+```
+
+## Your first query
+
+```ts
+import { connect } from "@spark-connect-js/node";
+
+const session = connect("sc://localhost:15002");
+
+const df = session.sql("SELECT 1 AS n");
+const rows = await df.collect();
+
+console.log(rows); // [{ n: 1 }]
+
+await session.stop();
+```
