@@ -141,19 +141,19 @@ How spark-connect-js maps to the PySpark DataFrame API. Targets Spark 4.0+ via t
 
 ## Catalog
 
-| Feature                                        | Status |
-| ---------------------------------------------- | ------ |
-| `currentDatabase` / `setCurrentDatabase`       | ✅     |
-| `currentCatalog` / `setCurrentCatalog`         | ✅     |
-| `listDatabases` / `listTables` / `listColumns` | ✅     |
-| `listFunctions` / `listCatalogs`               | ✅     |
-| `databaseExists` / `tableExists`               | ✅     |
-| `functionExists` / `isCached`                  | ✅     |
-| `getDatabase` / `getTable` / `getFunction`     | ✅     |
-| `dropTempView` / `dropGlobalTempView`          | ✅     |
-| `cacheTable` / `uncacheTable` / `clearCache`   | ✅     |
-| `refreshTable` / `refreshByPath`               | ✅     |
-| `recoverPartitions`                            | ✅     |
+| Feature                                              | Status |
+| ---------------------------------------------------- | ------ |
+| `currentDatabase` / `setCurrentDatabase`             | ✅     |
+| `currentCatalog` / `setCurrentCatalog`               | ✅     |
+| `listDatabases` / `listTables` / `listColumns`       | ✅     |
+| `listFunctions` / `listCatalogs`                     | ✅     |
+| `databaseExists` / `tableExists`                     | ✅     |
+| `functionExists` / `isCached`                        | ✅     |
+| `getDatabase` / `getTable` / `getFunction`           | ✅     |
+| `dropTempView` / `dropGlobalTempView`                | ✅     |
+| `cacheTable` / `uncacheTable` / `clearCache`         | ✅     |
+| `refreshTable` / `refreshByPath`                     | ✅     |
+| `recoverPartitions`                                  | ✅     |
 | `createTable` / `createExternalTable` _(deprecated)_ | ✅     |
 
 ## Functions

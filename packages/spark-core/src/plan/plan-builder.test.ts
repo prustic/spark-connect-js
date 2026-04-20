@@ -207,3 +207,384 @@ describe("PlanBuilder catalog operations", () => {
     );
   });
 });
+
+describe("PlanBuilder toExpression", () => {
+  it("unresolvedAttribute", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "unresolvedAttribute", name: "col1" }),
+      {
+        unresolvedAttribute: { unparsedIdentifier: "col1" },
+      },
+    );
+  });
+
+  it("literal null", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "literal", value: null }), {
+      literal: { null: {} },
+    });
+  });
+
+  it("literal string", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "literal", value: "hello" }), {
+      literal: { string: "hello" },
+    });
+  });
+
+  it("literal boolean", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "literal", value: true }), {
+      literal: { boolean: true },
+    });
+  });
+
+  it("literal bigint", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "literal", value: 123n }), {
+      literal: { long: "123" },
+    });
+  });
+
+  it("literal number (double)", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "literal", value: 3.14 }), {
+      literal: { double: 3.14 },
+    });
+  });
+
+  it("alias", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "alias",
+        inner: { type: "unresolvedAttribute", name: "col1" },
+        name: "alias1",
+      }),
+      {
+        alias: {
+          expr: { unresolvedAttribute: { unparsedIdentifier: "col1" } },
+          name: ["alias1"],
+        },
+      },
+    );
+  });
+
+  it("aggregateFunction", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "aggregateFunction",
+        name: "sum",
+        arguments: [{ type: "unresolvedAttribute", name: "amount" }],
+        isDistinct: true,
+      }),
+      {
+        unresolvedFunction: {
+          functionName: "sum",
+          arguments: [{ unresolvedAttribute: { unparsedIdentifier: "amount" } }],
+          isDistinct: true,
+        },
+      },
+    );
+  });
+
+  it("aggregateFunction defaults isDistinct to false", () => {
+    const result = PlanBuilder.toExpression({
+      type: "aggregateFunction",
+      name: "count",
+      arguments: [{ type: "literal", value: 1 }],
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { isDistinct: boolean } }).unresolvedFunction.isDistinct,
+      false,
+    );
+  });
+
+  it("binary operator gt", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "gt",
+        left: { type: "unresolvedAttribute", name: "age" },
+        right: { type: "literal", value: 18 },
+      }),
+      {
+        unresolvedFunction: {
+          functionName: ">",
+          arguments: [
+            { unresolvedAttribute: { unparsedIdentifier: "age" } },
+            { literal: { double: 18 } },
+          ],
+          isDistinct: false,
+        },
+      },
+    );
+  });
+
+  it("binary operator lt", () => {
+    const result = PlanBuilder.toExpression({
+      type: "lt",
+      left: { type: "literal", value: 1 },
+      right: { type: "literal", value: 2 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "<",
+    );
+  });
+
+  it("binary operator eq", () => {
+    const result = PlanBuilder.toExpression({
+      type: "eq",
+      left: { type: "literal", value: "a" },
+      right: { type: "literal", value: "b" },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "=",
+    );
+  });
+
+  it("binary operator neq", () => {
+    const result = PlanBuilder.toExpression({
+      type: "neq",
+      left: { type: "literal", value: 1 },
+      right: { type: "literal", value: 2 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "!=",
+    );
+  });
+
+  it("binary operator gte", () => {
+    const result = PlanBuilder.toExpression({
+      type: "gte",
+      left: { type: "literal", value: 5 },
+      right: { type: "literal", value: 3 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      ">=",
+    );
+  });
+
+  it("binary operator lte", () => {
+    const result = PlanBuilder.toExpression({
+      type: "lte",
+      left: { type: "literal", value: 3 },
+      right: { type: "literal", value: 5 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "<=",
+    );
+  });
+
+  it("binary operator and", () => {
+    const result = PlanBuilder.toExpression({
+      type: "and",
+      left: { type: "literal", value: true },
+      right: { type: "literal", value: false },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "and",
+    );
+  });
+
+  it("binary operator or", () => {
+    const result = PlanBuilder.toExpression({
+      type: "or",
+      left: { type: "literal", value: true },
+      right: { type: "literal", value: false },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "or",
+    );
+  });
+
+  it("binary operator add", () => {
+    const result = PlanBuilder.toExpression({
+      type: "add",
+      left: { type: "literal", value: 1 },
+      right: { type: "literal", value: 2 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "+",
+    );
+  });
+
+  it("binary operator subtract", () => {
+    const result = PlanBuilder.toExpression({
+      type: "subtract",
+      left: { type: "literal", value: 5 },
+      right: { type: "literal", value: 3 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "-",
+    );
+  });
+
+  it("binary operator multiply", () => {
+    const result = PlanBuilder.toExpression({
+      type: "multiply",
+      left: { type: "literal", value: 3 },
+      right: { type: "literal", value: 4 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "*",
+    );
+  });
+
+  it("binary operator divide", () => {
+    const result = PlanBuilder.toExpression({
+      type: "divide",
+      left: { type: "literal", value: 10 },
+      right: { type: "literal", value: 2 },
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { functionName: string } }).unresolvedFunction.functionName,
+      "/",
+    );
+  });
+
+  it("sortOrder", () => {
+    // sortOrder just extracts the inner expression
+    const result = PlanBuilder.toExpression({
+      type: "sortOrder",
+      inner: { type: "unresolvedAttribute", name: "col1" },
+      direction: "ascending",
+      nullOrdering: "nulls_first",
+    });
+    assert.deepStrictEqual(result, {
+      unresolvedAttribute: { unparsedIdentifier: "col1" },
+    });
+  });
+
+  it("unresolvedFunction", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "unresolvedFunction",
+        name: "upper",
+        arguments: [{ type: "unresolvedAttribute", name: "name" }],
+        isDistinct: false,
+      }),
+      {
+        unresolvedFunction: {
+          functionName: "upper",
+          arguments: [{ unresolvedAttribute: { unparsedIdentifier: "name" } }],
+          isDistinct: false,
+        },
+      },
+    );
+  });
+
+  it("unresolvedFunction defaults isDistinct to false", () => {
+    const result = PlanBuilder.toExpression({
+      type: "unresolvedFunction",
+      name: "lower",
+      arguments: [{ type: "literal", value: "ABC" }],
+    });
+    assert.strictEqual(
+      (result as { unresolvedFunction: { isDistinct: boolean } }).unresolvedFunction.isDistinct,
+      false,
+    );
+  });
+
+  it("expressionString", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "expressionString", expression: "col1 + 1" }),
+      {
+        expressionString: { expression: "col1 + 1" },
+      },
+    );
+  });
+
+  it("cast", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "cast",
+        inner: { type: "unresolvedAttribute", name: "str_col" },
+        targetType: "int",
+      }),
+      {
+        cast: {
+          expr: { unresolvedAttribute: { unparsedIdentifier: "str_col" } },
+          typeStr: "int",
+        },
+      },
+    );
+  });
+
+  it("window without frameSpec", () => {
+    const result = PlanBuilder.toExpression({
+      type: "window",
+      windowFunction: {
+        type: "aggregateFunction",
+        name: "sum",
+        arguments: [{ type: "unresolvedAttribute", name: "amt" }],
+      },
+      partitionSpec: [{ type: "unresolvedAttribute", name: "dept" }],
+      orderSpec: [
+        {
+          expression: { type: "unresolvedAttribute", name: "date" },
+          direction: "ascending",
+          nullOrdering: "nulls_last",
+        },
+      ],
+    });
+    const w = (result as { window: Record<string, unknown> }).window;
+    assert.ok(w.windowFunction);
+    assert.ok(Array.isArray(w.partitionSpec));
+    assert.ok(Array.isArray(w.orderSpec));
+    assert.strictEqual(w.frameSpec, undefined);
+  });
+
+  it("window with row frameSpec using currentRow and unbounded", () => {
+    const result = PlanBuilder.toExpression({
+      type: "window",
+      windowFunction: {
+        type: "aggregateFunction",
+        name: "count",
+        arguments: [{ type: "literal", value: 1 }],
+      },
+      partitionSpec: [],
+      orderSpec: [],
+      frameSpec: {
+        frameType: "row",
+        lower: { type: "unbounded" },
+        upper: { type: "currentRow" },
+      },
+    });
+    const w = (result as { window: { frameSpec: Record<string, unknown> } }).window;
+    assert.deepStrictEqual(w.frameSpec, {
+      frameType: "ROW",
+      lower: { unbounded: true },
+      upper: { currentRow: true },
+    });
+  });
+
+  it("window with range frameSpec using value bounds", () => {
+    const result = PlanBuilder.toExpression({
+      type: "window",
+      windowFunction: {
+        type: "aggregateFunction",
+        name: "avg",
+        arguments: [{ type: "unresolvedAttribute", name: "price" }],
+      },
+      partitionSpec: [],
+      orderSpec: [],
+      frameSpec: {
+        frameType: "range",
+        lower: { type: "value", value: { type: "literal", value: -10 } },
+        upper: { type: "value", value: { type: "literal", value: 10 } },
+      },
+    });
+    const w = (result as { window: { frameSpec: Record<string, unknown> } }).window;
+    assert.strictEqual((w.frameSpec as { frameType: string }).frameType, "RANGE");
+    assert.deepStrictEqual((w.frameSpec as { lower: { value: unknown } }).lower, {
+      value: { literal: { double: -10 } },
+    });
+    assert.deepStrictEqual((w.frameSpec as { upper: { value: unknown } }).upper, {
+      value: { literal: { double: 10 } },
+    });
+  });
+});

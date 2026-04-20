@@ -295,34 +295,34 @@ const catalog = spark.catalog;
 const tables = await catalog.listTables().collect();
 ```
 
-| Method                                      | Description                                        |
-| ------------------------------------------- | -------------------------------------------------- |
-| `currentDatabase()`                         | Get the current database name                      |
-| `setCurrentDatabase(name)`                  | Set the current database                           |
-| `currentCatalog()`                          | Get the current catalog name                       |
-| `setCurrentCatalog(name)`                   | Set the current catalog                            |
-| `listDatabases(pattern?)`                   | List databases                                     |
-| `listTables(dbName?, pattern?)`             | List tables                                        |
-| `listColumns(tableName, dbName?)`           | List columns of a table                            |
-| `listFunctions(dbName?, pattern?)`          | List functions                                     |
-| `listCatalogs(pattern?)`                    | List catalogs                                      |
-| `getDatabase(name)`                         | Get database metadata                              |
-| `getTable(name, dbName?)`                   | Get table metadata                                 |
-| `getFunction(name, dbName?)`                | Get function metadata                              |
-| `databaseExists(name)`                      | Check if a database exists                         |
-| `tableExists(name, dbName?)`                | Check if a table exists                            |
-| `functionExists(name, dbName?)`             | Check if a function exists                         |
-| `isCached(tableName)`                       | Check if a table is cached                         |
-| `dropTempView(viewName)`                    | Drop a temp view, returns whether it existed       |
-| `dropGlobalTempView(viewName)`              | Drop a global temp view, returns whether it existed |
-| `cacheTable(tableName, storageLevel?)`      | Cache a table in memory                            |
-| `uncacheTable(tableName)`                   | Remove a table from cache                          |
-| `clearCache()`                              | Remove all cached tables                           |
-| `refreshTable(tableName)`                   | Invalidate and refresh cached metadata             |
-| `refreshByPath(path)`                       | Invalidate cached metadata for a path              |
-| `recoverPartitions(tableName)`              | Recover partitions of a table                      |
-| `createTable(tableName, options?)`          | Create a managed or external table                 |
-| `createExternalTable(tableName, options?)`  | _(Deprecated)_ Delegates to `createTable`          |
+| Method                                     | Description                                         |
+| ------------------------------------------ | --------------------------------------------------- |
+| `currentDatabase()`                        | Get the current database name                       |
+| `setCurrentDatabase(name)`                 | Set the current database                            |
+| `currentCatalog()`                         | Get the current catalog name                        |
+| `setCurrentCatalog(name)`                  | Set the current catalog                             |
+| `listDatabases(pattern?)`                  | List databases                                      |
+| `listTables(dbName?, pattern?)`            | List tables                                         |
+| `listColumns(tableName, dbName?)`          | List columns of a table                             |
+| `listFunctions(dbName?, pattern?)`         | List functions                                      |
+| `listCatalogs(pattern?)`                   | List catalogs                                       |
+| `getDatabase(name)`                        | Get database metadata                               |
+| `getTable(name, dbName?)`                  | Get table metadata                                  |
+| `getFunction(name, dbName?)`               | Get function metadata                               |
+| `databaseExists(name)`                     | Check if a database exists                          |
+| `tableExists(name, dbName?)`               | Check if a table exists                             |
+| `functionExists(name, dbName?)`            | Check if a function exists                          |
+| `isCached(tableName)`                      | Check if a table is cached                          |
+| `dropTempView(viewName)`                   | Drop a temp view, returns whether it existed        |
+| `dropGlobalTempView(viewName)`             | Drop a global temp view, returns whether it existed |
+| `cacheTable(tableName, storageLevel?)`     | Cache a table in memory                             |
+| `uncacheTable(tableName)`                  | Remove a table from cache                           |
+| `clearCache()`                             | Remove all cached tables                            |
+| `refreshTable(tableName)`                  | Invalidate and refresh cached metadata              |
+| `refreshByPath(path)`                      | Invalidate cached metadata for a path               |
+| `recoverPartitions(tableName)`             | Recover partitions of a table                       |
+| `createTable(tableName, options?)`         | Create a managed or external table                  |
+| `createExternalTable(tableName, options?)` | _(Deprecated)_ Delegates to `createTable`           |
 
 ---
 
