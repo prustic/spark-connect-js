@@ -188,16 +188,80 @@ export class PlanBuilder {
             return { catalog: { listTables: { dbName: op.dbName, pattern: op.pattern } } };
           case "listColumns":
             return { catalog: { listColumns: { tableName: op.tableName, dbName: op.dbName } } };
+          case "listFunctions":
+            return { catalog: { listFunctions: { dbName: op.dbName, pattern: op.pattern } } };
+          case "listCatalogs":
+            return { catalog: { listCatalogs: { pattern: op.pattern } } };
+          case "getDatabase":
+            return { catalog: { getDatabase: { dbName: op.dbName } } };
+          case "getTable":
+            return { catalog: { getTable: { tableName: op.tableName, dbName: op.dbName } } };
+          case "getFunction":
+            return {
+              catalog: { getFunction: { functionName: op.functionName, dbName: op.dbName } },
+            };
           case "tableExists":
             return { catalog: { tableExists: { tableName: op.tableName, dbName: op.dbName } } };
           case "databaseExists":
             return { catalog: { databaseExists: { dbName: op.dbName } } };
+          case "functionExists":
+            return {
+              catalog: {
+                functionExists: { functionName: op.functionName, dbName: op.dbName },
+              },
+            };
+          case "isCached":
+            return { catalog: { isCached: { tableName: op.tableName } } };
+          case "dropTempView":
+            return { catalog: { dropTempView: { viewName: op.viewName } } };
+          case "dropGlobalTempView":
+            return { catalog: { dropGlobalTempView: { viewName: op.viewName } } };
           case "currentDatabase":
             return { catalog: { currentDatabase: {} } };
           case "setCurrentDatabase":
             return { catalog: { setCurrentDatabase: { dbName: op.dbName } } };
+          case "currentCatalog":
+            return { catalog: { currentCatalog: {} } };
+          case "setCurrentCatalog":
+            return { catalog: { setCurrentCatalog: { catalogName: op.catalogName } } };
+          case "cacheTable":
+            return {
+              catalog: {
+                cacheTable: { tableName: op.tableName, storageLevel: op.storageLevel },
+              },
+            };
+          case "uncacheTable":
+            return { catalog: { uncacheTable: { tableName: op.tableName } } };
+          case "clearCache":
+            return { catalog: { clearCache: {} } };
+          case "refreshTable":
+            return { catalog: { refreshTable: { tableName: op.tableName } } };
+          case "refreshByPath":
+            return { catalog: { refreshByPath: { path: op.path } } };
+          case "recoverPartitions":
+            return { catalog: { recoverPartitions: { tableName: op.tableName } } };
+          case "createTable":
+            return {
+              catalog: {
+                createTable: {
+                  tableName: op.tableName,
+                  ...(op.path !== undefined ? { path: op.path } : {}),
+                  ...(op.source !== undefined ? { source: op.source } : {}),
+                  ...(op.description !== undefined ? { description: op.description } : {}),
+                  ...(op.schema !== undefined
+                    ? { schema: { unparsed: { dataTypeString: op.schema } } }
+                    : {}),
+                  ...(op.options !== undefined ? { options: op.options } : {}),
+                },
+              },
+            };
+          default: {
+            const _exhaustive: never = op;
+            throw new UnsupportedOperationError(
+              `Unsupported catalog operation: ${(_exhaustive as { op: string }).op}`,
+            );
+          }
         }
-        break;
       }
 
       case "setOperation": {

@@ -220,19 +220,19 @@ spark.read.format("parquet").option("mergeSchema", "true").load("/data/events");
 spark.read.schema("id BIGINT, name STRING").csv("/data/people.csv");
 ```
 
-| Method               | Description                      |
-| -------------------- | -------------------------------- |
-| `format(source)`     | Set data source format           |
+| Method               | Description                                                       |
+| -------------------- | ----------------------------------------------------------------- |
+| `format(source)`     | Set data source format                                            |
 | `schema(schema)`     | Set schema (DDL string or object with `toDDL()`, e.g. StructType) |
-| `option(key, value)` | Set a read option                |
-| `options(opts)`      | Set multiple options             |
-| `load(path?)`        | Read from path                   |
-| `table(name)`        | Read a named table               |
-| `csv(path)`          | Read CSV files                   |
-| `json(path)`         | Read JSON files                  |
-| `parquet(path)`      | Read Parquet files               |
-| `orc(path)`          | Read ORC files                   |
-| `text(path)`         | Read text files (single column)  |
+| `option(key, value)` | Set a read option                                                 |
+| `options(opts)`      | Set multiple options                                              |
+| `load(path?)`        | Read from path                                                    |
+| `table(name)`        | Read a named table                                                |
+| `csv(path)`          | Read CSV files                                                    |
+| `json(path)`         | Read JSON files                                                   |
+| `parquet(path)`      | Read Parquet files                                                |
+| `orc(path)`          | Read ORC files                                                    |
+| `text(path)`         | Read text files (single column)                                   |
 
 ---
 
@@ -243,23 +243,23 @@ df.write.format("parquet").mode("overwrite").partitionBy("year").save("/output")
 df.write.mode("overwrite").bucketBy(4, "category").saveAsTable("bucketed");
 ```
 
-| Method                        | Description                                      |
-| ----------------------------- | ------------------------------------------------ |
-| `format(source)`              | Set data source format                           |
-| `mode(saveMode)`              | `"append"`, `"overwrite"`, `"ignore"`, `"error"` |
-| `option(key, value)`          | Set a write option                               |
-| `options(opts)`               | Set multiple options                             |
-| `partitionBy(...cols)`        | Partition output by columns                      |
-| `sortBy(...cols)`             | Sort within partitions                           |
-| `bucketBy(n, col, ...cols)`   | Bucket by columns into n buckets                 |
-| `save(path?)`                 | Write to path                                    |
-| `saveAsTable(name)`           | Write to a table                                 |
-| `insertInto(tableName)`       | Insert into an existing table                    |
-| `csv(path)`                   | Write as CSV                                     |
-| `json(path)`                  | Write as JSON                                    |
-| `parquet(path)`               | Write as Parquet                                 |
-| `orc(path)`                   | Write as ORC                                     |
-| `text(path)`                  | Write as text                                    |
+| Method                      | Description                                      |
+| --------------------------- | ------------------------------------------------ |
+| `format(source)`            | Set data source format                           |
+| `mode(saveMode)`            | `"append"`, `"overwrite"`, `"ignore"`, `"error"` |
+| `option(key, value)`        | Set a write option                               |
+| `options(opts)`             | Set multiple options                             |
+| `partitionBy(...cols)`      | Partition output by columns                      |
+| `sortBy(...cols)`           | Sort within partitions                           |
+| `bucketBy(n, col, ...cols)` | Bucket by columns into n buckets                 |
+| `save(path?)`               | Write to path                                    |
+| `saveAsTable(name)`         | Write to a table                                 |
+| `insertInto(tableName)`     | Insert into an existing table                    |
+| `csv(path)`                 | Write as CSV                                     |
+| `json(path)`                | Write as JSON                                    |
+| `parquet(path)`             | Write as Parquet                                 |
+| `orc(path)`                 | Write as ORC                                     |
+| `text(path)`                | Write as text                                    |
 
 ---
 
@@ -271,20 +271,20 @@ df.writeTo("events").partitionedBy(col("date")).append();
 df.writeTo("events").overwrite(col("date").eq(lit("2026-01-01")));
 ```
 
-| Method                        | Description                                    |
-| ----------------------------- | ---------------------------------------------- |
-| `using(provider)`             | Set the data source provider                   |
-| `option(key, value)`          | Set a write option                             |
-| `options(opts)`               | Set multiple options                           |
-| `tableProperty(prop, value)`  | Set a table property                           |
-| `partitionedBy(...cols)`      | Partition by column expressions                |
-| `clusterBy(...colNames)`      | Cluster by column names                        |
-| `create()`                    | Create a new table                             |
-| `replace()`                   | Replace an existing table                      |
-| `createOrReplace()`           | Create or replace a table                      |
-| `append()`                    | Append rows to the table                       |
-| `overwrite(condition)`        | Overwrite rows matching the condition          |
-| `overwritePartitions()`       | Dynamically overwrite partitions               |
+| Method                       | Description                           |
+| ---------------------------- | ------------------------------------- |
+| `using(provider)`            | Set the data source provider          |
+| `option(key, value)`         | Set a write option                    |
+| `options(opts)`              | Set multiple options                  |
+| `tableProperty(prop, value)` | Set a table property                  |
+| `partitionedBy(...cols)`     | Partition by column expressions       |
+| `clusterBy(...colNames)`     | Cluster by column names               |
+| `create()`                   | Create a new table                    |
+| `replace()`                  | Replace an existing table             |
+| `createOrReplace()`          | Create or replace a table             |
+| `append()`                   | Append rows to the table              |
+| `overwrite(condition)`       | Overwrite rows matching the condition |
+| `overwritePartitions()`      | Dynamically overwrite partitions      |
 
 ---
 
@@ -292,18 +292,37 @@ df.writeTo("events").overwrite(col("date").eq(lit("2026-01-01")));
 
 ```typescript
 const catalog = spark.catalog;
-const tables = await catalog.listTables();
+const tables = await catalog.listTables().collect();
 ```
 
-| Method                            | Description                |
-| --------------------------------- | -------------------------- |
-| `currentDatabase()`               | Get the current database   |
-| `setCurrentDatabase(name)`        | Set the current database   |
-| `listDatabases(pattern?)`         | List databases             |
-| `listTables(dbName?, pattern?)`   | List tables                |
-| `listColumns(tableName, dbName?)` | List columns of a table    |
-| `databaseExists(name)`            | Check if a database exists |
-| `tableExists(name, dbName?)`      | Check if a table exists    |
+| Method                                     | Description                                         |
+| ------------------------------------------ | --------------------------------------------------- |
+| `currentDatabase()`                        | Get the current database name                       |
+| `setCurrentDatabase(name)`                 | Set the current database                            |
+| `currentCatalog()`                         | Get the current catalog name                        |
+| `setCurrentCatalog(name)`                  | Set the current catalog                             |
+| `listDatabases(pattern?)`                  | List databases                                      |
+| `listTables(dbName?, pattern?)`            | List tables                                         |
+| `listColumns(tableName, dbName?)`          | List columns of a table                             |
+| `listFunctions(dbName?, pattern?)`         | List functions                                      |
+| `listCatalogs(pattern?)`                   | List catalogs                                       |
+| `getDatabase(name)`                        | Get database metadata                               |
+| `getTable(name, dbName?)`                  | Get table metadata                                  |
+| `getFunction(name, dbName?)`               | Get function metadata                               |
+| `databaseExists(name)`                     | Check if a database exists                          |
+| `tableExists(name, dbName?)`               | Check if a table exists                             |
+| `functionExists(name, dbName?)`            | Check if a function exists                          |
+| `isCached(tableName)`                      | Check if a table is cached                          |
+| `dropTempView(viewName)`                   | Drop a temp view, returns whether it existed        |
+| `dropGlobalTempView(viewName)`             | Drop a global temp view, returns whether it existed |
+| `cacheTable(tableName, storageLevel?)`     | Cache a table in memory                             |
+| `uncacheTable(tableName)`                  | Remove a table from cache                           |
+| `clearCache()`                             | Remove all cached tables                            |
+| `refreshTable(tableName)`                  | Invalidate and refresh cached metadata              |
+| `refreshByPath(path)`                      | Invalidate cached metadata for a path               |
+| `recoverPartitions(tableName)`             | Recover partitions of a table                       |
+| `createTable(tableName, options?)`         | Create a managed or external table                  |
+| `createExternalTable(tableName, options?)` | _(Deprecated)_ Delegates to `createTable`           |
 
 ---
 

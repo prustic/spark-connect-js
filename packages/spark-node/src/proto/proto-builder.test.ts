@@ -292,31 +292,279 @@ describe("buildExpression()", () => {
 });
 
 describe("buildRelation() - catalog", () => {
-  it("builds a listDatabases catalog relation", () => {
-    const plan: LogicalPlan = {
-      type: "catalog",
-      operation: { op: "listDatabases" },
-    };
+  /** Extract the catalog catType from a relation, asserting the outer shape. */
+  function catType(plan: LogicalPlan) {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "catalog");
+    assert.ok(rel.relType.value, "catalog value must exist");
+    return (rel.relType.value as { catType: { case: string; value: unknown } }).catType;
+  }
+
+  it("builds currentDatabase", () => {
+    const cat = catType({ type: "catalog", operation: { op: "currentDatabase" } });
+    assert.equal(cat.case, "currentDatabase");
   });
 
-  it("builds a listTables catalog relation", () => {
-    const plan: LogicalPlan = {
+  it("builds setCurrentDatabase", () => {
+    const cat = catType({
       type: "catalog",
-      operation: { op: "listTables", dbName: "default" },
-    };
-    const rel = buildRelation(plan);
-    assert.equal(rel.relType.case, "catalog");
+      operation: { op: "setCurrentDatabase", dbName: "test_db" },
+    });
+    assert.equal(cat.case, "setCurrentDatabase");
+    assert.equal((cat.value as { dbName: string }).dbName, "test_db");
   });
 
-  it("builds a tableExists catalog relation", () => {
-    const plan: LogicalPlan = {
+  it("builds listDatabases with pattern", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "listDatabases", pattern: "test*" },
+    });
+    assert.equal(cat.case, "listDatabases");
+    assert.equal((cat.value as { pattern: string }).pattern, "test*");
+  });
+
+  it("builds listTables with dbName and pattern", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "listTables", dbName: "default", pattern: "emp*" },
+    });
+    assert.equal(cat.case, "listTables");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+    assert.equal((cat.value as { pattern: string }).pattern, "emp*");
+  });
+
+  it("builds listColumns", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "listColumns", tableName: "my_table", dbName: "default" },
+    });
+    assert.equal(cat.case, "listColumns");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+  });
+
+  it("builds listFunctions with dbName and pattern", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "listFunctions", dbName: "default", pattern: "count*" },
+    });
+    assert.equal(cat.case, "listFunctions");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+    assert.equal((cat.value as { pattern: string }).pattern, "count*");
+  });
+
+  it("builds listCatalogs with pattern", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "listCatalogs", pattern: "spark*" },
+    });
+    assert.equal(cat.case, "listCatalogs");
+    assert.equal((cat.value as { pattern: string }).pattern, "spark*");
+  });
+
+  it("builds getDatabase", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "getDatabase", dbName: "default" },
+    });
+    assert.equal(cat.case, "getDatabase");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+  });
+
+  it("builds getTable with dbName", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "getTable", tableName: "my_table", dbName: "default" },
+    });
+    assert.equal(cat.case, "getTable");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+  });
+
+  it("builds getFunction", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "getFunction", functionName: "count" },
+    });
+    assert.equal(cat.case, "getFunction");
+    assert.equal((cat.value as { functionName: string }).functionName, "count");
+  });
+
+  it("builds tableExists", () => {
+    const cat = catType({
       type: "catalog",
       operation: { op: "tableExists", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "tableExists");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds databaseExists", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "databaseExists", dbName: "test_db" },
+    });
+    assert.equal(cat.case, "databaseExists");
+    assert.equal((cat.value as { dbName: string }).dbName, "test_db");
+  });
+
+  it("builds functionExists with dbName", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "functionExists", functionName: "count", dbName: "default" },
+    });
+    assert.equal(cat.case, "functionExists");
+    assert.equal((cat.value as { functionName: string }).functionName, "count");
+    assert.equal((cat.value as { dbName: string }).dbName, "default");
+  });
+
+  it("builds isCached", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "isCached", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "isCached");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds dropTempView", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "dropTempView", viewName: "my_view" },
+    });
+    assert.equal(cat.case, "dropTempView");
+    assert.equal((cat.value as { viewName: string }).viewName, "my_view");
+  });
+
+  it("builds dropGlobalTempView", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "dropGlobalTempView", viewName: "my_global_view" },
+    });
+    assert.equal(cat.case, "dropGlobalTempView");
+    assert.equal((cat.value as { viewName: string }).viewName, "my_global_view");
+  });
+
+  it("builds currentCatalog", () => {
+    const cat = catType({ type: "catalog", operation: { op: "currentCatalog" } });
+    assert.equal(cat.case, "currentCatalog");
+  });
+
+  it("builds setCurrentCatalog", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "setCurrentCatalog", catalogName: "my_catalog" },
+    });
+    assert.equal(cat.case, "setCurrentCatalog");
+    assert.equal((cat.value as { catalogName: string }).catalogName, "my_catalog");
+  });
+
+  it("builds cacheTable without storageLevel", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "cacheTable", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "cacheTable");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds cacheTable with storageLevel", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: {
+        op: "cacheTable",
+        tableName: "my_table",
+        storageLevel: {
+          useDisk: true,
+          useMemory: true,
+          useOffHeap: false,
+          deserialized: false,
+          replication: 1,
+        },
+      },
+    });
+    assert.equal(cat.case, "cacheTable");
+    const val = cat.value as { tableName: string; storageLevel: { useDisk: boolean } };
+    assert.equal(val.tableName, "my_table");
+    assert.equal(val.storageLevel.useDisk, true);
+  });
+
+  it("builds uncacheTable", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "uncacheTable", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "uncacheTable");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds clearCache", () => {
+    const cat = catType({ type: "catalog", operation: { op: "clearCache" } });
+    assert.equal(cat.case, "clearCache");
+  });
+
+  it("builds refreshTable", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "refreshTable", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "refreshTable");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds refreshByPath", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "refreshByPath", path: "/data/my_table" },
+    });
+    assert.equal(cat.case, "refreshByPath");
+    assert.equal((cat.value as { path: string }).path, "/data/my_table");
+  });
+
+  it("builds recoverPartitions", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "recoverPartitions", tableName: "my_table" },
+    });
+    assert.equal(cat.case, "recoverPartitions");
+    assert.equal((cat.value as { tableName: string }).tableName, "my_table");
+  });
+
+  it("builds createTable minimal", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: { op: "createTable", tableName: "new_table" },
+    });
+    assert.equal(cat.case, "createTable");
+    assert.equal((cat.value as { tableName: string }).tableName, "new_table");
+  });
+
+  it("builds createTable with all options", () => {
+    const cat = catType({
+      type: "catalog",
+      operation: {
+        op: "createTable",
+        tableName: "new_table",
+        path: "/data/tables/new_table",
+        source: "parquet",
+        description: "A test table",
+        schema: "name string, age integer",
+        options: { compression: "snappy" },
+      },
+    });
+    assert.equal(cat.case, "createTable");
+    const val = cat.value as {
+      tableName: string;
+      path: string;
+      source: string;
+      description: string;
+      schema: { kind: { case: string } };
     };
-    const rel = buildRelation(plan);
-    assert.equal(rel.relType.case, "catalog");
+    assert.equal(val.tableName, "new_table");
+    assert.equal(val.path, "/data/tables/new_table");
+    assert.equal(val.source, "parquet");
+    assert.equal(val.description, "A test table");
+    assert.equal(val.schema.kind.case, "unparsed");
   });
 });
 

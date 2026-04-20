@@ -13,6 +13,7 @@
     "@spark-connect-js/typescript-config",
     "@spark-connect-js/example-node-quickstart",
     "@spark-connect-js/example-node-cache-pivot-stats",
+    "@spark-connect-js/example-node-catalog",
     "@spark-connect-js/example-node-read-write",
     "@spark-connect-js/integration-tests"
   ]

@@ -34,6 +34,8 @@
  * a malformed unresolved plan causes cryptic AnalysisExceptions.
  */
 
+import type { StorageLevel } from "../storage-level.js";
+
 // Expression types
 // These model nodes in the expression tree inside filter, select, and agg.
 
@@ -319,10 +321,40 @@ export type CatalogOperation =
   | { op: "listDatabases"; pattern?: string }
   | { op: "listTables"; dbName?: string; pattern?: string }
   | { op: "listColumns"; tableName: string; dbName?: string }
+  | { op: "listFunctions"; dbName?: string; pattern?: string }
+  | { op: "listCatalogs"; pattern?: string }
+  | { op: "getDatabase"; dbName: string }
+  | { op: "getTable"; tableName: string; dbName?: string }
+  | { op: "getFunction"; functionName: string; dbName?: string }
   | { op: "tableExists"; tableName: string; dbName?: string }
   | { op: "databaseExists"; dbName: string }
+  | { op: "functionExists"; functionName: string; dbName?: string }
+  | { op: "isCached"; tableName: string }
+  | { op: "dropTempView"; viewName: string }
+  | { op: "dropGlobalTempView"; viewName: string }
   | { op: "currentDatabase" }
-  | { op: "setCurrentDatabase"; dbName: string };
+  | { op: "setCurrentDatabase"; dbName: string }
+  | { op: "currentCatalog" }
+  | { op: "setCurrentCatalog"; catalogName: string }
+  | {
+      op: "cacheTable";
+      tableName: string;
+      storageLevel?: StorageLevel;
+    }
+  | { op: "uncacheTable"; tableName: string }
+  | { op: "clearCache" }
+  | { op: "refreshTable"; tableName: string }
+  | { op: "refreshByPath"; path: string }
+  | { op: "recoverPartitions"; tableName: string }
+  | {
+      op: "createTable";
+      tableName: string;
+      path?: string;
+      source?: string;
+      description?: string;
+      schema?: string;
+      options?: Record<string, string>;
+    };
 
 export interface CatalogPlan {
   type: "catalog";
