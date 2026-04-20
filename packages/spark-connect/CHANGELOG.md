@@ -1,5 +1,12 @@
 # @spark-connect-js/connect
 
+## 0.3.0
+
+### Minor Changes
+
+- [#40](https://github.com/prustic/spark-connect-js/pull/40) [`d468479`](https://github.com/prustic/spark-connect-js/commit/d46847934011df16aefb39db7c3bb5fdcf220f73) Thanks [@prustic](https://github.com/prustic)!
+  - Re-exported proto schemas: `WriteOperationV2Schema`, `WriteOperationV2_ModeSchema`
+
 ## 0.2.0
 
 ### Minor Changes

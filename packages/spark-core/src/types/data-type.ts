@@ -21,7 +21,7 @@
  *   StringType     |         | string
  *   BooleanType    |         | boolean
  *   BinaryType     |         | Uint8Array
- *   TimestampType  |         | Date (lossy — microsecond precision lost)
+ *   TimestampType  |         | Date (lossy: microsecond precision lost)
  *   DateType       |         | Date
  *
  * Arrow's type system closely mirrors Spark's, which is why Arrow is the

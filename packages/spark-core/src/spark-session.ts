@@ -15,11 +15,12 @@
 
 import { DataFrame } from "./data-frame.js";
 import { Catalog } from "./catalog.js";
+import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from "./errors.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 
 // crypto.randomUUID() is available globally in Node 19+, Deno, and all modern
-// browsers — but TypeScript's ES2023 lib doesn't include it since it's a Web
+// browsers, but TypeScript's ES2023 lib doesn't include it since it's a Web
 // Crypto API, not an ECMAScript builtin.  We declare the minimal shape here
 // to keep spark-core free of @types/node or DOM lib dependencies.
 declare const crypto: { randomUUID(): string };
@@ -31,7 +32,7 @@ export interface Transport {
   /** Execute a plan and return raw Arrow IPC buffers. */
   executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array>;
 
-  /** Execute a command (write, createView, etc.) — no Arrow data returned. */
+  /** Execute a command (write, createView, etc.). No Arrow data returned. */
   executeCommand?(sessionId: string, command: Record<string, unknown>): Promise<void>;
 
   /** Send an AnalyzePlan request (schema, explain, etc.). */
@@ -80,7 +81,7 @@ export class SparkSession {
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
 
-  /** @internal — called by SparkSessionBuilder to construct the session. */
+  /** @internal Called by SparkSessionBuilder to construct the session. */
   static _create(config: SparkSessionConfig): SparkSession {
     return new SparkSession(config);
   }
@@ -104,7 +105,9 @@ export class SparkSession {
   readonly catalog: Catalog = new Catalog(this);
 
   /** Returns a DataFrameReader for building Read plans. */
-  read = new DataFrameReader(this);
+  get read(): DataFrameReader {
+    return new DataFrameReader(this);
+  }
 
   /** Execute a SQL query. */
   sql(query: string): DataFrame {
@@ -155,23 +158,29 @@ export class SparkSession {
     });
   }
 
-  /** @internal — used by DataFrame to send plans via the injected transport */
+  /** @internal Used by DataFrame to send plans via the injected transport */
   _executePlan(plan: LogicalPlan): AsyncIterable<Uint8Array> {
     return this.transport.executePlan(this.sessionId, plan);
   }
 
-  /** @internal — used by DataFrameWriter to send commands via the injected transport */
+  /** @internal Used by DataFrameWriter to send commands via the injected transport */
   async _executeCommand(command: Record<string, unknown>): Promise<void> {
     if (!this.transport.executeCommand) {
-      throw new Error("Transport does not support command execution.");
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support command execution. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports all operations.",
+      );
     }
     await this.transport.executeCommand(this.sessionId, command);
   }
 
-  /** @internal — used by DataFrame.schema()/explain() via the injected transport */
+  /** @internal Used by DataFrame.schema()/explain() via the injected transport */
   async _analyzePlan(request: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (!this.transport.analyzePlan) {
-      throw new Error("Transport does not support analyzePlan.");
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support analyzePlan. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports all operations.",
+      );
     }
     return this.transport.analyzePlan(this.sessionId, request);
   }
@@ -211,19 +220,19 @@ class SparkSessionBuilder {
 
   /**
    * Construct the session.  In Spark Connect, "getOrCreate" is a server-side
-   * concept — the server may return an existing session if the session ID
+   * concept: the server may return an existing session if the session ID
    * matches.  On the client we simply instantiate our handle.
    */
   getOrCreate(): SparkSession {
     if (!this.config.remote) {
-      throw new Error(
+      throw new InvalidConfigError(
         "SparkSession requires a remote URL. Call .remote('sc://host:port') on the builder.",
       );
     }
     if (!this.config.transport) {
-      throw new Error(
+      throw new InvalidConfigError(
         "SparkSession requires a Transport implementation. " +
-          "Use @spark-connect-js/node's GrpcTransport or supply a custom one.",
+          "Use a runtime adapter that provides a Transport (e.g. GrpcTransport) or supply a custom one.",
       );
     }
     return SparkSession._create(this.config as SparkSessionConfig);
@@ -236,10 +245,41 @@ class SparkSessionBuilder {
 class DataFrameReader {
   private session: SparkSession;
   private _format: string = "parquet";
+  private _schema: string | undefined;
   private _options: Record<string, string> = {};
 
   constructor(session: SparkSession) {
     this.session = session;
+  }
+
+  /**
+   * Set the schema for the data source.
+   * Accepts a DDL-formatted string (e.g. "name STRING, age INT")
+   * or a StructType with a toDDL() method.
+   */
+  schema(schema: string | { toDDL(): string }): this {
+    let ddl: string;
+    if (typeof schema === "string") {
+      ddl = schema;
+    } else if (
+      typeof schema === "object" &&
+      schema !== null &&
+      typeof schema.toDDL === "function"
+    ) {
+      ddl = schema.toDDL();
+    } else {
+      throw new InvalidInputError(
+        "schema must be a DDL string (e.g. 'id INT, name STRING') or an object with a toDDL() method",
+      );
+    }
+    if (!ddl.trim()) {
+      throw new InvalidInputError(
+        "DataFrameReader.schema() received an empty schema string. " +
+          "Provide a DDL string like 'id INT, name STRING'.",
+      );
+    }
+    this._schema = ddl;
+    return this;
   }
 
   format(fmt: string): this {
@@ -258,7 +298,7 @@ class DataFrameReader {
   }
 
   /**
-   * Trigger a Read plan node.  The resulting DataFrame is lazy — no data is
+   * Trigger a Read plan node.  The resulting DataFrame is lazy; no data is
    * fetched until .collect() or an action is called.
    *
    * This maps to Spark Connect's `Relation.Read` with `ReadType.DataSource`:
@@ -270,6 +310,7 @@ class DataFrameReader {
       format: this._format,
       path,
       options: { ...this._options },
+      ...(this._schema != null && { schema: this._schema }),
     });
   }
 
@@ -300,5 +341,10 @@ class DataFrameReader {
   /** Shortcut for .format("orc").load(path). */
   orc(path: string): DataFrame {
     return this.format("orc").load(path);
+  }
+
+  /** Shortcut for .format("text").load(path). */
+  text(path: string): DataFrame {
+    return this.format("text").load(path);
   }
 }

@@ -19,6 +19,7 @@ import type {
   SortOrder as CoreSortOrder,
   FrameBoundary as CoreFrameBoundary,
 } from "@spark-connect-js/core";
+import { UnsupportedOperationError } from "@spark-connect-js/core";
 import {
   type Relation,
   RelationSchema,
@@ -124,6 +125,7 @@ export function buildRelation(plan: LogicalPlan): Relation {
                 format: plan.format,
                 paths: [plan.path],
                 options: plan.options,
+                ...(plan.schema != null && { schema: plan.schema }),
               }),
             },
           }),
@@ -646,6 +648,13 @@ export function buildRelation(plan: LogicalPlan): Relation {
           }),
         },
       });
+
+    default: {
+      const _exhaustive: never = plan;
+      throw new UnsupportedOperationError(
+        `Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`,
+      );
+    }
   }
 }
 
@@ -828,7 +837,7 @@ export function buildExpression(expr: CoreExpression): Expression {
           value: create(Expression_UnresolvedFunctionSchema, {
             functionName: expr.name,
             arguments: expr.arguments.map(buildExpression),
-            isDistinct: false,
+            isDistinct: expr.isDistinct ?? false,
           }),
         },
       });
@@ -858,7 +867,7 @@ export function buildExpression(expr: CoreExpression): Expression {
       });
 
     case "sortOrder":
-      // sortOrder is a wrapper — build the inner expression
+      // sortOrder is a wrapper - build the inner expression
       return buildExpression(expr.inner);
 
     case "unresolvedFunction":
@@ -917,7 +926,9 @@ export function buildExpression(expr: CoreExpression): Expression {
 
     default: {
       const _exhaustive: never = expr;
-      throw new Error(`Unsupported expression type: ${(_exhaustive as CoreExpression).type}`);
+      throw new UnsupportedOperationError(
+        `Unsupported expression type: ${(_exhaustive as CoreExpression).type}`,
+      );
     }
   }
 }

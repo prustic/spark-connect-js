@@ -30,7 +30,7 @@
  *      Code generation (WholeStageCodegen) compiles the plan into JVM bytecode.
  *
  * We only control phase 1.  Everything from phase 2 onward is handled by the
- * JVM-side Spark Connect server.  But getting phase 1 RIGHT is essential —
+ * JVM-side Spark Connect server.  But getting phase 1 RIGHT is essential;
  * a malformed unresolved plan causes cryptic AnalysisExceptions.
  */
 
@@ -55,7 +55,7 @@ export type Expression =
   | { type: "multiply"; left: Expression; right: Expression }
   | { type: "divide"; left: Expression; right: Expression }
   // Aggregate functions (sum, avg, count, min, max, etc.)
-  | { type: "aggregateFunction"; name: string; arguments: Expression[] }
+  | { type: "aggregateFunction"; name: string; arguments: Expression[]; isDistinct?: boolean }
   // Sort ordering marker (wraps an expression with direction)
   | {
       type: "sortOrder";
@@ -145,6 +145,7 @@ export interface ReadPlan {
   format: string;
   path: string;
   options: Record<string, string>;
+  schema?: string;
 }
 
 /**

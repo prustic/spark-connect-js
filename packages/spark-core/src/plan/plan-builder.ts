@@ -23,10 +23,11 @@
  */
 
 import type { LogicalPlan, Expression } from "./logical-plan.js";
+import { UnsupportedOperationError } from "../errors.js";
 
 /**
  * Converts a LogicalPlan tree into a plain object that mirrors the Spark
- * Connect proto Relation message.  This is an intermediate representation —
+ * Connect proto Relation message.  This is an intermediate representation -
  * the runtime adapter further encodes it to binary protobuf for the wire.
  */
 export class PlanBuilder {
@@ -43,6 +44,7 @@ export class PlanBuilder {
               format: plan.format,
               paths: [plan.path],
               options: plan.options,
+              ...(plan.schema != null && { schema: plan.schema }),
             },
           },
         };
@@ -405,6 +407,13 @@ export class PlanBuilder {
             relativeError: plan.relativeError,
           },
         };
+
+      default: {
+        const _exhaustive: never = plan;
+        throw new UnsupportedOperationError(
+          `Unsupported plan type: ${(_exhaustive as LogicalPlan).type}`,
+        );
+      }
     }
   }
 
@@ -440,7 +449,7 @@ export class PlanBuilder {
           unresolvedFunction: {
             functionName: expr.name,
             arguments: expr.arguments.map((e) => PlanBuilder.toExpression(e)),
-            isDistinct: false,
+            isDistinct: expr.isDistinct ?? false,
           },
         };
 
@@ -517,6 +526,13 @@ export class PlanBuilder {
           };
         }
         return { window: w };
+      }
+
+      default: {
+        const _exhaustive: never = expr;
+        throw new UnsupportedOperationError(
+          `Unsupported expression type: ${(_exhaustive as Expression).type}`,
+        );
       }
     }
   }

@@ -17,6 +17,7 @@
  */
 
 import type { DataFrame } from "./data-frame.js";
+import { InvalidInputError } from "./errors.js";
 
 export type SaveMode = "append" | "overwrite" | "error" | "ignore";
 
@@ -27,6 +28,7 @@ export class DataFrameWriter {
   private _options: Record<string, string> = {};
   private _partitionBy: string[] = [];
   private _sortBy: string[] = [];
+  private _bucketBy: { numBuckets: number; columnNames: string[] } | undefined;
 
   constructor(df: DataFrame) {
     this._df = df;
@@ -40,10 +42,10 @@ export class DataFrameWriter {
 
   /**
    * Set the save mode:
-   *   - "append" — Append to existing data
-   *   - "overwrite" — Overwrite existing data
-   *   - "error" (default) — Error if data already exists
-   *   - "ignore" — Silently ignore if data already exists
+   *   - "append" - Append to existing data
+   *   - "overwrite" - Overwrite existing data
+   *   - "error" (default) - Error if data already exists
+   *   - "ignore" - Silently ignore if data already exists
    */
   mode(m: SaveMode): this {
     this._mode = m;
@@ -75,20 +77,43 @@ export class DataFrameWriter {
   }
 
   /**
+   * Bucket the output by the given columns with a fixed number of buckets.
+   * Only applicable when saving to a table (saveAsTable).
+   */
+  bucketBy(numBuckets: number, col: string, ...cols: string[]): this {
+    if (!Number.isInteger(numBuckets) || numBuckets <= 0) {
+      throw new InvalidInputError(
+        `bucketBy requires numBuckets to be a positive integer, but got: ${numBuckets}`,
+      );
+    }
+    this._bucketBy = { numBuckets, columnNames: [col, ...cols] };
+    return this;
+  }
+
+  /** Build the common command payload fields. */
+  private _commandFields() {
+    return {
+      type: "writeOperation" as const,
+      plan: this._df._plan,
+      source: this._format,
+      mode: this._mode,
+      options: { ...this._options },
+      partitioningColumns: this._partitionBy,
+      sortColumnNames: this._sortBy,
+      ...(this._bucketBy != null && { bucketBy: this._bucketBy }),
+    };
+  }
+
+  /**
    * Save the DataFrame to the given path.
    *
    * Sends a WriteOperation command through the Spark Connect RPC.
    */
   async save(path: string): Promise<void> {
+    const { bucketBy: _, ...fields } = this._commandFields();
     await this._df._session._executeCommand({
-      type: "writeOperation",
-      plan: this._df._plan,
-      source: this._format,
-      mode: this._mode,
+      ...fields,
       saveType: { case: "path", value: path },
-      options: { ...this._options },
-      partitioningColumns: this._partitionBy,
-      sortColumnNames: this._sortBy,
     });
   }
 
@@ -99,17 +124,57 @@ export class DataFrameWriter {
    */
   async saveAsTable(tableName: string): Promise<void> {
     await this._df._session._executeCommand({
-      type: "writeOperation",
-      plan: this._df._plan,
-      source: this._format,
-      mode: this._mode,
+      ...this._commandFields(),
       saveType: {
         case: "table",
         value: { tableName, saveMethod: "saveAsTable" },
       },
-      options: { ...this._options },
-      partitioningColumns: this._partitionBy,
-      sortColumnNames: this._sortBy,
     });
+  }
+
+  /**
+   * Insert the DataFrame's contents into the given table.
+   * Unlike saveAsTable, insertInto does not create the table;
+   * it must already exist.
+   */
+  async insertInto(tableName: string): Promise<void> {
+    const {
+      bucketBy: _b,
+      partitioningColumns: _p,
+      sortColumnNames: _s,
+      ...fields
+    } = this._commandFields();
+    await this._df._session._executeCommand({
+      ...fields,
+      saveType: {
+        case: "table",
+        value: { tableName, saveMethod: "insertInto" },
+      },
+    });
+  }
+
+  /** Shortcut for .format("json").save(path). */
+  async json(path: string): Promise<void> {
+    await this.format("json").save(path);
+  }
+
+  /** Shortcut for .format("csv").save(path). */
+  async csv(path: string): Promise<void> {
+    await this.format("csv").save(path);
+  }
+
+  /** Shortcut for .format("parquet").save(path). */
+  async parquet(path: string): Promise<void> {
+    await this.format("parquet").save(path);
+  }
+
+  /** Shortcut for .format("orc").save(path). */
+  async orc(path: string): Promise<void> {
+    await this.format("orc").save(path);
+  }
+
+  /** Shortcut for .format("text").save(path). */
+  async text(path: string): Promise<void> {
+    await this.format("text").save(path);
   }
 }

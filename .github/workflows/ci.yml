@@ -17,7 +17,7 @@ jobs:
   build-lint-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
 
@@ -28,7 +28,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}

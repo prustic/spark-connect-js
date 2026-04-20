@@ -1,6 +1,6 @@
 /**
  * Shared helpers for function modules.
- * @internal — not part of the public API.
+ * @internal Not part of the public API.
  */
 
 import { Column, col as _col, lit as _lit } from "../column.js";
