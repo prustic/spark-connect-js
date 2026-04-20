@@ -21,7 +21,7 @@ import type { Expression } from "./plan/logical-plan.js";
 import type { WindowSpec } from "./window.js";
 
 export class Column {
-  /** @internal — the raw expression tree node */
+  /** @internal The raw expression tree node */
   readonly _expr: Expression;
 
   constructor(expr: Expression) {
@@ -363,7 +363,7 @@ export class Column {
  *
  * "Unresolved" means the server will resolve it against the schema at
  * analysis time.  If the column doesn't exist, the JVM throws
- * AnalysisException — we can't catch that at compile time.
+ * AnalysisException; we can't catch that at compile time.
  */
 export function col(name: string): Column {
   return new Column({ type: "unresolvedAttribute", name });

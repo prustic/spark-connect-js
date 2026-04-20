@@ -70,12 +70,12 @@ export class Catalog {
     await this._collectCatalog({ op: "setCurrentDatabase", dbName });
   }
 
-  /** @internal — create a DataFrame from a catalog operation */
+  /** @internal Create a DataFrame from a catalog operation */
   private _catalogDF(operation: CatalogOperation): DataFrame {
     return DataFrame._fromPlan(this._session, { type: "catalog", operation });
   }
 
-  /** @internal — execute a catalog operation and collect the result */
+  /** @internal Execute a catalog operation and collect the result */
   private async _collectCatalog(operation: CatalogOperation): Promise<Row[]> {
     return this._catalogDF(operation).collect();
   }

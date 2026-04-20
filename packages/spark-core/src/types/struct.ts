@@ -22,7 +22,7 @@ export class StructField {
     this.name = name;
     this.dataType = dataType;
     this.nullable = nullable;
-    this.metadata = metadata;
+    this.metadata = { ...metadata };
   }
 
   toString(): string {
@@ -31,10 +31,10 @@ export class StructField {
 }
 
 export class StructType {
-  readonly fields: StructField[];
+  readonly fields: readonly StructField[];
 
   constructor(fields: StructField[] = []) {
-    this.fields = fields;
+    this.fields = [...fields];
   }
 
   /** Add a field and return a new StructType. */
@@ -73,6 +73,16 @@ export class StructType {
 
   toString(): string {
     return this.treeString();
+  }
+
+  /**
+   * Return a DDL-formatted schema string, e.g. "name string, age integer".
+   * Compatible with DataFrameReader.schema().
+   */
+  toDDL(): string {
+    return this.fields
+      .map((f) => `${f.name} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
+      .join(", ");
   }
 
   /**

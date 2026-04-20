@@ -39,7 +39,7 @@ describe("WindowSpec", () => {
     assert.equal(spec._frameSpec.upper.type, "currentRow");
   });
 
-  it("is immutable — each method returns a new instance", () => {
+  it("is immutable - each method returns a new instance", () => {
     const s1 = new WindowSpec();
     const s2 = s1.partitionBy("a");
     const s3 = s2.orderBy("b");

@@ -54,6 +54,15 @@ describe("StructType", () => {
     assert.equal(st.treeString(), expected);
   });
 
+  it("toDDL() returns DDL-formatted schema string", () => {
+    const st = new StructType().add("name", "string").add("age", "integer", false);
+    assert.equal(st.toDDL(), "name string, age integer NOT NULL");
+  });
+
+  it("toDDL() returns empty string for empty schema", () => {
+    assert.equal(new StructType().toDDL(), "");
+  });
+
   it("fromProto() parses struct fields from proto response", () => {
     const proto = {
       struct: {
@@ -75,5 +84,20 @@ describe("StructType", () => {
   it("fromProto() handles empty/missing struct", () => {
     const st = StructType.fromProto({});
     assert.equal(st.length, 0);
+  });
+
+  it("constructor defensively copies the fields array", () => {
+    const fields = [new StructField("a", "string")];
+    const st = new StructType(fields);
+    fields.push(new StructField("b", "int")); // mutate original
+    assert.equal(st.length, 1); // StructType unaffected
+    assert.equal(st.fields[0].name, "a");
+  });
+
+  it("StructField defensively copies metadata", () => {
+    const meta = { key: "val" };
+    const sf = new StructField("x", "string", true, meta);
+    meta.key = "changed"; // mutate original
+    assert.equal(sf.metadata.key, "val"); // unaffected
   });
 });

@@ -1,15 +1,29 @@
 services:
   spark-connect:
-    image: apache/spark:4.0.0-preview2
+    image: apache/spark:4.0.0
     ports:
       - "15002:15002"
     command:
       - /opt/spark/sbin/start-connect-server.sh
+      - --packages
+      - io.delta:delta-spark_2.13:4.0.0,org.apache.iceberg:iceberg-spark-4.0_2.13:1.10.1
+      - --conf
+      - spark.jars.ivy=/tmp/.ivy2
+      - --conf
+      - spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension,org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+      - --conf
+      - spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
+      - --conf
+      - spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog
+      - --conf
+      - spark.sql.catalog.iceberg.type=hadoop
+      - --conf
+      - spark.sql.catalog.iceberg.warehouse=/tmp/iceberg-warehouse
     environment:
       - SPARK_NO_DAEMONIZE=true
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/15002'"]
       interval: 5s
       timeout: 3s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
