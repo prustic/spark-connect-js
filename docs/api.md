@@ -292,7 +292,7 @@ df.writeTo("events").overwrite(col("date").eq(lit("2026-01-01")));
 
 ```typescript
 const catalog = spark.catalog;
-const tables = await catalog.listTables();
+const tables = await catalog.listTables().collect();
 ```
 
 | Method                                      | Description                                        |

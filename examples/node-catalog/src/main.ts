@@ -94,6 +94,9 @@ const schema = new StructType([
   new StructField("value", "double"),
 ]);
 
+// Drop leftover table from a previous run to keep the example idempotent
+await session.sql("DROP TABLE IF EXISTS catalog_demo").collect();
+
 console.log("\nCreating table with schema:", schema.toDDL());
 const created = catalog.createTable("catalog_demo", {
   source: "parquet",
