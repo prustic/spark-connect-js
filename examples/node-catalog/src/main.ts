@@ -4,8 +4,6 @@ const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 const session = connect(SPARK_REMOTE);
 const catalog = session.catalog;
 
-// ── Catalogs & databases ───────────────────────────────────────────
-
 console.log("Current catalog:", await catalog.currentCatalog());
 
 const catalogs = await catalog.listCatalogs().collect();
@@ -23,8 +21,6 @@ const databases = await catalog.listDatabases().collect();
 console.log("All databases:");
 console.table(databases);
 
-// ── Functions ──────────────────────────────────────────────────────
-
 console.log("\n'count' exists?", await catalog.functionExists("count"));
 
 const countMeta = await catalog.getFunction("count").collect();
@@ -35,8 +31,6 @@ console.table(countMeta);
 const fns = await catalog.listFunctions().limit(5).collect();
 console.log("\nFirst 5 functions:");
 console.table(fns);
-
-// ── Temp views: create, list, cache, drop ──────────────────────────
 
 const employees = session.sql(`
   SELECT * FROM VALUES
@@ -80,13 +74,9 @@ console.log("dropTempView returned:", dropped);
 const droppedAgain = await catalog.dropTempView("employees");
 console.log("dropTempView again:", droppedAgain);
 
-// ── Global temp views ──────────────────────────────────────────────
-
 await employees.createOrReplaceGlobalTempView("global_emp");
 const gDropped = await catalog.dropGlobalTempView("global_emp");
 console.log("\ndropGlobalTempView returned:", gDropped);
-
-// ── createTable with schema ────────────────────────────────────────
 
 const schema = new StructType([
   new StructField("id", "long"),
