@@ -588,3 +588,140 @@ describe("PlanBuilder toExpression", () => {
     });
   });
 });
+
+describe("PlanBuilder toRelation", () => {
+  it("aggregate with pivot using string values", () => {
+    const result = PlanBuilder.toRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "category" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "amount" }],
+        },
+      ],
+      groupType: "pivot",
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "year" },
+        values: ["2023", "2024", "2025"],
+      },
+    });
+    const agg = (result as { aggregate: Record<string, unknown> }).aggregate;
+    assert.strictEqual(agg.groupType, "GROUP_TYPE_PIVOT");
+    const pivot = agg.pivot as { col: unknown; values: Array<{ literal: { string: string } }> };
+    assert.deepStrictEqual(pivot.values, [
+      { literal: { string: "2023" } },
+      { literal: { string: "2024" } },
+      { literal: { string: "2025" } },
+    ]);
+  });
+
+  it("aggregate with pivot using number values", () => {
+    const result = PlanBuilder.toRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "category" }],
+      aggregateExpressions: [
+        { type: "aggregateFunction", name: "count", arguments: [{ type: "literal", value: 1 }] },
+      ],
+      groupType: "pivot",
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "quarter" },
+        values: [1, 2, 3, 4],
+      },
+    });
+    const agg = (result as { aggregate: Record<string, unknown> }).aggregate;
+    const pivot = agg.pivot as { values: Array<{ literal: { double: number } }> };
+    assert.deepStrictEqual(pivot.values, [
+      { literal: { double: 1 } },
+      { literal: { double: 2 } },
+      { literal: { double: 3 } },
+      { literal: { double: 4 } },
+    ]);
+  });
+
+  it("aggregate with pivot using boolean values", () => {
+    const result = PlanBuilder.toRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "category" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "amount" }],
+        },
+      ],
+      groupType: "pivot",
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "is_active" },
+        values: [true, false],
+      },
+    });
+    const agg = (result as { aggregate: Record<string, unknown> }).aggregate;
+    const pivot = agg.pivot as { values: Array<{ literal: { boolean: boolean } }> };
+    assert.deepStrictEqual(pivot.values, [
+      { literal: { boolean: true } },
+      { literal: { boolean: false } },
+    ]);
+  });
+
+  it("naReplace with string replacements", () => {
+    const result = PlanBuilder.toRelation({
+      type: "naReplace",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["name"],
+      replacements: [
+        { oldValue: "unknown", newValue: "N/A" },
+        { oldValue: "missing", newValue: "default" },
+      ],
+    });
+    const replace = (result as { replace: Record<string, unknown> }).replace;
+    assert.deepStrictEqual(replace.cols, ["name"]);
+    const replacements = replace.replacements as Array<{
+      oldValue: { literal: unknown };
+      newValue: { literal: unknown };
+    }>;
+    assert.deepStrictEqual(replacements[0].oldValue, { literal: { string: "unknown" } });
+    assert.deepStrictEqual(replacements[0].newValue, { literal: { string: "N/A" } });
+  });
+
+  it("naReplace with number replacements", () => {
+    const result = PlanBuilder.toRelation({
+      type: "naReplace",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["value"],
+      replacements: [
+        { oldValue: -1, newValue: 0 },
+        { oldValue: 999, newValue: 100 },
+      ],
+    });
+    const replace = (result as { replace: Record<string, unknown> }).replace;
+    const replacements = replace.replacements as Array<{
+      oldValue: { literal: unknown };
+      newValue: { literal: unknown };
+    }>;
+    assert.deepStrictEqual(replacements[0].oldValue, { literal: { double: -1 } });
+    assert.deepStrictEqual(replacements[0].newValue, { literal: { double: 0 } });
+    assert.deepStrictEqual(replacements[1].oldValue, { literal: { double: 999 } });
+    assert.deepStrictEqual(replacements[1].newValue, { literal: { double: 100 } });
+  });
+
+  it("naReplace with boolean replacements", () => {
+    const result = PlanBuilder.toRelation({
+      type: "naReplace",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      cols: ["flag"],
+      replacements: [{ oldValue: false, newValue: true }],
+    });
+    const replace = (result as { replace: Record<string, unknown> }).replace;
+    const replacements = replace.replacements as Array<{
+      oldValue: { literal: unknown };
+      newValue: { literal: unknown };
+    }>;
+    assert.deepStrictEqual(replacements[0].oldValue, { literal: { boolean: false } });
+    assert.deepStrictEqual(replacements[0].newValue, { literal: { boolean: true } });
+  });
+});
