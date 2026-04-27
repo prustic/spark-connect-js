@@ -1,12 +1,9 @@
 /**
- * StructType / StructField
- *
  * Mirrors Spark's StructType and StructField for schema inspection.
  *
- * @see Spark source (StructType): sql/api/src/main/scala/org/apache/spark/sql/types/StructType.scala
- * @see Spark source (StructField): sql/api/src/main/scala/org/apache/spark/sql/types/StructField.scala
+ * @see [Spark source: StructType.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructType.scala)
+ * @see [Spark source: StructField.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructField.scala)
  */
-
 export class StructField {
   readonly name: string;
   readonly dataType: string;
@@ -30,6 +27,12 @@ export class StructField {
   }
 }
 
+/**
+ * Mirrors Spark's StructType and StructField for schema inspection.
+ *
+ * @see [Spark source: StructType.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructType.scala)
+ * @see [Spark source: StructField.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructField.scala)
+ */
 export class StructType {
   readonly fields: readonly StructField[];
 

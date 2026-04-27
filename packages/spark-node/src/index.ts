@@ -1,24 +1,24 @@
 /**
- * @spark-connect-js/node - Node.js runtime adapter for Spark Connect.
+ * @packageDocumentation
  *
- * Bridges @spark-connect-js/core's platform-agnostic DataFrame API with Node.js:
- *   - gRPC transport via @grpc/grpc-js (HTTP/2, protobuf on the wire)
- *   - Arrow IPC decoding via apache-arrow
- *   - Optional child_process management for local Spark servers
- *
- * @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
- * @see https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format
+ * `@spark-connect-js/node` is the Node.js runtime adapter. It provides the
+ * gRPC transport (via `@grpc/grpc-js`), the Arrow IPC decoder (via
+ * `apache-arrow`), and an optional helper for launching a local Spark Connect
+ * server during development. It re-exports the public API from
+ * `@spark-connect-js/core` so a single import works for end users.
  *
  * @example
- *   import { SparkSession, col, lit } from "@spark-connect-js/node";
+ * ```ts
+ * import { SparkSession, col, lit } from "@spark-connect-js/node";
  *
- *   const spark = SparkSession.builder()
- *     .remote("sc://localhost:15002")
- *     .getOrCreate();
+ * const spark = SparkSession.builder()
+ *   .remote("sc://localhost:15002")
+ *   .getOrCreate();
  *
- *   const rows = await spark.table("people")
- *     .filter(col("age").gt(lit(30)))
- *     .collect();
+ * const rows = await spark.table("people")
+ *   .filter(col("age").gt(lit(30)))
+ *   .collect();
+ * ```
  */
 
 // Public API

@@ -1,0 +1,17 @@
+---
+interface Props {
+  name: string;
+  version: string;
+}
+const { name, version } = Astro.props;
+---
+
+<section class="release-pkg">
+  <h3 class="release-pkg__title">
+    <code>{name}</code>
+    <span class="release-pkg__version">{version}</span>
+  </h3>
+  <div class="release-pkg__body">
+    <slot />
+  </div>
+</section>

@@ -1,6 +1,102 @@
 ---
 title: Changelog
-description: Release notes for spark-js packages.
+description: Release history for the @spark-connect-js packages.
 ---
 
-Generated from changesets. Placeholder for now.
+import { Badge } from '@astrojs/starlight/components';
+import PackageHeader from '../../components/changelog/PackageHeader.astro';
+
+The three packages version and ship together. Per-package changelogs live alongside the source:
+
+- [`@spark-connect-js/core`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-core/CHANGELOG.md)
+- [`@spark-connect-js/node`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-node/CHANGELOG.md)
+- [`@spark-connect-js/connect`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-connect/CHANGELOG.md)
+
+## 0.3.0
+
+*29 March 2026* · [GitHub release](https://github.com/prustic/spark-connect-js/releases?q=0.3.0&expanded=true) · <Badge text="Latest" variant="success" />
+
+<p class="release-references"><strong>References:</strong> <a href="https://github.com/prustic/spark-connect-js/pull/40">#40</a> · <a href="https://github.com/prustic/spark-connect-js/commit/d46847934011df16aefb39db7c3bb5fdcf220f73"><code>d468479</code></a></p>
+
+<PackageHeader name={"@spark-connect-js/core"} version={"0.3.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/core/v/0.3.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fcore%400.3.0"} />
+
+- DataFrameReader shortcuts: `csv()`, `json()`, `parquet()`, `orc()`, `text()`, `schema()`
+- DataFrameWriter shortcuts: `csv()`, `json()`, `parquet()`, `orc()`, `text()`, `bucketBy()`, `insertInto()`
+- DataFrameWriterV2 with full `writeTo()` API: `create`, `replace`, `createOrReplace`, `append`, `overwrite`, `overwritePartitions`
+- Typed client error hierarchy: `SparkClientError`, `InvalidConfigError`, `InvalidInputError`, `UnsupportedOperationError`
+- `isDistinct` propagation on aggregate functions
+- Cross join validation rejects join conditions
+
+<PackageHeader name={"@spark-connect-js/node"} version={"0.3.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/node/v/0.3.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fnode%400.3.0"} />
+
+- Proto serialization for `WriteOperationV2` command
+- `SparkProcessManager` throw sites reclassified to `SparkClientError`
+- Re-exported typed client errors from core
+
+<PackageHeader name={"@spark-connect-js/connect"} version={"0.3.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/connect/v/0.3.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fconnect%400.3.0"} />
+
+- Re-exported proto schemas: `WriteOperationV2Schema`, `WriteOperationV2_ModeSchema`
+
+## 0.2.0
+
+*15 March 2026* · [GitHub release](https://github.com/prustic/spark-connect-js/releases?q=0.2.0&expanded=true)
+
+<p class="release-references"><strong>References:</strong> <a href="https://github.com/prustic/spark-connect-js/pull/18">#18</a> · <a href="https://github.com/prustic/spark-connect-js/commit/924ea50d700711733cef96857a48c900dc8d7f4b"><code>924ea50</code></a></p>
+
+<PackageHeader name={"@spark-connect-js/core"} version={"0.2.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/core/v/0.2.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fcore%400.2.0"} />
+
+- `DataFrame.cube()`, `.rollup()` for multi-dimensional aggregation
+- `DataFrame.unpivot()` / `.melt()` for wide-to-long reshaping
+- `DataFrame.summary()` for descriptive statistics
+- `DataFrame.replace()` for value substitution via `NAReplace`
+- `DataFrame.randomSplit()` for splitting into multiple DataFrames
+- `DataFrame.createTempView()`, `.createGlobalTempView()`, `.createOrReplaceGlobalTempView()`
+- `DataFrame.sameSemantics()` and `.semanticHash()` for plan comparison
+- `DataFrameStat` class (`.stat` accessor) with `corr()`, `cov()`, `crosstab()`, `freqItems()`, `approxQuantile()`
+- `GroupedData.pivot()` support with cube/rollup/pivot group types
+
+<PackageHeader name={"@spark-connect-js/node"} version={"0.2.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/node/v/0.2.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fnode%400.2.0"} />
+
+- Proto serialization for `StatSummary`, `NAReplace`, `Unpivot`, `StatCorr`, `StatCov`, `StatCrosstab`, `StatFreqItems`, `StatApproxQuantile`, and `Aggregate_Pivot`
+- Added analyze-plan request/response handling for `sameSemantics` and `semanticHash`
+- Re-exported `DataFrameStat` from package index
+
+<PackageHeader name={"@spark-connect-js/connect"} version={"0.2.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/connect/v/0.2.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fconnect%400.2.0"} />
+
+- Re-exported proto schemas: `StatSummarySchema`, `NAReplaceSchema`, `NAReplace_ReplacementSchema`, `StatCorrSchema`, `StatCovSchema`, `StatCrosstabSchema`, `StatFreqItemsSchema`, `StatApproxQuantileSchema`, `UnpivotSchema`, `Unpivot_ValuesSchema`, `Aggregate_PivotSchema`
+- Re-exported analyze-plan schemas for `SameSemantics` and `SemanticHash`
+
+## 0.1.0
+
+*9 March 2026* · [GitHub release](https://github.com/prustic/spark-connect-js/releases?q=0.1.0&expanded=true)
+
+<p class="release-references"><strong>References:</strong> <a href="https://github.com/prustic/spark-connect-js/pull/10">#10</a> · <a href="https://github.com/prustic/spark-connect-js/commit/895f389d703182ed149c4a634f48b894aa7d5131"><code>895f389</code></a></p>
+
+<PackageHeader name={"@spark-connect-js/core"} version={"0.1.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/core/v/0.1.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fcore%400.1.0"} />
+
+- **SparkSession**: connect via `sc://` URL, execute SQL, read tables, create DataFrames from local data
+- **DataFrame**: 30+ transformations (select, filter, join, groupBy, sort, union, intersect, sample, fillna, dropna, and more), actions (collect, show, count, head, tail, toLocalIterator), properties (schema, columns, dtypes, isEmpty, printSchema, explain)
+- **Column**: comparisons, arithmetic, logical ops, cast, alias, null checks, pattern matching, bitwise ops, window support
+- **GroupedData**: agg, count, sum, avg, mean, min, max
+- **Window**: partitionBy, orderBy, rowsBetween, rangeBetween
+- **DataFrameReader**: format, option, options, load, table
+- **DataFrameWriter**: format, mode, option, options, partitionBy, sortBy, save, saveAsTable
+- **Catalog**: currentDatabase, setCurrentDatabase, listDatabases, listTables, listColumns, databaseExists, tableExists
+- **248 built-in functions** across 12 categories: aggregate, math, string, date/timestamp, window, collection, conditional, hash, JSON, CSV, bitwise, sort
+- **PlanBuilder**: constructs Spark Connect logical plan protobuf messages from the DataFrame API
+- Zero runtime dependencies
+
+<PackageHeader name={"@spark-connect-js/node"} version={"0.1.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/node/v/0.1.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fnode%400.1.0"} />
+
+- **GrpcTransport**: connects to Spark Connect over gRPC, streams ExecutePlan responses, handles metadata and session management
+- **ArrowDecoder**: deserializes Arrow IPC batches into JavaScript row objects
+- **SparkProcessManager**: launches and manages local `spark-connect` server processes for development
+- **buildRelation / buildExpression**: serializes logical plan nodes and expressions to protobuf wire format
+- Re-exports the entire `@spark-connect-js/core` public API (SparkSession, DataFrame, Column, functions, etc.) for single-package convenience
+
+<PackageHeader name={"@spark-connect-js/connect"} version={"0.1.0"} npmUrl={"https://www.npmjs.com/package/@spark-connect-js/connect/v/0.1.0"} githubUrl={"https://github.com/prustic/spark-connect-js/releases/tag/%40spark-connect-js%2Fconnect%400.1.0"} />
+
+- **Protobuf types**: Plan, Relation, Expression, DataType, and all nested message types
+- **Service stubs**: ExecutePlanRequest/Response, AnalyzePlanRequest/Response, ConfigRequest/Response, AddArtifactsRequest/Response, ArtifactStatusesRequest/Response
+- **Schema objects**: StructType, StructField, MapType, ArrayType, and all Spark data type descriptors
+- Single runtime dependency: `@bufbuild/protobuf`

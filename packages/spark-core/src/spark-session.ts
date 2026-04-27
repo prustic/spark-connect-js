@@ -1,18 +1,3 @@
-/**
- * Thin client handle for a Spark Connect session.
- *
- * @see sql/core/src/main/scala/org/apache/spark/sql/SparkSession.scala
- * @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
- *
- * The JVM-side server owns the real session state (SparkContext, Catalog,
- * SessionState). Our SparkSession is a thin client that:
- *   1. Holds a session ID (UUID) to correlate requests on the server.
- *   2. Provides the builder-pattern entry for creating DataFrames.
- *   3. Delegates plan execution to a Transport injected by the runtime adapter.
- *
- * Transport is defined here in core so this package stays platform-agnostic.
- */
-
 import { DataFrame } from "./data-frame.js";
 import { Catalog } from "./catalog.js";
 import { UDFRegistration } from "./udf-registration.js";
@@ -27,9 +12,6 @@ import type { Row } from "./types/row.js";
 // to keep spark-core free of @types/node or DOM lib dependencies.
 declare const crypto: { randomUUID(): string };
 
-// Transport
-// Runtime adapters implement this to provide actual network I/O.
-
 /**
  * Per-call options forwarded by `SparkSession` to the transport.
  * Today carries tags only; future fields (operation_id override, deadline,
@@ -40,22 +22,30 @@ export interface ExecuteOptions {
   tags?: readonly string[];
 }
 
+/**
+ * The network seam between {@link SparkSession} and a Spark Connect server.
+ * Runtime adapters (e.g. `@spark-connect-js/node`) implement this interface to
+ * provide actual gRPC I/O, while `@spark-connect-js/core` stays platform-agnostic.
+ *
+ * Most methods are optional: a minimal in-memory `Transport` for testing only
+ * needs `executePlan`. A full runtime adapter implements them all.
+ */
 export interface Transport {
-  /** Execute a plan and return raw Arrow IPC buffers. */
+  /** Execute a plan and stream raw Arrow IPC buffers back to the client. */
   executePlan(
     sessionId: string,
     plan: LogicalPlan,
     options?: ExecuteOptions,
   ): AsyncIterable<Uint8Array>;
 
-  /** Execute a command (write, createView, etc.). No Arrow data returned. */
+  /** Execute a command (write, createView, etc.) that returns no Arrow data. */
   executeCommand?(
     sessionId: string,
     command: Record<string, unknown>,
     options?: ExecuteOptions,
   ): Promise<void>;
 
-  /** Send an AnalyzePlan request (schema, explain, etc.). */
+  /** Send an AnalyzePlan request (schema, explain, etc.) and return the response. */
   analyzePlan?(
     sessionId: string,
     request: Record<string, unknown>,
@@ -73,39 +63,67 @@ export interface Transport {
    */
   interrupt?(sessionId: string, request: Record<string, unknown>): Promise<string[]>;
 
-  /** Release the server-side session. */
+  /** Release server-side session state. Called from `SparkSession.stop()`. */
   releaseSession?(sessionId: string): Promise<void>;
 
-  /** Close the underlying connection. */
+  /** Close the underlying connection. Called from `SparkSession.stop()`. */
   close?(): void;
 }
 
-// Configuration
-
-/** Decodes Arrow IPC bytes into Row objects. Injected by the runtime adapter. */
+/**
+ * Decodes Arrow IPC byte buffers into plain JavaScript {@link Row} objects.
+ * Injected by the runtime adapter; the core package has no Arrow dependency.
+ */
 export type ArrowDecoderFn = (chunks: Uint8Array[]) => Promise<Row[]>;
 
+/**
+ * Construction parameters for a {@link SparkSession}. Most users build a session
+ * via the runtime adapter's builder (e.g. `SparkSessionBuilder` from
+ * `@spark-connect-js/node`); this config is what the builder hands to
+ * `SparkSession._create` internally.
+ */
 export interface SparkSessionConfig {
-  /** Spark Connect endpoint, e.g. "sc://localhost:15002" */
+  /** Spark Connect endpoint, e.g. `"sc://localhost:15002"`. */
   remote: string;
 
-  /**
-   * Transport implementation injected by the runtime adapter.
-   */
+  /** Transport implementation injected by the runtime adapter. */
   transport: Transport;
 
   /**
-   * Arrow IPC → Row[] decoder function injected by the runtime adapter.
-   * If not provided, collect() will throw at runtime.
+   * Arrow IPC to `Row[]` decoder injected by the runtime adapter. If not
+   * provided, `collect()` and similar actions will throw at runtime.
    */
   arrowDecoder?: ArrowDecoderFn;
 
-  /** Optional session ID override for reconnecting to an existing session. */
+  /** Optional session ID override for reattaching to an existing server-side session. */
   sessionId?: string;
 }
 
-// SparkSession
-
+/**
+ * The client handle for a Spark Connect session.
+ *
+ * Holds the transport, session identifier, and runtime-adapter hooks (for
+ * example the Arrow decoder). All DataFrame operations are scheduled against
+ * a `SparkSession`; most applications create one session at startup and
+ * reuse it.
+ *
+ * Construct a session with the runtime-specific builder, for example
+ * `SparkSessionBuilder` from `@spark-connect-js/node`.
+ *
+ * @example
+ * ```ts
+ * import { SparkSessionBuilder } from "@spark-connect-js/node";
+ *
+ * const spark = await SparkSessionBuilder
+ *   .remote("sc://localhost:15002")
+ *   .build();
+ *
+ * const df = await spark.sql("SELECT 1 AS n");
+ * console.log(await df.collect());
+ * ```
+ *
+ * @see [Spark source: SparkSession.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/SparkSession.scala)
+ */
 export class SparkSession {
   readonly sessionId: string;
   private readonly transport: Transport;
@@ -329,21 +347,36 @@ export class SparkSession {
   }
 }
 
-// Builder
-
-class SparkSessionBuilder {
+/**
+ * Fluent builder for {@link SparkSession}. Returned by `SparkSession.builder()`
+ * in `@spark-connect-js/core`; runtime adapters (e.g. `@spark-connect-js/node`)
+ * usually subclass it to add their own transport defaults.
+ *
+ * @example
+ * ```ts
+ * const spark = SparkSession.builder()
+ *   .remote("sc://localhost:15002")
+ *   .transport(myTransport)
+ *   .arrowDecoder(myDecoder)
+ *   .getOrCreate();
+ * ```
+ */
+export class SparkSessionBuilder {
   private config: Partial<SparkSessionConfig> = {};
 
+  /** Set the Spark Connect endpoint URL (`sc://host:port`). Required. */
   remote(connectionString: string): this {
     this.config.remote = connectionString;
     return this;
   }
 
+  /** Inject a {@link Transport} implementation. Required. */
   transport(t: Transport): this {
     this.config.transport = t;
     return this;
   }
 
+  /** Inject an Arrow IPC decoder. Required for `collect()` and similar actions. */
   arrowDecoder(decoder: ArrowDecoderFn): this {
     this.config.arrowDecoder = decoder;
     return this;
@@ -361,9 +394,9 @@ class SparkSessionBuilder {
   }
 
   /**
-   * Construct the session.  In Spark Connect, "getOrCreate" is a server-side
+   * Construct the session. In Spark Connect, "getOrCreate" is a server-side
    * concept: the server may return an existing session if the session ID
-   * matches.  On the client we simply instantiate our handle.
+   * matches. On the client we just instantiate the handle.
    */
   getOrCreate(): SparkSession {
     if (!this.config.remote) {
@@ -415,10 +448,24 @@ function validateUuid(value: string, field: string): void {
   }
 }
 
-// DataFrameReader
-// @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/DataFrameReader.scala
-
-class DataFrameReader {
+/**
+ * Fluent reader for loading data into a {@link DataFrame}. Returned by
+ * `spark.read`; configure the format, options, and schema, then terminate
+ * with a format shortcut (`csv`, `json`, `parquet`, `orc`, `text`) or `.load()`.
+ *
+ * @example
+ * ```ts
+ * spark.read.parquet("s3://bucket/events/");
+ *
+ * spark.read
+ *   .schema("id INT, name STRING")
+ *   .option("header", "true")
+ *   .csv("/data/people.csv");
+ * ```
+ *
+ * @see [Spark source: DataFrameReader.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/DataFrameReader.scala)
+ */
+export class DataFrameReader {
   private session: SparkSession;
   private _format: string = "parquet";
   private _schema: string | undefined;

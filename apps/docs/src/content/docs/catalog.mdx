@@ -1,0 +1,144 @@
+---
+title: Catalog
+description: Databases, tables, temp views, functions, and caching through SparkSession.catalog.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside>
+  For the catalog API in PySpark, see the [Catalog reference](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/catalog.html) in the Apache Spark documentation.
+</Aside>
+
+`session.catalog` is the client-side handle to Spark's `CatalogManager`: listing catalogs and databases, inspecting tables and functions, managing temp views, and controlling the storage-level cache.
+
+```ts
+const catalog = spark.catalog;
+```
+
+All listing methods return `DataFrame`s so they compose with the rest of the API. Existence checks and state-changing methods return `Promise<T>`.
+
+## Catalogs and databases
+
+A Spark server can register multiple catalogs. `spark_catalog` is built in; others (Iceberg, Delta, JDBC, Hive) are configured server-side in `spark-defaults.conf`. The client forwards catalog operations as-is, so what you can list and query depends on the server's configuration.
+
+```ts
+await catalog.currentCatalog();                  // string
+await catalog.listCatalogs().collect();          // Row[]
+await catalog.setCurrentCatalog("iceberg");
+
+await catalog.currentDatabase();                 // "default"
+await catalog.listDatabases().collect();
+await catalog.databaseExists("analytics");       // boolean
+await catalog.getDatabase("analytics").collect();
+await catalog.setCurrentDatabase("analytics");
+```
+
+## Tables and views
+
+```ts
+await catalog.listTables().collect();
+await catalog.listTables("analytics").collect();     // in a specific database
+await catalog.tableExists("events");
+await catalog.getTable("events").collect();
+await catalog.listColumns("events").collect();
+```
+
+### Temp views
+
+Temp views are session-scoped; they disappear when the session ends. Global temp views live in the `global_temp` database and are visible across sessions until explicitly dropped.
+
+```ts
+await df.createOrReplaceTempView("events");
+await df.createOrReplaceGlobalTempView("events_global");
+
+await catalog.dropTempView("events");                // returns boolean
+await catalog.dropGlobalTempView("events_global");
+```
+
+### Creating tables
+
+`createTable` registers a managed or external table backed by a file format:
+
+```ts
+import { StructType, StructField } from "@spark-connect-js/node";
+
+const schema = new StructType([
+  new StructField("id", "long"),
+  new StructField("name", "string"),
+  new StructField("value", "double"),
+]);
+
+const created = catalog.createTable("demo_table", {
+  source: "parquet",
+  schema,
+  path: "/tmp/demo",           // optional, omit for a managed table
+  options: { compression: "snappy" },
+});
+await created.collect();       // returns an empty DataFrame
+```
+
+For INSERT / OVERWRITE / MERGE semantics, use the [DataFrame writer](/spark-connect-js/io/#writing) instead.
+
+## Functions
+
+```ts
+await catalog.listFunctions().collect();           // every SQL function registered on the server
+await catalog.functionExists("count");
+await catalog.getFunction("count").collect();      // metadata row with return type, signature, etc.
+```
+
+## Caching
+
+The catalog cache controls in-memory persistence for named tables and views. Useful when you plan to query the same relation several times in a session.
+
+```ts
+await catalog.cacheTable("events");
+await catalog.isCached("events");          // true
+await catalog.uncacheTable("events");
+
+await catalog.cacheTable("events");
+await catalog.clearCache();                // drops every cached relation
+```
+
+For caching intermediate DataFrames (not named tables), use `df.cache()` / `df.persist(...)` / `df.unpersist()` directly.
+
+## Metadata refresh
+
+Spark caches file listings and partition metadata. After an out-of-band change to underlying storage, refresh explicitly:
+
+```ts
+await catalog.refreshTable("events");
+await catalog.refreshByPath("s3://bucket/events/");
+await catalog.recoverPartitions("events");     // re-discovers Hive-style partitions
+```
+
+## A complete example
+
+```ts
+import { connect, StructType, StructField } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+const catalog = spark.catalog;
+
+console.log("Catalog:", await catalog.currentCatalog());
+console.log("Database:", await catalog.currentDatabase());
+
+const employees = spark.sql(`
+  SELECT * FROM VALUES
+    ('Alice', 'Engineering', 90000),
+    ('Bob',   'Marketing',   75000)
+  AS employees(name, department, salary)
+`);
+await employees.createOrReplaceTempView("employees");
+
+console.log(await catalog.tableExists("employees"));
+console.table(await catalog.listColumns("employees").collect());
+
+await catalog.cacheTable("employees");
+console.log("cached?", await catalog.isCached("employees"));
+
+await catalog.dropTempView("employees");
+await spark.stop();
+```
+
+The full runnable version is in [`examples/node-catalog`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-catalog).

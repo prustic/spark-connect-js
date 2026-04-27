@@ -4,9 +4,9 @@
  * Concrete implementation of @spark-connect-js/core's Transport interface using
  * @grpc/grpc-js to communicate with the Spark Connect gRPC service.
  *
- * @see Spark Connect service proto: sql/connect/common/src/main/protobuf/spark/connect/base.proto
- * @see Spark Connect server: sql/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectService.scala
- * @see ExecutePlan handler: sql/connect/server/src/main/scala/org/apache/spark/sql/connect/execution/ExecuteGrpcResponseSender.scala
+ * @see [Spark Connect proto: base.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/base.proto)
+ * @see [Spark source: SparkConnectService.scala](https://github.com/apache/spark/blob/master/sql/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectService.scala)
+ * @see [Spark source: ExecuteGrpcResponseSender.scala](https://github.com/apache/spark/blob/master/sql/connect/server/src/main/scala/org/apache/spark/sql/connect/execution/ExecuteGrpcResponseSender.scala)
  *
  * Uses @bufbuild/protobuf for message serialization and @grpc/grpc-js for
  * the HTTP/2 transport. Messages are created using the generated schemas

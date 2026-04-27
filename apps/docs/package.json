@@ -2,12 +2,13 @@
   "name": "@spark-connect-js/docs",
   "version": "0.0.0",
   "private": true,
-  "description": "spark-js documentation site — Starlight/Astro",
+  "description": "spark-connect-js documentation site (Starlight/Astro)",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
+    "changelog:build": "node scripts/build-changelog.ts",
     "docs:dev": "astro dev",
-    "docs:build": "astro build",
+    "docs:build": "pnpm changelog:build && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "clean": "git clean -xdf .astro .turbo dist node_modules"
@@ -15,6 +16,7 @@
   "dependencies": {
     "@astrojs/starlight": "^0.38.3",
     "astro": "^6.1.8",
+    "mermaid": "^11.14.0",
     "sharp": "^0.34.5",
     "starlight-typedoc": "^0.21.5",
     "typedoc": "^0.28.19",

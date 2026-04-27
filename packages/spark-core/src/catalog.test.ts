@@ -7,7 +7,7 @@ import type { SparkSession } from "./spark-session.js";
 import type { CatalogOperation } from "./plan/logical-plan.js";
 
 /**
- * Create a Catalog with a stub session — just enough to let
+ * Create a Catalog with a stub session: just enough to let
  * DataFrame._fromPlan store the session reference without executing anything.
  */
 function makeCatalog(): Catalog {
@@ -22,7 +22,7 @@ function planOp(df: DataFrame): CatalogOperation {
   return df._plan.operation;
 }
 
-describe("Catalog — sync DataFrame methods", () => {
+describe("Catalog: sync DataFrame methods", () => {
   it("listDatabases() builds correct operation", () => {
     const op = planOp(makeCatalog().listDatabases());
     assert.equal(op.op, "listDatabases");

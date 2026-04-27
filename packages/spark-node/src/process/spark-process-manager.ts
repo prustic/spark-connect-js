@@ -4,8 +4,8 @@ import { SparkClientError } from "@spark-connect-js/core";
  * Spawns and manages a local Spark Connect server process.
  * Useful for local development and testing.
  *
- * @see connector/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectServer.scala
- * @see core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala
+ * @see [Spark source: SparkConnectServer.scala](https://github.com/apache/spark/blob/master/sql/connect/server/src/main/scala/org/apache/spark/sql/connect/service/SparkConnectServer.scala)
+ * @see [Spark source: SparkSubmit.scala](https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala)
  *
  * child_process notes:
  *   - spawn() over exec(): the server can produce GB of logs.

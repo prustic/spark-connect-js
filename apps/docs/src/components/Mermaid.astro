@@ -1,0 +1,126 @@
+---
+/**
+ * Mermaid.astro
+ *
+ * Renders a Mermaid diagram. The `mermaid` package is loaded on the client
+ * only on pages that actually use this component; pages without diagrams
+ * ship no extra JS.
+ *
+ * Usage in MDX:
+ *
+ *   import Mermaid from '../../components/Mermaid.astro';
+ *
+ *   <Mermaid title="Plan flow" code={`
+ *     graph LR
+ *       A[DataFrame] --> B[LogicalPlan]
+ *       B --> C[Spark Connect]
+ *   `} />
+ */
+
+interface Props {
+  /** Mermaid source. Leading indentation is stripped. */
+  code: string;
+  /** Optional caption rendered below the diagram. */
+  title?: string;
+}
+
+const { code, title } = Astro.props;
+
+// Strip the common leading indentation so diagrams can be indented in MDX.
+const lines = code.replace(/^\n+/, "").replace(/\s+$/, "").split("\n");
+const indent = Math.min(
+  ...lines.filter((l) => l.trim().length > 0).map((l) => l.match(/^ */)![0].length),
+);
+const dedented = lines.map((l) => l.slice(indent)).join("\n");
+---
+
+<figure class="mermaid-figure">
+  <pre class="mermaid" data-mermaid>{dedented}</pre>
+  {title && <figcaption>{title}</figcaption>}
+</figure>
+
+<style is:global>
+  .mermaid-figure {
+    margin: 1rem 0 2rem;
+  }
+  .mermaid-figure pre.mermaid {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+    /* Hide the raw source until Mermaid renders it. */
+    opacity: 0;
+    transition: opacity 0.15s ease-in;
+  }
+  .mermaid-figure pre.mermaid svg {
+    max-width: 100%;
+    height: auto;
+  }
+  .mermaid-figure pre.mermaid[data-processed="true"] {
+    opacity: 1;
+  }
+  .mermaid-figure figcaption {
+    text-align: center;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+    margin-top: 0.5rem;
+  }
+</style>
+
+<script>
+  import mermaid from "mermaid";
+
+  const currentTheme = (): "dark" | "default" =>
+    document.documentElement.dataset.theme === "dark" ? "dark" : "default";
+
+  const initMermaid = () => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: currentTheme(),
+      securityLevel: "loose",
+      fontFamily: "var(--sl-font)",
+    });
+  };
+
+  const renderAll = async () => {
+    const blocks = [
+      ...document.querySelectorAll<HTMLElement>("pre.mermaid[data-mermaid]"),
+    ];
+    if (blocks.length === 0) return;
+
+    // Restore original source before each run so theme changes re-render.
+    blocks.forEach((el) => {
+      if (el.dataset.source === undefined) {
+        el.dataset.source = el.textContent ?? "";
+        return;
+      }
+      el.removeAttribute("data-processed");
+      el.innerHTML = el.dataset.source;
+    });
+
+    initMermaid();
+    await mermaid.run({ nodes: blocks });
+  };
+
+  const setupThemeObserver = () => {
+    const existing = (window as typeof window & { __mermaidThemeObserver?: MutationObserver })
+      .__mermaidThemeObserver;
+    if (existing) existing.disconnect();
+
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((m) => m.attributeName === "data-theme")) {
+        void renderAll();
+      }
+    });
+
+    observer.observe(document.documentElement, { attributes: true });
+    (window as typeof window & { __mermaidThemeObserver?: MutationObserver }).__mermaidThemeObserver = observer;
+  };
+
+  void renderAll();
+  document.addEventListener("astro:page-load", () => {
+    void renderAll();
+  });
+  setupThemeObserver();
+</script>

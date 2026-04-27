@@ -1,0 +1,47 @@
+---
+title: Examples
+description: Runnable sample apps that demonstrate the client against a local Spark Connect server.
+---
+
+The repository's [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples) directory contains four self-contained applications. Each has its own `package.json`, a `docker-compose.yml` for a local Spark Connect server, and a single-command run script. Clone the repo, `cd` into one, and follow its README.
+
+### [`node-quickstart`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-quickstart)
+
+Connect, run a SQL query, print the rows, disconnect. The minimum viable script and copy-paste starting point for a new project.
+
+Covers: `connect()`, `spark.sql(...)`, `collect()`, `stop()`.
+
+### [`node-catalog`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-catalog)
+
+Walks through the `session.catalog` surface: inspect catalogs and databases, register a temp view, list columns, cache and uncache a table. Mirrors the structure of the [Catalog guide](/spark-connect-js/catalog/).
+
+Covers: `spark.catalog.*`, temp views, `cacheTable`, `isCached`, `dropTempView`.
+
+### [`node-read-write`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-read-write)
+
+End-to-end round trip through the DataFrame reader and writer: build a DataFrame from SQL, write it as CSV / JSON / Parquet, read it back with an explicit schema, verify equality. Mirrors the [I/O guide](/spark-connect-js/io/).
+
+Covers: `spark.read`, `spark.write`, save modes, schema-on-read, `partitionBy`.
+
+### [`node-cache-pivot-stats`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-cache-pivot-stats)
+
+Broader workload: aggregation, pivoting, caching, windowed stats. Closer to a real analytics pipeline, and useful for benchmarking small-to-medium queries.
+
+Covers: `groupBy`, `pivot`, `rollup`, `Window`, `df.cache()`, `unpersist`, statistical functions.
+
+## Running an example
+
+Each example has a `docker-compose.yml` that brings up a Spark 3.5 Connect server on `localhost:15002`. From inside an example directory:
+
+```bash
+docker compose up -d          # start the Spark Connect server
+pnpm install
+pnpm start                    # or: node src/index.js
+docker compose down           # tear down when done
+```
+
+The compose files don't share state across examples; each starts a fresh server. Stop one before starting another if you want to reuse port 15002.
+
+## Using an example as a starting point
+
+Each example is a standalone package with its own `tsconfig.json`, ESLint config, and Turbo cache setup. Copy one to a new directory, rename the package, and you have a working project skeleton.

@@ -1,0 +1,34 @@
+---
+title: Security
+description: What the client does and does not do for transport security and authentication today.
+---
+
+The transport is plaintext gRPC at `sc://host:port`. Standard Node networking applies, so anything you can do at the OS or container level (SSH tunnels, service meshes, sidecar proxies) works the same.
+
+## Gaps
+
+| Feature | What's missing |
+| ------- | -------------- |
+| TLS (`scc://`) | URL parser doesn't recognize the scheme. Channels use `credentials.createInsecure()`. |
+| Bearer tokens | URL parser ignores `;token=`; no `.token()` on the builder; no `authorization` header sent. |
+| Mutual TLS | No public way to supply client certificates. |
+| `user_id` propagation | `sessionId` exists internally but no user metadata attaches to outgoing RPCs. |
+| User-agent customization | Uses the `@grpc/grpc-js` default. |
+| Request IDs / trace propagation | No `x-request-id` or `grpc-trace-bin` headers. |
+
+If you need any of this today, front the Spark Connect server with a proxy that terminates TLS and handles authentication, and route plaintext gRPC from your Node process to the proxy over a private network. The [roadmap](/spark-connect-js/roadmap/) tracks when each gap closes.
+
+## What goes on the wire
+
+Each RPC carries whatever `@grpc/grpc-js` attaches by default (a `user-agent` and the gRPC framing headers) plus the serialized `spark.connect.Plan` in the request body. The client adds no application-level metadata.
+
+## Secrets in logs
+
+The client itself doesn't log. Two things to watch in your own code:
+
+- `df.explain()` output includes the query text, SQL string literals included. Sanitize before logging if your SQL embeds secrets.
+- Once token support lands, connection URLs will carry the token in URL form. Scrub URLs before logging.
+
+## Reporting a vulnerability
+
+[SECURITY.md](https://github.com/prustic/spark-connect-js/blob/main/SECURITY.md) has the disclosure policy. Don't file security issues on the public tracker.

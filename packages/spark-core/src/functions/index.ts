@@ -1,10 +1,8 @@
 /**
- * Functions
- *
  * Built-in functions that mirror PySpark's `pyspark.sql.functions` module.
  *
- * @see PySpark functions: python/pyspark/sql/functions/builtin.py
- * @see Spark built-in functions registry: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
+ * @see [PySpark source: functions/builtin.py](https://github.com/apache/spark/blob/master/python/pyspark/sql/functions/builtin.py)
+ * @see [Spark source: FunctionRegistry.scala](https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala)
  *
  * All functions return Column objects wrapping expression AST nodes.
  * They are NEVER evaluated in JavaScript; the server resolves them.

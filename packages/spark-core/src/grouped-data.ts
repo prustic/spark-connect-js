@@ -1,31 +1,24 @@
-/**
- * GroupedData
- *
- * Returned by DataFrame.groupBy().  Mirrors `RelationalGroupedDataset` in the
- * JVM Spark API.
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/RelationalGroupedDataset.scala
- * @see Aggregate plan: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/basicLogicalOperators.scala
- *
- * GroupedData is NOT a DataFrame. It's a transient builder that captures
- * grouping expressions and waits for an aggregation call (agg, count, sum, etc.)
- * to produce the final Aggregate logical plan node.
- *
- * In Catalyst, the Aggregate node looks like:
- *   Aggregate(
- *     groupingExpressions = [col("department")],
- *     aggregateExpressions = [col("department"), sum(col("salary"))],
- *     child = <the source plan>
- *   )
- *
- * The grouping + aggregate expressions are combined into a single plan node,
- * which is why GroupedData must collect both before producing a DataFrame.
- */
-
 import { DataFrame } from "./data-frame.js";
 import { Column, col } from "./column.js";
 import type { Expression } from "./plan/logical-plan.js";
 
+/**
+ * Returned by {@link DataFrame.groupBy}, {@link DataFrame.rollup},
+ * {@link DataFrame.cube}, and related methods. Mirrors `RelationalGroupedDataset`
+ * in the JVM Spark API.
+ *
+ * `GroupedData` is **not** a `DataFrame`. It is a transient builder that
+ * captures grouping expressions and waits for an aggregation call
+ * (`agg`, `count`, `sum`, `avg`, `min`, `max`, `pivot`) to produce the final
+ * `DataFrame`.
+ *
+ * @example
+ * ```ts
+ * const totals = df.groupBy("department").agg(sum("salary").alias("payroll"));
+ * ```
+ *
+ * @see [Spark source: RelationalGroupedDataset.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/RelationalGroupedDataset.scala)
+ */
 export class GroupedData {
   private readonly _df: DataFrame;
   private readonly _groupExprs: Expression[];

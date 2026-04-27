@@ -1,16 +1,3 @@
-/**
- * Lazy DataFrame - each transformation returns a new instance wrapping
- * a logical plan tree. No work happens until an action (collect, count, etc.)
- * triggers execution via Spark Connect.
- *
- * @see sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala
- * @see sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
- *
- * Laziness is a correctness requirement, not a convenience. Catalyst needs
- * the full plan to push predicates, prune columns, reorder joins, and fold
- * constant expressions.
- */
-
 import type { SparkSession } from "./spark-session.js";
 import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
@@ -37,6 +24,30 @@ function inferLiteralValue(s: string): string | number | boolean | null {
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
 
+/**
+ * A distributed collection of rows with a named schema, obtained from a
+ * {@link SparkSession} (for example via `spark.read.parquet(path)` or
+ * `spark.sql(...)`).
+ *
+ * `DataFrame` is **lazy**. Transformation methods (`select`, `filter`, `join`,
+ * `withColumn`, etc.) return a new `DataFrame` that wraps an extended logical
+ * plan; no work is performed on the server until an **action** (`collect`,
+ * `count`, `show`, `write.save`, etc.) is called.
+ *
+ * @example Read, transform, collect
+ * ```ts
+ * const df = await spark.read.parquet("s3://bucket/events");
+ *
+ * const recent = df
+ *   .filter(col("ts").gte(lit("2026-01-01")))
+ *   .groupBy("country")
+ *   .count();
+ *
+ * const rows = await recent.collect();
+ * ```
+ *
+ * @see [Spark source: Dataset.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala)
+ */
 export class DataFrame {
   /** @internal */
   readonly _session: SparkSession;

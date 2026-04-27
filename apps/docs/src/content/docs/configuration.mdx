@@ -1,0 +1,110 @@
+---
+title: Configuration
+description: Connection strings, builder options, and data-source options.
+---
+
+## The connection URL
+
+Today the client accepts exactly one URL shape:
+
+```
+sc://host:port
+```
+
+Only the scheme, host, and port are read. Any path, query string, or `;`-separated parameters are ignored. TLS (`scc://`), bearer tokens, `user_id`, `user_agent`, and `session_id` aren't implemented yet; see the [roadmap](/spark-connect-js/roadmap/).
+
+### Examples
+
+```ts
+connect("sc://localhost:15002");
+connect("sc://spark.internal:15002");
+```
+
+To skip the URL string, use the builder directly:
+
+```ts
+import { SparkSession } from "@spark-connect-js/node";
+
+const spark = SparkSession.builder()
+  .remote("sc://spark.internal:15002")
+  .getOrCreate();
+```
+
+## Builder methods
+
+The builder currently exposes four methods:
+
+```ts
+SparkSession.builder()
+  .remote("sc://localhost:15002")   // required, connection URL
+  .transport(customTransport)       // optional, plug in a custom transport
+  .arrowDecoder(customDecoder)      // optional, plug in a custom Arrow decoder
+  .getOrCreate();                   // return the session
+```
+
+`getOrCreate()` constructs the session without opening the channel. The channel opens lazily on the first RPC.
+
+## Data-source options
+
+Reader and writer options pass through to Spark unchanged. The full list is in the [Spark SQL data sources documentation](https://spark.apache.org/docs/latest/sql-data-sources.html).
+
+### CSV
+
+| Option            | Default      | Description                                |
+| ----------------- | ------------ | ------------------------------------------ |
+| `header`          | `false`      | Treat the first line as a header.          |
+| `sep`             | `,`          | Field separator.                           |
+| `quote`           | `"`          | Quote character.                           |
+| `escape`          | `\\`         | Escape character inside quotes.            |
+| `inferSchema`     | `false`      | Infer types; requires a second pass.       |
+| `nullValue`       | `""`         | String that represents null.               |
+| `dateFormat`      |              | Date parse pattern.                        |
+| `timestampFormat` |              | Timestamp parse pattern.                   |
+| `mode`            | `PERMISSIVE` | `PERMISSIVE`, `DROPMALFORMED`, `FAILFAST`. |
+| `multiLine`       | `false`      | Allow newlines inside quoted fields.       |
+
+### JSON
+
+| Option               | Default      | Description                                         |
+| -------------------- | ------------ | --------------------------------------------------- |
+| `multiLine`          | `false`      | One JSON object may span multiple lines per file.   |
+| `allowComments`      | `false`      | Permit `//` comments.                               |
+| `allowSingleQuotes`  | `true`       | Permit `'...'` strings.                             |
+| `mode`               | `PERMISSIVE` | `PERMISSIVE`, `DROPMALFORMED`, `FAILFAST`.          |
+| `primitivesAsString` | `false`      | Keep every primitive value as a string.             |
+
+### Parquet and ORC
+
+| Option        | Default  | Description                                            |
+| ------------- | -------- | ------------------------------------------------------ |
+| `compression` | `snappy` | `none`, `snappy`, `gzip`, `lz4`, `zstd`.               |
+| `mergeSchema` | `false`  | Merge schemas across files. Expensive for wide tables. |
+
+### All formats
+
+| Option                              | Description                                      |
+| ----------------------------------- | ------------------------------------------------ |
+| `pathGlobFilter`                    | Restrict file discovery with a glob pattern.     |
+| `recursiveFileLookup`               | Include files in nested directories.             |
+| `modifiedBefore` / `modifiedAfter`  | Filter by file modification time.                |
+
+### Write modes
+
+| Mode                      | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `append`                  | Add to existing data.                    |
+| `overwrite`               | Replace existing data.                   |
+| `ignore`                  | No-op if the target exists.              |
+| `error` / `errorifexists` | Fail if the target exists (the default). |
+
+## Runtime configuration
+
+`session.conf.get("spark.sql.shuffle.partitions")` and related runtime-configuration APIs are not yet exposed. For now, set Spark configuration on the server: `spark-defaults.conf`, or `--conf` flags on the launch command.
+
+```bash
+./sbin/start-connect-server.sh \
+  --conf spark.sql.shuffle.partitions=50 \
+  --conf spark.sql.adaptive.enabled=true
+```
+
+A TypeScript `RuntimeConfig` that mirrors `spark.conf.*` in Scala and PySpark is on the [roadmap](/spark-connect-js/roadmap/).

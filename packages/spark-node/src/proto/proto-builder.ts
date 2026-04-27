@@ -8,8 +8,8 @@
  * This module bridges the gap by creating typed protobuf messages that
  * can be serialized to binary for the gRPC wire format.
  *
- * @see Spark Connect proto (Relation): sql/connect/common/src/main/protobuf/spark/connect/relations.proto
- * @see Spark Connect proto (Expression): sql/connect/common/src/main/protobuf/spark/connect/expressions.proto
+ * @see [Spark Connect proto: relations.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/relations.proto)
+ * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  */
 
 import { create } from "@bufbuild/protobuf";
