@@ -15,8 +15,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DOCS_ROOT = resolve(HERE, "..");
 const REPO_ROOT = resolve(DOCS_ROOT, "..", "..");
 
-const REPO = "prustic/spark-connect-js";
-const REPO_URL = `https://github.com/${REPO}`;
+const REPO_URL = "https://github.com/prustic/spark-connect-js";
+const PR_PREFIX = `${REPO_URL}/pull/`;
+const COMMIT_PREFIX = `${REPO_URL}/commit/`;
 
 interface Package {
   readonly name: string;
@@ -35,14 +36,12 @@ interface VersionEntry {
   readonly commits: Set<string>;
 }
 
-const HEADING_VERSION = "## ";
-const HEADING_SECTION = "### ";
-const SECTION_MINOR = "Minor Changes";
-const SECTION_PATCH = "Patch Changes";
-const UPDATED_DEPS = "Updated dependencies";
+function newEntry(): VersionEntry {
+  return { bullets: [], prs: new Set(), commits: new Set() };
+}
 
-// Parse changeset-generated CHANGELOG.md with line-based state. The structure
-// is stable because changesets owns the rendering.
+// changesets owns the CHANGELOG.md format, so this parser tracks heading state
+// line by line. Only Minor Changes (user-facing bullets) are kept.
 function parseChangelog(text: string): Map<string, VersionEntry> {
   const versions = new Map<string, VersionEntry>();
   let current: VersionEntry | undefined;
@@ -51,10 +50,10 @@ function parseChangelog(text: string): Map<string, VersionEntry> {
   for (const raw of text.split("\n")) {
     const line = raw.trimEnd();
 
-    if (line.startsWith(HEADING_VERSION) && !line.startsWith(HEADING_SECTION)) {
-      const version = line.slice(HEADING_VERSION.length).trim();
+    if (line.startsWith("## ") && !line.startsWith("### ")) {
+      const version = line.slice(3).trim();
       if (isSemver(version)) {
-        current = { bullets: [], prs: new Set(), commits: new Set() };
+        current = newEntry();
         versions.set(version, current);
         inMinor = false;
       }
@@ -63,9 +62,8 @@ function parseChangelog(text: string): Map<string, VersionEntry> {
 
     if (!current) continue;
 
-    if (line.startsWith(HEADING_SECTION)) {
-      const section = line.slice(HEADING_SECTION.length).trim();
-      inMinor = section === SECTION_MINOR;
+    if (line.startsWith("### ")) {
+      inMinor = line.slice(4).trim() === "Minor Changes";
       continue;
     }
 
@@ -74,9 +72,10 @@ function parseChangelog(text: string): Map<string, VersionEntry> {
     collectLinks(line, current);
 
     // Nested user-facing bullets are indented with two spaces.
-    if (line.startsWith("  - ") && !line.includes(UPDATED_DEPS)) {
+    if (line.startsWith("  - ") && !line.includes("Updated dependencies")) {
       const bullet = line.slice(4).trim();
-      if (bullet && !looksLikeDependencyBump(bullet)) {
+      // Skip workspace dependency-bump bullets like "@spark-connect-js/core@0.3.0".
+      if (bullet && !bullet.startsWith("@spark-connect-js/")) {
         current.bullets.push(bullet);
       }
     }
@@ -91,50 +90,36 @@ function isSemver(value: string): boolean {
   return parts.every((p) => p.length > 0 && [...p].every((c) => c >= "0" && c <= "9"));
 }
 
-function looksLikeDependencyBump(bullet: string): boolean {
-  // Examples: "@spark-connect-js/core@0.3.0", "@spark-connect-js/connect@0.3.0"
-  return bullet.startsWith("@spark-connect-js/");
-}
-
-// Pull references out of markdown link targets without a regex.
-// Markdown link target is always between `](` and `)`.
+// Markdown link target sits between `](` and `)`. Walk the line and pluck them
+// without a regex.
 function collectLinks(line: string, entry: VersionEntry): void {
-  const marker = "](";
   let cursor = 0;
-  while (true) {
-    const start = line.indexOf(marker, cursor);
-    if (start === -1) return;
-    const end = line.indexOf(")", start + marker.length);
+  let start = line.indexOf("](", cursor);
+  while (start !== -1) {
+    const end = line.indexOf(")", start + 2);
     if (end === -1) return;
-    const target = line.slice(start + marker.length, end);
-    classifyTarget(target, entry);
+    const target = line.slice(start + 2, end);
+    if (target.startsWith(PR_PREFIX)) {
+      entry.prs.add(target.slice(PR_PREFIX.length));
+    } else if (target.startsWith(COMMIT_PREFIX)) {
+      entry.commits.add(target.slice(COMMIT_PREFIX.length));
+    }
     cursor = end + 1;
+    start = line.indexOf("](", cursor);
   }
 }
 
-function classifyTarget(target: string, entry: VersionEntry): void {
-  const pullMarker = `${REPO_URL}/pull/`;
-  const commitMarker = `${REPO_URL}/commit/`;
-  if (target.startsWith(pullMarker)) {
-    entry.prs.add(target.slice(pullMarker.length));
-    return;
-  }
-  if (target.startsWith(commitMarker)) {
-    entry.commits.add(target.slice(commitMarker.length));
-  }
-}
-
-// Release date for each version comes from the git tag created by changesets
-// on publish. All three packages share the tag suffix; we use the node tag.
+// Each release has a `@spark-connect-js/node@VERSION` git tag created by
+// changesets on publish. Use that as the canonical release date.
 function tagDates(versions: readonly string[]): Map<string, string> {
   const dates = new Map<string, string>();
   for (const version of versions) {
-    const tag = `@spark-connect-js/node@${version}`;
     try {
-      const iso = execFileSync("git", ["log", "-1", "--format=%cI", tag], {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-      }).trim();
+      const iso = execFileSync(
+        "git",
+        ["log", "-1", "--format=%cI", `@spark-connect-js/node@${version}`],
+        { cwd: REPO_ROOT, encoding: "utf8" },
+      ).trim();
       if (iso) dates.set(version, iso.slice(0, 10));
     } catch {
       // Tag missing (pre-release local build): leave undated.
@@ -146,16 +131,12 @@ function tagDates(versions: readonly string[]): Map<string, string> {
 function compareSemverDesc(a: string, b: string): number {
   const pa = a.split(".").map(Number);
   const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if (pa[i] !== pb[i]) return pb[i] - pa[i];
-  }
-  return 0;
+  return pb[0] - pa[0] || pb[1] - pa[1] || pb[2] - pa[2];
 }
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return "";
-  const date = new Date(`${iso}T00:00:00Z`);
-  return date.toLocaleDateString("en-GB", {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -164,7 +145,7 @@ function formatDate(iso: string | undefined): string {
 }
 
 function encodeTag(version: string, pkg: string): string {
-  return `${pkg}@${version}`.replace("@", "%40").replace("/", "%2F").replace("@", "%40");
+  return encodeURIComponent(`${pkg}@${version}`);
 }
 
 function render(
@@ -172,7 +153,16 @@ function render(
   dates: ReadonlyMap<string, string>,
   versions: readonly string[],
 ): string {
-  const lines: string[] = [
+  const lines: string[] = [];
+  pushFrontmatter(lines);
+  for (let i = 0; i < versions.length; i++) {
+    pushRelease(lines, versions[i], i === 0, byPackage, dates.get(versions[i]));
+  }
+  return lines.join("\n");
+}
+
+function pushFrontmatter(lines: string[]): void {
+  lines.push(
     "---",
     "title: Changelog",
     "description: Release history for the @spark-connect-js packages.",
@@ -183,66 +173,72 @@ function render(
     "",
     "The three packages version and ship together. Per-package changelogs live alongside the source:",
     "",
-  ];
+  );
   for (const pkg of PACKAGES) {
     lines.push(`- [\`${pkg.name}\`](${REPO_URL}/blob/main/${pkg.dir}/CHANGELOG.md)`);
   }
   lines.push("");
+}
 
-  for (let i = 0; i < versions.length; i++) {
-    const version = versions[i];
-    const date = dates.get(version);
-    const displayDate = formatDate(date);
+function pushRelease(
+  lines: string[],
+  version: string,
+  isLatest: boolean,
+  byPackage: ReadonlyMap<string, Map<string, VersionEntry>>,
+  date: string | undefined,
+): void {
+  lines.push(`## ${version}`, "", renderChips(version, date, isLatest), "");
 
-    lines.push(`## ${version}`);
+  const refs = renderReferences(version, byPackage);
+  if (refs) lines.push(refs, "");
+
+  for (const pkg of PACKAGES) {
+    const entry = byPackage.get(pkg.name)?.get(version);
+    if (!entry || entry.bullets.length === 0) continue;
+    lines.push(renderPackageHeader(pkg, version), "");
+    for (const bullet of entry.bullets) lines.push(`- ${bullet}`);
     lines.push("");
-
-    const tagUrl = `${REPO_URL}/releases?q=${encodeURIComponent(version)}&expanded=true`;
-    const chips: string[] = [];
-    if (displayDate) chips.push(`*${displayDate}*`);
-    chips.push(`[GitHub release](${tagUrl})`);
-    if (i === 0) chips.push('<Badge text="Latest" variant="success" />');
-    lines.push(chips.join(" · "));
-    lines.push("");
-
-    const prs = new Set<string>();
-    const commits = new Set<string>();
-    for (const pkg of PACKAGES) {
-      const entry = byPackage.get(pkg.name)?.get(version);
-      if (!entry) continue;
-      for (const pr of entry.prs) prs.add(pr);
-      for (const sha of entry.commits) commits.add(sha);
-    }
-
-    const refsHtml: string[] = [];
-    for (const pr of [...prs].sort((a, b) => Number(a) - Number(b))) {
-      refsHtml.push(`<a href="${REPO_URL}/pull/${pr}">#${pr}</a>`);
-    }
-    for (const sha of commits) {
-      refsHtml.push(`<a href="${REPO_URL}/commit/${sha}"><code>${sha.slice(0, 7)}</code></a>`);
-    }
-    if (refsHtml.length > 0) {
-      lines.push(
-        `<p class="release-references"><strong>References:</strong> ${refsHtml.join(" · ")}</p>`,
-      );
-      lines.push("");
-    }
-
-    for (const pkg of PACKAGES) {
-      const entry = byPackage.get(pkg.name)?.get(version);
-      if (!entry || entry.bullets.length === 0) continue;
-      const npmUrl = `https://www.npmjs.com/package/${pkg.name}/v/${version}`;
-      const githubUrl = `${REPO_URL}/releases/tag/${encodeTag(version, pkg.name)}`;
-      lines.push(
-        `<PackageHeader name={${JSON.stringify(pkg.name)}} version={${JSON.stringify(version)}} npmUrl={${JSON.stringify(npmUrl)}} githubUrl={${JSON.stringify(githubUrl)}} />`,
-      );
-      lines.push("");
-      for (const bullet of entry.bullets) lines.push(`- ${bullet}`);
-      lines.push("");
-    }
   }
+}
 
-  return lines.join("\n");
+function renderChips(version: string, date: string | undefined, isLatest: boolean): string {
+  const chips: string[] = [];
+  const displayDate = formatDate(date);
+  if (displayDate) chips.push(`*${displayDate}*`);
+  const tagUrl = `${REPO_URL}/releases?q=${encodeURIComponent(version)}&expanded=true`;
+  chips.push(`[GitHub release](${tagUrl})`);
+  if (isLatest) chips.push('<Badge text="Latest" variant="success" />');
+  return chips.join(" · ");
+}
+
+function renderReferences(
+  version: string,
+  byPackage: ReadonlyMap<string, Map<string, VersionEntry>>,
+): string {
+  const prs = new Set<string>();
+  const commits = new Set<string>();
+  for (const pkg of PACKAGES) {
+    const entry = byPackage.get(pkg.name)?.get(version);
+    if (!entry) continue;
+    for (const pr of entry.prs) prs.add(pr);
+    for (const sha of entry.commits) commits.add(sha);
+  }
+  if (prs.size === 0 && commits.size === 0) return "";
+
+  const items: string[] = [];
+  for (const pr of [...prs].sort((a, b) => Number(a) - Number(b))) {
+    items.push(`<a href="${REPO_URL}/pull/${pr}">#${pr}</a>`);
+  }
+  for (const sha of commits) {
+    items.push(`<a href="${REPO_URL}/commit/${sha}"><code>${sha.slice(0, 7)}</code></a>`);
+  }
+  return `<p class="release-references"><strong>References:</strong> ${items.join(" · ")}</p>`;
+}
+
+function renderPackageHeader(pkg: Package, version: string): string {
+  const npmUrl = `https://www.npmjs.com/package/${pkg.name}/v/${version}`;
+  const githubUrl = `${REPO_URL}/releases/tag/${encodeTag(version, pkg.name)}`;
+  return `<PackageHeader name={${JSON.stringify(pkg.name)}} version={${JSON.stringify(version)}} npmUrl={${JSON.stringify(npmUrl)}} githubUrl={${JSON.stringify(githubUrl)}} />`;
 }
 
 function main(): void {
@@ -250,16 +246,14 @@ function main(): void {
   const seen = new Set<string>();
 
   for (const pkg of PACKAGES) {
-    const path = join(REPO_ROOT, pkg.dir, "CHANGELOG.md");
-    const text = readFileSync(path, "utf8");
+    const text = readFileSync(join(REPO_ROOT, pkg.dir, "CHANGELOG.md"), "utf8");
     const versions = parseChangelog(text);
     byPackage.set(pkg.name, versions);
     for (const v of versions.keys()) seen.add(v);
   }
 
   const versions = [...seen].sort(compareSemverDesc);
-  const dates = tagDates(versions);
-  const output = render(byPackage, dates, versions);
+  const output = render(byPackage, tagDates(versions), versions);
 
   const dest = join(DOCS_ROOT, "src/content/docs/changelog.mdx");
   writeFileSync(dest, output);
