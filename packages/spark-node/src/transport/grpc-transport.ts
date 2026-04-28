@@ -64,12 +64,13 @@ import { buildRelation, buildExpression } from "../proto/proto-builder.js";
 const DEFAULT_MAX_MESSAGE_SIZE = 128 * 1024 * 1024;
 
 /**
- * Hardcoded version string used in `clientType`. Changesets bumps the
- * package.json version; this constant is updated by hand at release time.
- * Kept here rather than imported from package.json to avoid `resolveJsonModule`
- * gymnastics across the workspace.
+ * Version string used in `clientType` (server-side User-Agent equivalent).
+ * Must be kept in lockstep with `package.json#version`; changesets bumps
+ * the manifest at release, this constant gets bumped in the same commit.
+ * Hardcoded rather than imported from package.json to avoid
+ * `resolveJsonModule` gymnastics across the workspace.
  */
-const SPARK_JS_VERSION = "0.4.0";
+const SPARK_JS_VERSION = "0.3.0";
 
 export interface GrpcTransportOptions {
   host: string;

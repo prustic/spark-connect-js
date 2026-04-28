@@ -24,6 +24,9 @@
 // Public API
 
 export { GrpcTransport } from "./transport/grpc-transport.js";
+export type { GrpcTransportOptions } from "./transport/grpc-transport.js";
+export { parseConnectionString } from "./transport/connection-string.js";
+export type { ParsedConnectionString } from "./transport/connection-string.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
 /** @internal Used by GrpcTransport; not part of the public API */
