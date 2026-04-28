@@ -112,6 +112,35 @@ describe("SparkSession.interrupt*", () => {
   });
 });
 
+describe("SparkSession unsupported-transport paths", () => {
+  function bareTransport(): { spark: SparkSession } {
+    const spark = SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      })
+      .getOrCreate();
+    return { spark };
+  }
+
+  it("interruptAll throws UnsupportedOperationError when transport lacks interrupt", async () => {
+    const { spark } = bareTransport();
+    await assert.rejects(spark.interruptAll(), /does not support interrupt/);
+  });
+
+  it("conf.get throws UnsupportedOperationError when transport lacks config", async () => {
+    const { spark } = bareTransport();
+    await assert.rejects(spark.conf.get("any.key"), /does not support config/);
+  });
+
+  it("interruptOperation rejects empty IDs", async () => {
+    const { spark } = bareTransport();
+    await assert.rejects(spark.interruptOperation(""));
+  });
+});
+
 describe("SparkSessionBuilder.sessionId", () => {
   it("rejects non-UUID strings", () => {
     const builder = SparkSession.builder()

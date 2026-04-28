@@ -19,7 +19,6 @@
  * @see connector/connect/common/src/main/scala/org/apache/spark/sql/connect/client/ExecutePlanResponseReattachableIterator.scala
  */
 
-import { SparkConnectError } from "@spark-connect-js/core";
 import type { ExecutePlanResponse } from "@spark-connect-js/connect";
 import { computeBackoff, isRetryable, type RetryPolicy } from "./retry.js";
 
@@ -47,7 +46,7 @@ export interface ReattachIterationOptions {
 export async function* iterateWithReattach(
   opts: ReattachIterationOptions,
 ): AsyncIterable<Uint8Array> {
-  const { initial, reattach, retryPolicy, sleep, wrapError = identity } = opts;
+  const { initial, reattach, retryPolicy, sleep, wrapError = passThrough } = opts;
   let lastResponseId: string | undefined;
   let attempt = 0;
   let stream = initial();
@@ -81,9 +80,11 @@ export async function* iterateWithReattach(
   }
 }
 
-function identity(err: unknown): unknown {
-  // Default wrapError preserves SparkConnectError as-is and lets raw errors
-  // through unchanged; transports override with their own wrap function.
-  if (err instanceof SparkConnectError) return err;
+/**
+ * Default `wrapError`: leaves the error unchanged. Transports pass their own
+ * wrapper (e.g. {@link wrapGrpcError}) to convert raw gRPC errors into the
+ * project's typed hierarchy.
+ */
+function passThrough(err: unknown): unknown {
   return err;
 }

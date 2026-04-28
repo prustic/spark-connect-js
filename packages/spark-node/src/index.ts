@@ -27,6 +27,8 @@ export { GrpcTransport } from "./transport/grpc-transport.js";
 export type { GrpcTransportOptions } from "./transport/grpc-transport.js";
 export { parseConnectionString } from "./transport/connection-string.js";
 export type { ParsedConnectionString } from "./transport/connection-string.js";
+export { DEFAULT_RETRY_POLICY } from "./transport/retry.js";
+export type { RetryPolicy } from "./transport/retry.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
 /** @internal Used by GrpcTransport; not part of the public API */

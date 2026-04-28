@@ -287,6 +287,9 @@ export class SparkSession {
 
   /** Interrupt a single running operation by its operation ID. */
   async interruptOperation(operationId: string): Promise<string[]> {
+    if (operationId.length === 0) {
+      throw new InvalidInputError("Spark Connect operation ID must be non-empty.");
+    }
     return this._interrupt({ type: "operationId", operationId });
   }
 
