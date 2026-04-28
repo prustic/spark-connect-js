@@ -22,7 +22,7 @@ timeline TD
            : TLS, bearer token, connection string
            : Reattach, retry, interrupts
            : RuntimeConfig (spark.conf)
-           : registerFunction (last catalog gap)
+           : Java UDF / UDAF registration via spark.udf
     0.5.0 : Structured Streaming
            : StreamingQuery & Manager
            : Listener callbacks
@@ -48,7 +48,8 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 
 ### 0.4.0 · Catalog parity, docs site, TLS and auth
 
-- Catalog parity with PySpark: the full `spark.catalog` surface plus `registerFunction(name, javaClassName, returnType?)`.
+- Catalog parity with PySpark: the full `spark.catalog` surface.
+- `spark.udf.registerJavaFunction` and `registerJavaUDAF` for binding Java UDFs already on the server's classpath to a SQL function name.
 - Documentation site (this site).
 - TLS via `scc://`, bearer tokens, and the full `sc://` connection-string grammar (`user_id`, `user_agent`, `session_id`).
 - Resilience for long-running queries: reattachable execute, configurable retry policy, and interrupts (`interruptAll`, `interruptTag`, `interruptOperation`).

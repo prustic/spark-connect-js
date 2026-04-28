@@ -87,6 +87,15 @@ await catalog.functionExists("count");
 await catalog.getFunction("count").collect();      // metadata row with return type, signature, etc.
 ```
 
+Registering a Java UDF or UDAF as a SQL function is on `spark.udf`, not the catalog:
+
+```ts
+await spark.udf.registerJavaFunction("my_upper", "com.example.UpperUDF", "STRING");
+await spark.udf.registerJavaUDAF("my_agg", "com.example.MyAggregate");
+```
+
+The class must already be on the Spark Connect server's classpath. JS closures aren't supported (no JS runtime on Spark executors); see the [roadmap](/spark-connect-js/roadmap/#070--udfs-and-table-functions) for Arrow batch UDFs.
+
 ## Caching
 
 The catalog cache controls in-memory persistence for named tables and views. Useful when you plan to query the same relation several times in a session.
