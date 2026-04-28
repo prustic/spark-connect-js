@@ -30,12 +30,30 @@ declare const crypto: { randomUUID(): string };
 // Transport
 // Runtime adapters implement this to provide actual network I/O.
 
+/**
+ * Per-call options forwarded by `SparkSession` to the transport.
+ * Today carries tags only; future fields (operation_id override, deadline,
+ * cancel signal) slot in here without further interface churn.
+ */
+export interface ExecuteOptions {
+  /** Tags attached to this operation; surface for {@link Transport.interrupt}. */
+  tags?: readonly string[];
+}
+
 export interface Transport {
   /** Execute a plan and return raw Arrow IPC buffers. */
-  executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array>;
+  executePlan(
+    sessionId: string,
+    plan: LogicalPlan,
+    options?: ExecuteOptions,
+  ): AsyncIterable<Uint8Array>;
 
   /** Execute a command (write, createView, etc.). No Arrow data returned. */
-  executeCommand?(sessionId: string, command: Record<string, unknown>): Promise<void>;
+  executeCommand?(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): Promise<void>;
 
   /** Send an AnalyzePlan request (schema, explain, etc.). */
   analyzePlan?(
@@ -45,6 +63,15 @@ export interface Transport {
 
   /** Get/set/unset runtime configuration via the Config RPC. */
   config?(sessionId: string, operation: Record<string, unknown>): Promise<Record<string, unknown>>;
+
+  /**
+   * Cancel running operations. Returns the operation IDs the server reports
+   * as interrupted. The `request` shape is one of:
+   *   `{ type: "all" }`
+   *   `{ type: "tag", tag: string }`
+   *   `{ type: "operationId", operationId: string }`
+   */
+  interrupt?(sessionId: string, request: Record<string, unknown>): Promise<string[]>;
 
   /** Release the server-side session. */
   releaseSession?(sessionId: string): Promise<void>;
@@ -83,6 +110,7 @@ export class SparkSession {
   readonly sessionId: string;
   private readonly transport: Transport;
   private readonly remote: string;
+  private readonly _tagSet: Set<string> = new Set();
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
 
@@ -171,7 +199,7 @@ export class SparkSession {
 
   /** @internal Used by DataFrame to send plans via the injected transport */
   _executePlan(plan: LogicalPlan): AsyncIterable<Uint8Array> {
-    return this.transport.executePlan(this.sessionId, plan);
+    return this.transport.executePlan(this.sessionId, plan, this._executeOptions());
   }
 
   /** @internal Used by DataFrameWriter to send commands via the injected transport */
@@ -182,7 +210,12 @@ export class SparkSession {
           "Use a full Transport implementation (e.g. GrpcTransport) that supports all operations.",
       );
     }
-    await this.transport.executeCommand(this.sessionId, command);
+    await this.transport.executeCommand(this.sessionId, command, this._executeOptions());
+  }
+
+  /** @internal Snapshot of per-call options at the time of dispatch. */
+  private _executeOptions(): ExecuteOptions {
+    return this._tagSet.size === 0 ? {} : { tags: Array.from(this._tagSet) };
   }
 
   /** @internal Used by DataFrame.schema()/explain() via the injected transport */
@@ -205,6 +238,72 @@ export class SparkSession {
       );
     }
     return this.transport.config(this.sessionId, operation);
+  }
+
+  // Operation tags
+  // @see Spark source: sql/api/src/main/scala/org/apache/spark/sql/SparkSession.scala (addTag, removeTag)
+  // PySpark: pyspark.sql.SparkSession.addTag
+
+  /**
+   * Tag every subsequent operation on this session with `tag`. Tags are
+   * carried on `ExecutePlanRequest.tags` and let you cancel a group of
+   * operations with {@link interruptTag}.
+   *
+   * @throws InvalidInputError if the tag contains `,` or is empty.
+   */
+  addTag(tag: string): void {
+    if (tag.length === 0) {
+      throw new InvalidInputError("Spark Connect operation tag must be non-empty.");
+    }
+    if (tag.includes(",")) {
+      throw new InvalidInputError(
+        `Spark Connect operation tag must not contain ',', got "${tag}".`,
+      );
+    }
+    this._tagSet.add(tag);
+  }
+
+  /** Remove a previously added tag. No-op if the tag wasn't set. */
+  removeTag(tag: string): void {
+    this._tagSet.delete(tag);
+  }
+
+  /** Return a snapshot of the currently active tags. */
+  getTags(): string[] {
+    return Array.from(this._tagSet);
+  }
+
+  /** Drop all active tags. */
+  clearTags(): void {
+    this._tagSet.clear();
+  }
+
+  // Interrupt
+  // @see Spark source: sql/api/src/main/scala/org/apache/spark/sql/SparkSession.scala (interruptAll, interruptTag, interruptOperation)
+
+  /** Interrupt every running operation in this session. */
+  async interruptAll(): Promise<string[]> {
+    return this._interrupt({ type: "all" });
+  }
+
+  /** Interrupt every running operation tagged with `tag`. */
+  async interruptTag(tag: string): Promise<string[]> {
+    return this._interrupt({ type: "tag", tag });
+  }
+
+  /** Interrupt a single running operation by its operation ID. */
+  async interruptOperation(operationId: string): Promise<string[]> {
+    return this._interrupt({ type: "operationId", operationId });
+  }
+
+  private async _interrupt(request: Record<string, unknown>): Promise<string[]> {
+    if (!this.transport.interrupt) {
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support interrupt. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports all operations.",
+      );
+    }
+    return this.transport.interrupt(this.sessionId, request);
   }
 
   /**

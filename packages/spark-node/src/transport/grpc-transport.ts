@@ -43,6 +43,9 @@ import {
   ConfigRequest_GetAllSchema,
   ConfigRequest_UnsetSchema,
   ConfigRequest_IsModifiableSchema,
+  InterruptRequestSchema,
+  InterruptResponseSchema,
+  InterruptRequest_InterruptType,
   KeyValueSchema,
   StorageLevelSchema,
   CommandSchema,
@@ -68,8 +71,10 @@ import {
   type ConfigRequest,
   type ConfigRequest_Operation,
   type ConfigResponse,
+  type InterruptRequest,
+  type InterruptResponse,
 } from "@spark-connect-js/connect";
-import type { Transport } from "@spark-connect-js/core";
+import type { ExecuteOptions, Transport } from "@spark-connect-js/core";
 import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation, buildExpression } from "../proto/proto-builder.js";
@@ -136,7 +141,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
-  async *executePlan(sessionId: string, plan: LogicalPlan): AsyncIterable<Uint8Array> {
+  async *executePlan(
+    sessionId: string,
+    plan: LogicalPlan,
+    options?: ExecuteOptions,
+  ): AsyncIterable<Uint8Array> {
     const client = this._getClient();
 
     // Convert our LogicalPlan to a typed Spark Connect Relation protobuf
@@ -153,6 +162,7 @@ export class GrpcTransport implements Transport {
         opType: { case: "root", value: relation },
       }),
       clientType: this.clientType,
+      tags: options?.tags ? Array.from(options.tags) : [],
     });
 
     // Server-streaming RPC call
@@ -198,7 +208,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Execute a command (write, createView, etc.) via ExecutePlan RPC. */
-  async executeCommand(sessionId: string, command: Record<string, unknown>): Promise<void> {
+  async executeCommand(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): Promise<void> {
     const client = this._getClient();
 
     const commandProto = buildCommandProto(command);
@@ -211,6 +225,7 @@ export class GrpcTransport implements Transport {
         opType: { case: "command", value: commandProto },
       }),
       clientType: this.clientType,
+      tags: options?.tags ? Array.from(options.tags) : [],
     });
 
     const serialize = (value: ExecutePlanRequest): Buffer =>
@@ -303,6 +318,40 @@ export class GrpcTransport implements Transport {
             reject(wrapGrpcError(err));
           } else {
             resolve(extractAnalyzeResult(response!));
+          }
+        },
+      );
+    });
+  }
+
+  /** Interrupt running operations. Returns server-reported interrupted IDs. */
+  interrupt(sessionId: string, request: Record<string, unknown>): Promise<string[]> {
+    const client = this._getClient();
+
+    const interruptRequest = create(InterruptRequestSchema, {
+      sessionId,
+      userContext: this.userContext,
+      clientType: this.clientType,
+      ...buildInterruptOneOf(request),
+    });
+
+    const serialize = (value: InterruptRequest): Buffer =>
+      Buffer.from(toBinary(InterruptRequestSchema, value));
+    const deserialize = (bytes: Buffer): InterruptResponse =>
+      fromBinary(InterruptResponseSchema, bytes);
+
+    return new Promise<string[]>((resolve, reject) => {
+      client.makeUnaryRequest<InterruptRequest, InterruptResponse>(
+        "/spark.connect.SparkConnectService/Interrupt",
+        serialize,
+        deserialize,
+        interruptRequest,
+        this.metadata,
+        (err: grpc.ServiceError | null, response?: InterruptResponse) => {
+          if (err) {
+            reject(wrapGrpcError(err));
+          } else {
+            resolve(response!.interruptedIds);
           }
         },
       );
@@ -466,6 +515,33 @@ function buildConfigOperation(op: Record<string, unknown>): ConfigRequest_Operat
       });
     default:
       throw new UnsupportedOperationError(`Unsupported config op: ${kind}`);
+  }
+}
+
+/**
+ * Map a core-side `_interrupt` request onto the proto fields. Returns a
+ * partial spread for `create(InterruptRequestSchema, { ... })`.
+ */
+function buildInterruptOneOf(req: Record<string, unknown>): {
+  interruptType: InterruptRequest_InterruptType;
+  interrupt?: InterruptRequest["interrupt"];
+} {
+  const type = req.type as string;
+  switch (type) {
+    case "all":
+      return { interruptType: InterruptRequest_InterruptType.ALL };
+    case "tag":
+      return {
+        interruptType: InterruptRequest_InterruptType.TAG,
+        interrupt: { case: "operationTag", value: req.tag as string },
+      };
+    case "operationId":
+      return {
+        interruptType: InterruptRequest_InterruptType.OPERATION_ID,
+        interrupt: { case: "operationId", value: req.operationId as string },
+      };
+    default:
+      throw new UnsupportedOperationError(`Unsupported interrupt type: ${type}`);
   }
 }
 

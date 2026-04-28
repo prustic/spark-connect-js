@@ -27,3 +27,77 @@ describe("SparkSession.version", () => {
     assert.deepStrictEqual(calls, [{ type: "sparkVersion" }]);
   });
 });
+
+describe("SparkSession tags", () => {
+  it("addTag stores; getTags reflects insertion order; clearTags removes all", () => {
+    const { spark } = makeSession({});
+    spark.addTag("etl");
+    spark.addTag("daily");
+    assert.deepStrictEqual(spark.getTags(), ["etl", "daily"]);
+    spark.clearTags();
+    assert.deepStrictEqual(spark.getTags(), []);
+  });
+
+  it("removeTag removes only that tag", () => {
+    const { spark } = makeSession({});
+    spark.addTag("a");
+    spark.addTag("b");
+    spark.removeTag("a");
+    assert.deepStrictEqual(spark.getTags(), ["b"]);
+  });
+
+  it("addTag rejects empty tags", () => {
+    const { spark } = makeSession({});
+    assert.throws(() => spark.addTag(""));
+  });
+
+  it("addTag rejects tags containing comma", () => {
+    const { spark } = makeSession({});
+    assert.throws(() => spark.addTag("a,b"));
+  });
+
+  it("removeTag is a no-op for tags that aren't set", () => {
+    const { spark } = makeSession({});
+    spark.removeTag("nope");
+    assert.deepStrictEqual(spark.getTags(), []);
+  });
+});
+
+describe("SparkSession.interrupt*", () => {
+  function makeWithInterrupt(): {
+    spark: import("./spark-session.js").SparkSession;
+    calls: Record<string, unknown>[];
+  } {
+    const calls: Record<string, unknown>[] = [];
+    const transport = {
+      executePlan: () => {
+        throw new Error("not used");
+      },
+      interrupt: async (_sessionId: string, request: Record<string, unknown>) => {
+        calls.push(request);
+        return ["op-1", "op-2"];
+      },
+    };
+    const spark = SparkSession.builder().remote("sc://stub").transport(transport).getOrCreate();
+    return { spark, calls };
+  }
+
+  it("interruptAll sends { type: 'all' } and returns interrupted IDs", async () => {
+    const { spark, calls } = makeWithInterrupt();
+    const ids = await spark.interruptAll();
+    assert.deepStrictEqual(ids, ["op-1", "op-2"]);
+    assert.deepStrictEqual(calls, [{ type: "all" }]);
+  });
+
+  it("interruptTag sends { type: 'tag', tag }", async () => {
+    const { spark, calls } = makeWithInterrupt();
+    await spark.interruptTag("etl");
+    assert.deepStrictEqual(calls, [{ type: "tag", tag: "etl" }]);
+  });
+
+  it("interruptOperation sends { type: 'operationId', operationId }", async () => {
+    const { spark, calls } = makeWithInterrupt();
+    await spark.interruptOperation("op-xyz");
+    assert.deepStrictEqual(calls, [{ type: "operationId", operationId: "op-xyz" }]);
+  });
+});

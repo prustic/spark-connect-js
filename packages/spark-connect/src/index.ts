@@ -30,6 +30,7 @@ export {
   ConfigResponseSchema,
   type InterruptRequest,
   InterruptRequestSchema,
+  InterruptRequest_InterruptType,
   type InterruptResponse,
   InterruptResponseSchema,
   type ReleaseSessionRequest,

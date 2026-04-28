@@ -356,7 +356,12 @@ export {
 // in implementation modules.
 export type { Row } from "./types/row.js";
 export type { Schema, FieldDescriptor } from "./types/schema.js";
-export type { SparkSessionConfig, Transport, ArrowDecoderFn } from "./spark-session.js";
+export type {
+  SparkSessionConfig,
+  Transport,
+  ArrowDecoderFn,
+  ExecuteOptions,
+} from "./spark-session.js";
 export {
   SparkConnectError,
   SparkClientError,
