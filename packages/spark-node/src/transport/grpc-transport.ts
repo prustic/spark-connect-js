@@ -61,9 +61,13 @@ import {
   JavaUDFSchema,
   DataTypeSchema,
   DataType_UnparsedSchema,
+  ReattachOptionsSchema,
+  ExecutePlanRequest_RequestOptionSchema,
+  ReattachExecuteRequestSchema,
   type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
+  type ReattachExecuteRequest,
   type ReleaseSessionRequest,
   type ReleaseSessionResponse,
   type AnalyzePlanRequest,
@@ -79,6 +83,7 @@ import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation, buildExpression } from "../proto/proto-builder.js";
 import { DEFAULT_RETRY_POLICY, withRetry, type RetryPolicy } from "./retry.js";
+import { iterateWithReattach } from "./reattach.js";
 
 /** Default gRPC max message size: Arrow batches commonly exceed 4 MB. */
 const DEFAULT_MAX_MESSAGE_SIZE = 128 * 1024 * 1024;
@@ -164,57 +169,13 @@ export class GrpcTransport implements Transport {
     plan: LogicalPlan,
     options?: ExecuteOptions,
   ): AsyncIterable<Uint8Array> {
-    const client = this._getClient();
-
-    // Convert our LogicalPlan to a typed Spark Connect Relation protobuf
+    const operationId = newOperationId();
     const relation = buildRelation(plan);
-
-    // Build the ExecutePlanRequest protobuf message. The operation_id is a
-    // client-generated UUIDv4 the server echoes on every response and that
-    // identifies the operation for reattach and interrupt RPCs.
-    const request = create(ExecutePlanRequestSchema, {
-      sessionId,
-      userContext: this.userContext,
-      operationId: newOperationId(),
-      plan: create(PlanSchema, {
-        opType: { case: "root", value: relation },
-      }),
-      clientType: this.clientType,
-      tags: options?.tags ? Array.from(options.tags) : [],
+    const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
+      case: "root",
+      value: relation,
     });
-
-    // Server-streaming RPC call
-    const serialize = (value: ExecutePlanRequest): Buffer =>
-      Buffer.from(toBinary(ExecutePlanRequestSchema, value));
-    const deserialize = (bytes: Buffer): ExecutePlanResponse =>
-      fromBinary(ExecutePlanResponseSchema, bytes);
-
-    const stream = client.makeServerStreamRequest<ExecutePlanRequest, ExecutePlanResponse>(
-      "/spark.connect.SparkConnectService/ExecutePlan",
-      serialize,
-      deserialize,
-      request,
-      this.metadata,
-    );
-
-    // Consume the gRPC server stream
-    try {
-      for await (const _response of stream) {
-        const response = _response as ExecutePlanResponse;
-        if (
-          response.responseType.case === "arrowBatch" &&
-          response.responseType.value.data.length > 0
-        ) {
-          yield response.responseType.value.data;
-        }
-
-        if (response.responseType.case === "resultComplete") {
-          break;
-        }
-      }
-    } catch (err: unknown) {
-      throw wrapGrpcError(err);
-    }
+    yield* this._streamWithReattach(sessionId, operationId, request);
   }
 
   /** Close the gRPC channel. */
@@ -231,45 +192,107 @@ export class GrpcTransport implements Transport {
     command: Record<string, unknown>,
     options?: ExecuteOptions,
   ): Promise<void> {
-    const client = this._getClient();
-
+    const operationId = newOperationId();
     const commandProto = buildCommandProto(command);
+    const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
+      case: "command",
+      value: commandProto,
+    });
+    // Drain the stream; commands don't yield Arrow batches but reattach
+    // still applies if the connection drops mid-execution.
+    for await (const _ of this._streamWithReattach(sessionId, operationId, request)) {
+      // discard
+    }
+  }
 
-    const request = create(ExecutePlanRequestSchema, {
+  /** @internal Build an ExecutePlanRequest with reattach enabled. */
+  private _buildExecutePlanRequest(
+    sessionId: string,
+    operationId: string,
+    options: ExecuteOptions | undefined,
+    plan:
+      | { case: "root"; value: ReturnType<typeof buildRelation> }
+      | { case: "command"; value: ReturnType<typeof buildCommandProto> },
+  ): ExecutePlanRequest {
+    return create(ExecutePlanRequestSchema, {
       sessionId,
       userContext: this.userContext,
-      operationId: newOperationId(),
-      plan: create(PlanSchema, {
-        opType: { case: "command", value: commandProto },
-      }),
+      operationId,
+      plan: create(PlanSchema, { opType: plan }),
       clientType: this.clientType,
       tags: options?.tags ? Array.from(options.tags) : [],
+      // Reattach must be requested on the initial ExecutePlan; if the
+      // server-streaming connection drops, we use the operationId and the
+      // last received responseId to pick up where we left off.
+      requestOptions: [
+        create(ExecutePlanRequest_RequestOptionSchema, {
+          requestOption: {
+            case: "reattachOptions",
+            value: create(ReattachOptionsSchema, { reattachable: true }),
+          },
+        }),
+      ],
     });
+  }
 
+  /** @internal */
+  private _streamWithReattach(
+    sessionId: string,
+    operationId: string,
+    request: ExecutePlanRequest,
+  ): AsyncIterable<Uint8Array> {
+    const client = this._getClient();
+    return iterateWithReattach({
+      initial: () => this._openExecutePlanStream(client, request),
+      reattach: (lastResponseId: string | undefined) =>
+        this._openReattachStream(client, sessionId, operationId, lastResponseId),
+      retryPolicy: this.retryPolicy,
+      sleep,
+      wrapError: wrapGrpcError,
+    });
+  }
+
+  private _openExecutePlanStream(
+    client: grpc.Client,
+    request: ExecutePlanRequest,
+  ): AsyncIterable<ExecutePlanResponse> {
     const serialize = (value: ExecutePlanRequest): Buffer =>
       Buffer.from(toBinary(ExecutePlanRequestSchema, value));
     const deserialize = (bytes: Buffer): ExecutePlanResponse =>
       fromBinary(ExecutePlanResponseSchema, bytes);
-
-    const stream = client.makeServerStreamRequest<ExecutePlanRequest, ExecutePlanResponse>(
+    return client.makeServerStreamRequest<ExecutePlanRequest, ExecutePlanResponse>(
       "/spark.connect.SparkConnectService/ExecutePlan",
       serialize,
       deserialize,
       request,
       this.metadata,
     );
+  }
 
-    // Consume the stream (commands may return resultComplete)
-    try {
-      for await (const _response of stream) {
-        const response = _response as ExecutePlanResponse;
-        if (response.responseType.case === "resultComplete") {
-          break;
-        }
-      }
-    } catch (err: unknown) {
-      throw wrapGrpcError(err);
-    }
+  private _openReattachStream(
+    client: grpc.Client,
+    sessionId: string,
+    operationId: string,
+    lastResponseId: string | undefined,
+  ): AsyncIterable<ExecutePlanResponse> {
+    const request = create(ReattachExecuteRequestSchema, {
+      sessionId,
+      userContext: this.userContext,
+      clientType: this.clientType,
+      operationId,
+      ...(lastResponseId !== undefined ? { lastResponseId } : {}),
+    });
+    const serialize = (value: ReattachExecuteRequest): Buffer =>
+      Buffer.from(toBinary(ReattachExecuteRequestSchema, value));
+    const deserialize = (bytes: Buffer): ExecutePlanResponse =>
+      fromBinary(ExecutePlanResponseSchema, bytes);
+    return client.makeServerStreamRequest<ReattachExecuteRequest, ExecutePlanResponse>(
+      "/spark.connect.SparkConnectService/ReattachExecute",
+      serialize,
+      deserialize,
+      request,
+      this.metadata,
+    );
   }
 
   /** Release the session on the server. */
@@ -484,6 +507,10 @@ function buildMetadata(headers: Record<string, string> | undefined): grpc.Metada
 /** UUIDv4 attached to every ExecutePlanRequest as `operation_id`. */
 function newOperationId(): string {
   return randomUUID();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
