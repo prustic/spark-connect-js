@@ -16,6 +16,7 @@
 import { DataFrame } from "./data-frame.js";
 import { Catalog } from "./catalog.js";
 import { UDFRegistration } from "./udf-registration.js";
+import { RuntimeConfig } from "./runtime-config.js";
 import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from "./errors.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
@@ -41,6 +42,9 @@ export interface Transport {
     sessionId: string,
     request: Record<string, unknown>,
   ): Promise<Record<string, unknown>>;
+
+  /** Get/set/unset runtime configuration via the Config RPC. */
+  config?(sessionId: string, operation: Record<string, unknown>): Promise<Record<string, unknown>>;
 
   /** Release the server-side session. */
   releaseSession?(sessionId: string): Promise<void>;
@@ -107,6 +111,9 @@ export class SparkSession {
 
   /** Register Java UDFs and UDAFs as SQL functions. */
   readonly udf: UDFRegistration = new UDFRegistration(this);
+
+  /** Read and write Spark configuration entries on the connected server. */
+  readonly conf: RuntimeConfig = new RuntimeConfig(this);
 
   /** Returns a DataFrameReader for building Read plans. */
   get read(): DataFrameReader {
@@ -187,6 +194,30 @@ export class SparkSession {
       );
     }
     return this.transport.analyzePlan(this.sessionId, request);
+  }
+
+  /** @internal Used by RuntimeConfig via the injected transport */
+  async _config(operation: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!this.transport.config) {
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support config. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports all operations.",
+      );
+    }
+    return this.transport.config(this.sessionId, operation);
+  }
+
+  /**
+   * Return the Apache Spark version reported by the connected server.
+   *
+   * One AnalyzePlan RPC. Result is not cached — call once and store if you
+   * need it repeatedly.
+   *
+   * Mirrors `pyspark.sql.SparkSession.version`.
+   */
+  async version(): Promise<string> {
+    const result = await this._analyzePlan({ type: "sparkVersion" });
+    return result["version"] as string;
   }
 
   /**

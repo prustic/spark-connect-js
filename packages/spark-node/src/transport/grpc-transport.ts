@@ -15,6 +15,7 @@
 
 import { InvalidConfigError, UnsupportedOperationError } from "@spark-connect-js/core";
 import * as grpc from "@grpc/grpc-js";
+import { randomUUID } from "node:crypto";
 import { create, toBinary, fromBinary } from "@bufbuild/protobuf";
 import {
   ExecutePlanRequestSchema,
@@ -33,6 +34,16 @@ import {
   AnalyzePlanRequest_GetStorageLevelSchema,
   AnalyzePlanRequest_SameSemanticsSchema,
   AnalyzePlanRequest_SemanticHashSchema,
+  AnalyzePlanRequest_SparkVersionSchema,
+  ConfigRequestSchema,
+  ConfigResponseSchema,
+  ConfigRequest_OperationSchema,
+  ConfigRequest_SetSchema,
+  ConfigRequest_GetSchema,
+  ConfigRequest_GetAllSchema,
+  ConfigRequest_UnsetSchema,
+  ConfigRequest_IsModifiableSchema,
+  KeyValueSchema,
   StorageLevelSchema,
   CommandSchema,
   WriteOperationSchema,
@@ -54,6 +65,9 @@ import {
   type ReleaseSessionResponse,
   type AnalyzePlanRequest,
   type AnalyzePlanResponse,
+  type ConfigRequest,
+  type ConfigRequest_Operation,
+  type ConfigResponse,
 } from "@spark-connect-js/connect";
 import type { Transport } from "@spark-connect-js/core";
 import type { LogicalPlan } from "@spark-connect-js/core";
@@ -128,10 +142,13 @@ export class GrpcTransport implements Transport {
     // Convert our LogicalPlan to a typed Spark Connect Relation protobuf
     const relation = buildRelation(plan);
 
-    // Build the ExecutePlanRequest protobuf message
+    // Build the ExecutePlanRequest protobuf message. The operation_id is a
+    // client-generated UUIDv4 the server echoes on every response and that
+    // identifies the operation for reattach and interrupt RPCs.
     const request = create(ExecutePlanRequestSchema, {
       sessionId,
       userContext: this.userContext,
+      operationId: newOperationId(),
       plan: create(PlanSchema, {
         opType: { case: "root", value: relation },
       }),
@@ -189,6 +206,7 @@ export class GrpcTransport implements Transport {
     const request = create(ExecutePlanRequestSchema, {
       sessionId,
       userContext: this.userContext,
+      operationId: newOperationId(),
       plan: create(PlanSchema, {
         opType: { case: "command", value: commandProto },
       }),
@@ -291,6 +309,39 @@ export class GrpcTransport implements Transport {
     });
   }
 
+  /** Read or write Spark runtime configuration via the Config RPC. */
+  config(sessionId: string, operation: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const client = this._getClient();
+
+    const configRequest = create(ConfigRequestSchema, {
+      sessionId,
+      userContext: this.userContext,
+      clientType: this.clientType,
+      operation: buildConfigOperation(operation),
+    });
+
+    const serialize = (value: ConfigRequest): Buffer =>
+      Buffer.from(toBinary(ConfigRequestSchema, value));
+    const deserialize = (bytes: Buffer): ConfigResponse => fromBinary(ConfigResponseSchema, bytes);
+
+    return new Promise<Record<string, unknown>>((resolve, reject) => {
+      client.makeUnaryRequest<ConfigRequest, ConfigResponse>(
+        "/spark.connect.SparkConnectService/Config",
+        serialize,
+        deserialize,
+        configRequest,
+        this.metadata,
+        (err: grpc.ServiceError | null, response?: ConfigResponse) => {
+          if (err) {
+            reject(wrapGrpcError(err));
+          } else {
+            resolve(extractConfigResult(response!));
+          }
+        },
+      );
+    });
+  }
+
   private _getClient(): grpc.Client {
     if (!this.client) {
       this.client = new grpc.Client(this.endpoint, this.credentials, this.channelOptions);
@@ -347,6 +398,11 @@ function buildMetadata(headers: Record<string, string> | undefined): grpc.Metada
   return md;
 }
 
+/** UUIDv4 attached to every ExecutePlanRequest as `operation_id`. */
+function newOperationId(): string {
+  return randomUUID();
+}
+
 /**
  * Synthesize the `clientType` field on Spark Connect requests, equivalent to
  * a User-Agent. The canonical suffix identifies the client library and
@@ -358,6 +414,66 @@ function buildClientType(userAgent: string | undefined): string {
     return `${userAgent} ${suffix}`;
   }
   return suffix;
+}
+
+// Config helpers
+
+/**
+ * Map a core-side `_config` operation record onto the proto
+ * `ConfigRequest.Operation` oneof. The shapes here mirror PySpark's
+ * `RuntimeConfig` calls and the variants that exist in `ConfigRequest`.
+ */
+function buildConfigOperation(op: Record<string, unknown>): ConfigRequest_Operation {
+  const kind = op.op as string;
+  switch (kind) {
+    case "set": {
+      const pairs = (op.pairs as [string, string][]).map(([key, value]) =>
+        create(KeyValueSchema, { key, value }),
+      );
+      return create(ConfigRequest_OperationSchema, {
+        opType: { case: "set", value: create(ConfigRequest_SetSchema, { pairs }) },
+      });
+    }
+    case "get":
+      return create(ConfigRequest_OperationSchema, {
+        opType: {
+          case: "get",
+          value: create(ConfigRequest_GetSchema, { keys: op.keys as string[] }),
+        },
+      });
+    case "getAll":
+      return create(ConfigRequest_OperationSchema, {
+        opType: {
+          case: "getAll",
+          value: create(ConfigRequest_GetAllSchema, {
+            ...(op.prefix !== undefined ? { prefix: op.prefix as string } : {}),
+          }),
+        },
+      });
+    case "unset":
+      return create(ConfigRequest_OperationSchema, {
+        opType: {
+          case: "unset",
+          value: create(ConfigRequest_UnsetSchema, { keys: op.keys as string[] }),
+        },
+      });
+    case "isModifiable":
+      return create(ConfigRequest_OperationSchema, {
+        opType: {
+          case: "isModifiable",
+          value: create(ConfigRequest_IsModifiableSchema, { keys: op.keys as string[] }),
+        },
+      });
+    default:
+      throw new UnsupportedOperationError(`Unsupported config op: ${kind}`);
+  }
+}
+
+function extractConfigResult(response: ConfigResponse): Record<string, unknown> {
+  return {
+    pairs: response.pairs.map((kv) => [kv.key, kv.value]),
+    warnings: response.warnings,
+  };
 }
 
 // Error wrapping
@@ -700,6 +816,16 @@ function buildAnalyzePlanRequest(
     });
   }
 
+  if (type === "sparkVersion") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "sparkVersion",
+        value: create(AnalyzePlanRequest_SparkVersionSchema, {}),
+      },
+    });
+  }
+
   throw new UnsupportedOperationError(`Unsupported analyze type: ${type}`);
 }
 
@@ -737,6 +863,8 @@ function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unk
       return { type: "sameSemantics", result: result.value.result };
     case "semanticHash":
       return { type: "semanticHash", result: result.value.result };
+    case "sparkVersion":
+      return { type: "sparkVersion", version: result.value.version };
     default:
       return { type: result.case };
   }

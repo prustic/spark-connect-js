@@ -60,6 +60,7 @@ export { DataType } from "./types/data-type.js";
 export { StructType, StructField } from "./types/struct.js";
 export { Catalog } from "./catalog.js";
 export { UDFRegistration } from "./udf-registration.js";
+export { RuntimeConfig } from "./runtime-config.js";
 export { WindowSpec, Window } from "./window.js";
 export type { StorageLevel } from "./storage-level.js";
 export {
