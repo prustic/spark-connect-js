@@ -20,7 +20,8 @@
  *   grpc_max_message_size  - bytes; defaults to 128 MiB elsewhere
  *
  * @see https://github.com/apache/spark/blob/master/sql/connect/docs/client-connection-string.md
- * @see python/pyspark/sql/connect/client/core.py — DefaultChannelBuilder
+ * @see python/pyspark/sql/connect/client/core.py (DefaultChannelBuilder)
+ * @see connector/connect/common/src/main/scala/org/apache/spark/sql/connect/client (Scala client)
  */
 
 import { InvalidConfigError } from "@spark-connect-js/core";
@@ -72,9 +73,19 @@ export function parseConnectionString(remote: string): ParsedConnectionString {
   const tail = slashIdx === -1 ? "" : body.slice(slashIdx + 1);
 
   const parsed = parseHostPort(hostPort);
-  applyParams(parsed, tail);
-  validate(parsed, remote);
+  const state: ParseState = { useSslExplicit: false };
+  applyParams(parsed, tail, state);
+  validate(parsed, state, remote);
   return parsed;
+}
+
+/**
+ * Mutable parsing state that doesn't belong on the result. Tracks whether
+ * `use_ssl` was set explicitly so we can distinguish from `token=`'s
+ * implicit `useSsl=true` and reject contradictory combinations.
+ */
+interface ParseState {
+  useSslExplicit: boolean;
 }
 
 function parseHostPort(input: string): ParsedConnectionString {
@@ -122,7 +133,7 @@ function parsePort(s: string, full: string): number {
   return port;
 }
 
-function applyParams(out: ParsedConnectionString, tail: string): void {
+function applyParams(out: ParsedConnectionString, tail: string, state: ParseState): void {
   if (tail.length === 0) return;
   if (!tail.startsWith(";")) {
     // Spec: path component must be empty. We tolerate `/` alone, but anything
@@ -143,18 +154,28 @@ function applyParams(out: ParsedConnectionString, tail: string): void {
     if (key.length === 0) {
       throw new InvalidConfigError(`Spark Connect URL parameter has empty name: "${piece}"`);
     }
-    applyParam(out, key, value);
+    applyParam(out, state, key, value);
   }
 }
 
-function applyParam(out: ParsedConnectionString, key: string, value: string): void {
+function applyParam(
+  out: ParsedConnectionString,
+  state: ParseState,
+  key: string,
+  value: string,
+): void {
   switch (key) {
     case "token":
       out.token = value;
-      out.useSsl = true; // token implies SSL per spec
+      // Token implies SSL per spec, but never override an explicit `use_ssl`.
+      // The contradictory combination (token + use_ssl=false) is caught in `validate`.
+      if (!state.useSslExplicit) {
+        out.useSsl = true;
+      }
       break;
     case "use_ssl":
       out.useSsl = parseBool(value, key);
+      state.useSslExplicit = true;
       break;
     case "user_id":
       out.userId = value;
@@ -199,10 +220,17 @@ function decode(s: string): string {
   }
 }
 
-function validate(parsed: ParsedConnectionString, raw: string): void {
+function validate(parsed: ParsedConnectionString, state: ParseState, raw: string): void {
   if (parsed.sessionId !== undefined && !isUuid(parsed.sessionId)) {
     throw new InvalidConfigError(
       `Spark Connect "session_id" must be a valid UUID, got "${parsed.sessionId}" (in "${raw}")`,
+    );
+  }
+  if (parsed.token !== undefined && state.useSslExplicit && !parsed.useSsl) {
+    throw new InvalidConfigError(
+      `Spark Connect URL has token=... with use_ssl=false; the spec says setting token enables SSL, ` +
+        `so this combination is contradictory. Either drop use_ssl=false or remove the token. ` +
+        `(in "${raw}")`,
     );
   }
 }

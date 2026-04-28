@@ -95,9 +95,43 @@ describe("SparkSession.interrupt*", () => {
     assert.deepStrictEqual(calls, [{ type: "tag", tag: "etl" }]);
   });
 
+  it("interruptTag rejects empty tags", async () => {
+    const { spark } = makeWithInterrupt();
+    await assert.rejects(spark.interruptTag(""));
+  });
+
+  it("interruptTag rejects tags containing comma", async () => {
+    const { spark } = makeWithInterrupt();
+    await assert.rejects(spark.interruptTag("a,b"));
+  });
+
   it("interruptOperation sends { type: 'operationId', operationId }", async () => {
     const { spark, calls } = makeWithInterrupt();
     await spark.interruptOperation("op-xyz");
     assert.deepStrictEqual(calls, [{ type: "operationId", operationId: "op-xyz" }]);
+  });
+});
+
+describe("SparkSessionBuilder.sessionId", () => {
+  it("rejects non-UUID strings", () => {
+    const builder = SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      });
+    assert.throws(() => builder.sessionId("not-a-uuid"));
+  });
+
+  it("accepts a valid UUID", () => {
+    const builder = SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      });
+    builder.sessionId("550e8400-e29b-41d4-a716-446655440000");
   });
 });

@@ -130,6 +130,14 @@ export class GrpcTransport implements Transport {
   private client: grpc.Client | null = null;
 
   constructor(options: GrpcTransportOptions) {
+    if (!options.host) {
+      throw new InvalidConfigError("GrpcTransport requires a non-empty host.");
+    }
+    if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65535) {
+      throw new InvalidConfigError(
+        `GrpcTransport requires a valid port (1-65535), got ${String(options.port)}.`,
+      );
+    }
     this.endpoint = `${options.host}:${options.port}`;
     this.credentials = buildCredentials(options);
     this.channelOptions = buildChannelOptions(options.grpcMaxMessageSize);

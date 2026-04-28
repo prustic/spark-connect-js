@@ -252,14 +252,7 @@ export class SparkSession {
    * @throws InvalidInputError if the tag contains `,` or is empty.
    */
   addTag(tag: string): void {
-    if (tag.length === 0) {
-      throw new InvalidInputError("Spark Connect operation tag must be non-empty.");
-    }
-    if (tag.includes(",")) {
-      throw new InvalidInputError(
-        `Spark Connect operation tag must not contain ',', got "${tag}".`,
-      );
-    }
+    validateTag(tag);
     this._tagSet.add(tag);
   }
 
@@ -288,6 +281,7 @@ export class SparkSession {
 
   /** Interrupt every running operation tagged with `tag`. */
   async interruptTag(tag: string): Promise<string[]> {
+    validateTag(tag);
     return this._interrupt({ type: "tag", tag });
   }
 
@@ -309,7 +303,7 @@ export class SparkSession {
   /**
    * Return the Apache Spark version reported by the connected server.
    *
-   * One AnalyzePlan RPC. Result is not cached — call once and store if you
+   * One AnalyzePlan RPC. Result is not cached; call once and store if you
    * need it repeatedly.
    *
    * Mirrors `pyspark.sql.SparkSession.version`.
@@ -357,6 +351,7 @@ class SparkSessionBuilder {
    * If unset, a fresh UUID is generated on the client.
    */
   sessionId(id: string): this {
+    validateUuid(id, "sessionId");
     this.config.sessionId = id;
     return this;
   }
@@ -379,6 +374,40 @@ class SparkSessionBuilder {
       );
     }
     return SparkSession._create(this.config as SparkSessionConfig);
+  }
+}
+
+// Validation helpers shared between session and builder
+
+/**
+ * Validate a Spark Connect operation tag. The proto comment requires tags
+ * to be non-empty and free of `,`; the server splits on commas internally.
+ *
+ * @see ExecutePlanRequest.tags in spark/connect/base.proto
+ */
+function validateTag(tag: string): void {
+  if (tag.length === 0) {
+    throw new InvalidInputError("Spark Connect operation tag must be non-empty.");
+  }
+  if (tag.includes(",")) {
+    throw new InvalidInputError(`Spark Connect operation tag must not contain ',', got "${tag}".`);
+  }
+}
+
+/**
+ * Canonical UUID format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (36 chars,
+ * hex with `-` at fixed positions). The reference clients all validate via
+ * a stdlib parser (PySpark `uuid.UUID(s)`, Scala `UUID.fromString(s)`); Node
+ * has no stdlib UUID parser and even the npm `uuid` library uses a regex
+ * internally. With zero runtime deps in core, this is the canonical form.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateUuid(value: string, field: string): void {
+  if (!UUID_RE.test(value)) {
+    throw new InvalidInputError(
+      `Spark Connect ${field} must be a valid UUID string, got "${value}".`,
+    );
   }
 }
 

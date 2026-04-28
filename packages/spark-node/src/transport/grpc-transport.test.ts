@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { InvalidConfigError } from "@spark-connect-js/core";
 import { GrpcTransport } from "./grpc-transport.js";
 
-describe("GrpcTransport — credentials selection", () => {
+describe("GrpcTransport: credentials selection", () => {
   it("rejects token without TLS", () => {
     assert.throws(
       () =>
@@ -11,7 +11,8 @@ describe("GrpcTransport — credentials selection", () => {
           host: "example.com",
           port: 443,
           token: "abc",
-          // useSsl deliberately omitted (falsy) to assert rejection
+          // useSsl is omitted (falsy) so the constructor must reject the
+          // combination instead of silently downgrading to insecure.
         }),
       InvalidConfigError,
     );

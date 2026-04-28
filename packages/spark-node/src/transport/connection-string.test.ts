@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseConnectionString } from "./connection-string.js";
 import { InvalidConfigError } from "@spark-connect-js/core";
 
-describe("parseConnectionString — host and port", () => {
+describe("parseConnectionString: host and port", () => {
   it("parses sc://host:port", () => {
     const r = parseConnectionString("sc://localhost:15002");
     assert.equal(r.host, "localhost");
@@ -42,7 +42,7 @@ describe("parseConnectionString — host and port", () => {
   });
 });
 
-describe("parseConnectionString — reserved params", () => {
+describe("parseConnectionString: reserved params", () => {
   it("parses use_ssl=true", () => {
     const r = parseConnectionString("sc://localhost:15002/;use_ssl=true");
     assert.equal(r.useSsl, true);
@@ -57,6 +57,15 @@ describe("parseConnectionString — reserved params", () => {
     const r = parseConnectionString("sc://example.com:15002/;token=abc123");
     assert.equal(r.token, "abc123");
     assert.equal(r.useSsl, true);
+  });
+
+  it("explicit use_ssl=true together with token is fine, in either order", () => {
+    const a = parseConnectionString("sc://h:1/;token=t;use_ssl=true");
+    const b = parseConnectionString("sc://h:1/;use_ssl=true;token=t");
+    assert.equal(a.useSsl, true);
+    assert.equal(b.useSsl, true);
+    assert.equal(a.token, "t");
+    assert.equal(b.token, "t");
   });
 
   it("decodes percent-encoded values", () => {
@@ -87,7 +96,7 @@ describe("parseConnectionString — reserved params", () => {
   });
 });
 
-describe("parseConnectionString — non-reserved params", () => {
+describe("parseConnectionString: non-reserved params", () => {
   it("collects unknown params as headers", () => {
     const r = parseConnectionString(
       "sc://localhost:15002/;x-databricks-cluster-id=0123-456789-abcdefgh",
@@ -104,7 +113,7 @@ describe("parseConnectionString — non-reserved params", () => {
   });
 });
 
-describe("parseConnectionString — error cases", () => {
+describe("parseConnectionString: error cases", () => {
   it("rejects empty input", () => {
     assert.throws(() => parseConnectionString(""), InvalidConfigError);
   });
@@ -152,6 +161,20 @@ describe("parseConnectionString — error cases", () => {
   it("rejects non-numeric grpc_max_message_size", () => {
     assert.throws(
       () => parseConnectionString("sc://localhost:15002/;grpc_max_message_size=large"),
+      InvalidConfigError,
+    );
+  });
+
+  it("rejects token together with explicit use_ssl=false (token first)", () => {
+    assert.throws(
+      () => parseConnectionString("sc://h:1/;token=t;use_ssl=false"),
+      InvalidConfigError,
+    );
+  });
+
+  it("rejects token together with explicit use_ssl=false (use_ssl first)", () => {
+    assert.throws(
+      () => parseConnectionString("sc://h:1/;use_ssl=false;token=t"),
       InvalidConfigError,
     );
   });
