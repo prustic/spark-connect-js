@@ -78,6 +78,7 @@ import type { ExecuteOptions, Transport } from "@spark-connect-js/core";
 import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation, buildExpression } from "../proto/proto-builder.js";
+import { DEFAULT_RETRY_POLICY, withRetry, type RetryPolicy } from "./retry.js";
 
 /** Default gRPC max message size: Arrow batches commonly exceed 4 MB. */
 const DEFAULT_MAX_MESSAGE_SIZE = 128 * 1024 * 1024;
@@ -108,6 +109,13 @@ export interface GrpcTransportOptions {
   channelCredentials?: grpc.ChannelCredentials;
   /** Override the 128 MiB default for both send and receive. */
   grpcMaxMessageSize?: number;
+  /**
+   * Retry policy for unary RPCs (analyzePlan, releaseSession, config,
+   * interrupt). Server-streaming RPCs use ReattachExecute instead.
+   * Defaults to {@link DEFAULT_RETRY_POLICY}, which mirrors PySpark's
+   * `DefaultPolicy`.
+   */
+  retryPolicy?: RetryPolicy;
 }
 
 /**
@@ -127,6 +135,7 @@ export class GrpcTransport implements Transport {
   private readonly metadata: grpc.Metadata;
   private readonly userContext: UserContext;
   private readonly clientType: string;
+  private readonly retryPolicy: RetryPolicy;
   private client: grpc.Client | null = null;
 
   constructor(options: GrpcTransportOptions) {
@@ -146,6 +155,7 @@ export class GrpcTransport implements Transport {
       userId: options.userId ?? "spark-js",
     });
     this.clientType = buildClientType(options.userAgent);
+    this.retryPolicy = options.retryPolicy ?? DEFAULT_RETRY_POLICY;
   }
 
   /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
@@ -277,22 +287,26 @@ export class GrpcTransport implements Transport {
     const deserialize = (bytes: Buffer): ReleaseSessionResponse =>
       fromBinary(ReleaseSessionResponseSchema, bytes);
 
-    return new Promise<void>((resolve, reject) => {
-      client.makeUnaryRequest<ReleaseSessionRequest, ReleaseSessionResponse>(
-        "/spark.connect.SparkConnectService/ReleaseSession",
-        serialize,
-        deserialize,
-        request,
-        this.metadata,
-        (err: grpc.ServiceError | null) => {
-          if (err) {
-            reject(wrapGrpcError(err));
-          } else {
-            resolve();
-          }
-        },
-      );
-    });
+    return withRetry(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          client.makeUnaryRequest<ReleaseSessionRequest, ReleaseSessionResponse>(
+            "/spark.connect.SparkConnectService/ReleaseSession",
+            serialize,
+            deserialize,
+            request,
+            this.metadata,
+            (err: grpc.ServiceError | null) => {
+              if (err) {
+                reject(wrapGrpcError(err));
+              } else {
+                resolve();
+              }
+            },
+          );
+        }),
+      this.retryPolicy,
+    );
   }
 
   /** Send an AnalyzePlan request (unary RPC). */
@@ -314,22 +328,26 @@ export class GrpcTransport implements Transport {
     const deserialize = (bytes: Buffer): AnalyzePlanResponse =>
       fromBinary(AnalyzePlanResponseSchema, bytes);
 
-    return new Promise<Record<string, unknown>>((resolve, reject) => {
-      client.makeUnaryRequest<AnalyzePlanRequest, AnalyzePlanResponse>(
-        "/spark.connect.SparkConnectService/AnalyzePlan",
-        serialize,
-        deserialize,
-        analyzeRequest,
-        this.metadata,
-        (err: grpc.ServiceError | null, response?: AnalyzePlanResponse) => {
-          if (err) {
-            reject(wrapGrpcError(err));
-          } else {
-            resolve(extractAnalyzeResult(response!));
-          }
-        },
-      );
-    });
+    return withRetry(
+      () =>
+        new Promise<Record<string, unknown>>((resolve, reject) => {
+          client.makeUnaryRequest<AnalyzePlanRequest, AnalyzePlanResponse>(
+            "/spark.connect.SparkConnectService/AnalyzePlan",
+            serialize,
+            deserialize,
+            analyzeRequest,
+            this.metadata,
+            (err: grpc.ServiceError | null, response?: AnalyzePlanResponse) => {
+              if (err) {
+                reject(wrapGrpcError(err));
+              } else {
+                resolve(extractAnalyzeResult(response!));
+              }
+            },
+          );
+        }),
+      this.retryPolicy,
+    );
   }
 
   /** Interrupt running operations. Returns server-reported interrupted IDs. */
@@ -348,22 +366,26 @@ export class GrpcTransport implements Transport {
     const deserialize = (bytes: Buffer): InterruptResponse =>
       fromBinary(InterruptResponseSchema, bytes);
 
-    return new Promise<string[]>((resolve, reject) => {
-      client.makeUnaryRequest<InterruptRequest, InterruptResponse>(
-        "/spark.connect.SparkConnectService/Interrupt",
-        serialize,
-        deserialize,
-        interruptRequest,
-        this.metadata,
-        (err: grpc.ServiceError | null, response?: InterruptResponse) => {
-          if (err) {
-            reject(wrapGrpcError(err));
-          } else {
-            resolve(response!.interruptedIds);
-          }
-        },
-      );
-    });
+    return withRetry(
+      () =>
+        new Promise<string[]>((resolve, reject) => {
+          client.makeUnaryRequest<InterruptRequest, InterruptResponse>(
+            "/spark.connect.SparkConnectService/Interrupt",
+            serialize,
+            deserialize,
+            interruptRequest,
+            this.metadata,
+            (err: grpc.ServiceError | null, response?: InterruptResponse) => {
+              if (err) {
+                reject(wrapGrpcError(err));
+              } else {
+                resolve(response!.interruptedIds);
+              }
+            },
+          );
+        }),
+      this.retryPolicy,
+    );
   }
 
   /** Read or write Spark runtime configuration via the Config RPC. */
@@ -381,22 +403,26 @@ export class GrpcTransport implements Transport {
       Buffer.from(toBinary(ConfigRequestSchema, value));
     const deserialize = (bytes: Buffer): ConfigResponse => fromBinary(ConfigResponseSchema, bytes);
 
-    return new Promise<Record<string, unknown>>((resolve, reject) => {
-      client.makeUnaryRequest<ConfigRequest, ConfigResponse>(
-        "/spark.connect.SparkConnectService/Config",
-        serialize,
-        deserialize,
-        configRequest,
-        this.metadata,
-        (err: grpc.ServiceError | null, response?: ConfigResponse) => {
-          if (err) {
-            reject(wrapGrpcError(err));
-          } else {
-            resolve(extractConfigResult(response!));
-          }
-        },
-      );
-    });
+    return withRetry(
+      () =>
+        new Promise<Record<string, unknown>>((resolve, reject) => {
+          client.makeUnaryRequest<ConfigRequest, ConfigResponse>(
+            "/spark.connect.SparkConnectService/Config",
+            serialize,
+            deserialize,
+            configRequest,
+            this.metadata,
+            (err: grpc.ServiceError | null, response?: ConfigResponse) => {
+              if (err) {
+                reject(wrapGrpcError(err));
+              } else {
+                resolve(extractConfigResult(response!));
+              }
+            },
+          );
+        }),
+      this.retryPolicy,
+    );
   }
 
   private _getClient(): grpc.Client {
