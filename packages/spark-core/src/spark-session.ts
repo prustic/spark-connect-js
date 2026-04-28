@@ -223,6 +223,15 @@ class SparkSessionBuilder {
   }
 
   /**
+   * Reuse an existing server-side session by ID. Must be a UUIDv4 string.
+   * If unset, a fresh UUID is generated on the client.
+   */
+  sessionId(id: string): this {
+    this.config.sessionId = id;
+    return this;
+  }
+
+  /**
    * Construct the session.  In Spark Connect, "getOrCreate" is a server-side
    * concept: the server may return an existing session if the session ID
    * matches.  On the client we simply instantiate our handle.

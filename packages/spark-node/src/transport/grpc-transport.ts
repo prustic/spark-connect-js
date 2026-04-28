@@ -13,7 +13,7 @@
  * from @spark-connect-js/connect and serialized to binary protobuf on the wire.
  */
 
-import { UnsupportedOperationError } from "@spark-connect-js/core";
+import { InvalidConfigError, UnsupportedOperationError } from "@spark-connect-js/core";
 import * as grpc from "@grpc/grpc-js";
 import { create, toBinary, fromBinary } from "@bufbuild/protobuf";
 import {
@@ -21,6 +21,7 @@ import {
   ExecutePlanResponseSchema,
   PlanSchema,
   UserContextSchema,
+  type UserContext,
   ReleaseSessionRequestSchema,
   ReleaseSessionResponseSchema,
   AnalyzePlanRequestSchema,
@@ -59,21 +60,41 @@ import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation, buildExpression } from "../proto/proto-builder.js";
 
-/** gRPC channel options tuned for Spark Connect workloads. */
-const CHANNEL_OPTIONS: Record<string, number> = {
-  // Arrow batches can be 64MB+; default 4MB limit is too small
-  "grpc.max_receive_message_length": 128 * 1024 * 1024,
-  "grpc.max_send_message_length": 128 * 1024 * 1024,
-  // Keepalive to detect dead connections through load balancers
-  "grpc.keepalive_time_ms": 30_000,
-  "grpc.keepalive_timeout_ms": 10_000,
-};
+/** Default gRPC max message size: Arrow batches commonly exceed 4 MB. */
+const DEFAULT_MAX_MESSAGE_SIZE = 128 * 1024 * 1024;
+
+/**
+ * Hardcoded version string used in `clientType`. Changesets bumps the
+ * package.json version; this constant is updated by hand at release time.
+ * Kept here rather than imported from package.json to avoid `resolveJsonModule`
+ * gymnastics across the workspace.
+ */
+const SPARK_JS_VERSION = "0.4.0";
+
+export interface GrpcTransportOptions {
+  host: string;
+  port: number;
+  /** Connect over TLS. Implied by `token`. */
+  useSsl?: boolean;
+  /** Bearer token. Requires `useSsl` (token-over-insecure is rejected). */
+  token?: string;
+  /** Spark user identity for `UserContext.userId`. */
+  userId?: string;
+  /** User-provided client identifier; a canonical suffix is appended. */
+  userAgent?: string;
+  /** Free-form gRPC metadata attached to every RPC. */
+  metadata?: Record<string, string>;
+  /** Explicit ChannelCredentials override; bypasses `useSsl` / `token`. */
+  channelCredentials?: grpc.ChannelCredentials;
+  /** Override the 128 MiB default for both send and receive. */
+  grpcMaxMessageSize?: number;
+}
 
 /**
  * gRPC-based transport for Spark Connect.
  *
- * Usage:
- *   const transport = new GrpcTransport("localhost:15002");
+ * @example
+ *   const transport = new GrpcTransport({ host: "localhost", port: 15002 });
  *   const spark = SparkSession.builder()
  *     .remote("sc://localhost:15002")
  *     .transport(transport)
@@ -82,11 +103,21 @@ const CHANNEL_OPTIONS: Record<string, number> = {
 export class GrpcTransport implements Transport {
   private readonly endpoint: string;
   private readonly credentials: grpc.ChannelCredentials;
+  private readonly channelOptions: Record<string, number>;
+  private readonly metadata: grpc.Metadata;
+  private readonly userContext: UserContext;
+  private readonly clientType: string;
   private client: grpc.Client | null = null;
 
-  constructor(endpoint: string, credentials?: grpc.ChannelCredentials) {
-    this.endpoint = endpoint;
-    this.credentials = credentials ?? grpc.credentials.createInsecure();
+  constructor(options: GrpcTransportOptions) {
+    this.endpoint = `${options.host}:${options.port}`;
+    this.credentials = buildCredentials(options);
+    this.channelOptions = buildChannelOptions(options.grpcMaxMessageSize);
+    this.metadata = buildMetadata(options.metadata);
+    this.userContext = create(UserContextSchema, {
+      userId: options.userId ?? "spark-js",
+    });
+    this.clientType = buildClientType(options.userAgent);
   }
 
   /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
@@ -99,13 +130,11 @@ export class GrpcTransport implements Transport {
     // Build the ExecutePlanRequest protobuf message
     const request = create(ExecutePlanRequestSchema, {
       sessionId,
-      userContext: create(UserContextSchema, {
-        userId: "spark-js",
-      }),
+      userContext: this.userContext,
       plan: create(PlanSchema, {
         opType: { case: "root", value: relation },
       }),
-      clientType: "spark-js-node",
+      clientType: this.clientType,
     });
 
     // Server-streaming RPC call
@@ -119,6 +148,7 @@ export class GrpcTransport implements Transport {
       serialize,
       deserialize,
       request,
+      this.metadata,
     );
 
     // Consume the gRPC server stream
@@ -157,11 +187,11 @@ export class GrpcTransport implements Transport {
 
     const request = create(ExecutePlanRequestSchema, {
       sessionId,
-      userContext: create(UserContextSchema, { userId: "spark-js" }),
+      userContext: this.userContext,
       plan: create(PlanSchema, {
         opType: { case: "command", value: commandProto },
       }),
-      clientType: "spark-js-node",
+      clientType: this.clientType,
     });
 
     const serialize = (value: ExecutePlanRequest): Buffer =>
@@ -174,6 +204,7 @@ export class GrpcTransport implements Transport {
       serialize,
       deserialize,
       request,
+      this.metadata,
     );
 
     // Consume the stream (commands may return resultComplete)
@@ -195,10 +226,8 @@ export class GrpcTransport implements Transport {
 
     const request = create(ReleaseSessionRequestSchema, {
       sessionId,
-      userContext: create(UserContextSchema, {
-        userId: "spark-js",
-      }),
-      clientType: "spark-js-node",
+      userContext: this.userContext,
+      clientType: this.clientType,
     });
 
     const serialize = (value: ReleaseSessionRequest): Buffer =>
@@ -212,6 +241,7 @@ export class GrpcTransport implements Transport {
         serialize,
         deserialize,
         request,
+        this.metadata,
         (err: grpc.ServiceError | null) => {
           if (err) {
             reject(wrapGrpcError(err));
@@ -230,7 +260,12 @@ export class GrpcTransport implements Transport {
   ): Promise<Record<string, unknown>> {
     const client = this._getClient();
 
-    const analyzeRequest = buildAnalyzePlanRequest(sessionId, request);
+    const analyzeRequest = buildAnalyzePlanRequest(
+      sessionId,
+      request,
+      this.userContext,
+      this.clientType,
+    );
 
     const serialize = (value: AnalyzePlanRequest): Buffer =>
       Buffer.from(toBinary(AnalyzePlanRequestSchema, value));
@@ -243,6 +278,7 @@ export class GrpcTransport implements Transport {
         serialize,
         deserialize,
         analyzeRequest,
+        this.metadata,
         (err: grpc.ServiceError | null, response?: AnalyzePlanResponse) => {
           if (err) {
             reject(wrapGrpcError(err));
@@ -256,10 +292,71 @@ export class GrpcTransport implements Transport {
 
   private _getClient(): grpc.Client {
     if (!this.client) {
-      this.client = new grpc.Client(this.endpoint, this.credentials, CHANNEL_OPTIONS);
+      this.client = new grpc.Client(this.endpoint, this.credentials, this.channelOptions);
     }
     return this.client;
   }
+}
+
+// Construction helpers
+
+function buildCredentials(opts: GrpcTransportOptions): grpc.ChannelCredentials {
+  if (opts.channelCredentials !== undefined) {
+    return opts.channelCredentials;
+  }
+  if (opts.token !== undefined) {
+    if (opts.useSsl !== true) {
+      throw new InvalidConfigError(
+        "Spark Connect token authentication requires use_ssl=true. " +
+          "Token-over-insecure transports are rejected to avoid leaking credentials.",
+      );
+    }
+    const token = opts.token;
+    const callCreds = grpc.credentials.createFromMetadataGenerator((_params, callback) => {
+      const md = new grpc.Metadata();
+      md.add("authorization", `Bearer ${token}`);
+      callback(null, md);
+    });
+    return grpc.credentials.combineChannelCredentials(grpc.credentials.createSsl(), callCreds);
+  }
+  if (opts.useSsl === true) {
+    return grpc.credentials.createSsl();
+  }
+  return grpc.credentials.createInsecure();
+}
+
+function buildChannelOptions(grpcMaxMessageSize: number | undefined): Record<string, number> {
+  const max = grpcMaxMessageSize ?? DEFAULT_MAX_MESSAGE_SIZE;
+  return {
+    "grpc.max_receive_message_length": max,
+    "grpc.max_send_message_length": max,
+    // Keepalive to detect dead connections through load balancers
+    "grpc.keepalive_time_ms": 30_000,
+    "grpc.keepalive_timeout_ms": 10_000,
+  };
+}
+
+function buildMetadata(headers: Record<string, string> | undefined): grpc.Metadata {
+  const md = new grpc.Metadata();
+  if (headers !== undefined) {
+    for (const [k, v] of Object.entries(headers)) {
+      md.add(k, v);
+    }
+  }
+  return md;
+}
+
+/**
+ * Synthesize the `clientType` field on Spark Connect requests, equivalent to
+ * a User-Agent. The canonical suffix identifies the client library and
+ * runtime so server logs can attribute traffic.
+ */
+function buildClientType(userAgent: string | undefined): string {
+  const suffix = `spark-connect-js/${SPARK_JS_VERSION} (node ${process.versions.node}; ${process.platform})`;
+  if (userAgent !== undefined && userAgent.length > 0) {
+    return `${userAgent} ${suffix}`;
+  }
+  return suffix;
 }
 
 // Error wrapping
@@ -462,6 +559,8 @@ function buildCommandProto(command: Record<string, unknown>): Command {
 function buildAnalyzePlanRequest(
   sessionId: string,
   request: Record<string, unknown>,
+  userContext: UserContext,
+  clientType: string,
 ): AnalyzePlanRequest {
   const type = request.type as string;
   const plan = request.plan as import("@spark-connect-js/core").LogicalPlan | undefined;
@@ -469,8 +568,8 @@ function buildAnalyzePlanRequest(
 
   const base = {
     sessionId,
-    userContext: create(UserContextSchema, { userId: "spark-js" }),
-    clientType: "spark-js-node",
+    userContext,
+    clientType,
   };
 
   if (type === "schema") {

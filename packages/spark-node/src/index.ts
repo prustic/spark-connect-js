@@ -345,39 +345,49 @@ export type {
 
 import { SparkSession } from "@spark-connect-js/core";
 import { GrpcTransport } from "./transport/grpc-transport.js";
+import { parseConnectionString } from "./transport/connection-string.js";
 import { ArrowDecoder } from "./arrow/arrow-decoder.js";
-
-/**
- * Parse a Spark Connect URL (sc://host:port) into host:port.
- * Falls through to the raw string if no sc:// prefix.
- */
-function parseEndpoint(remote: string): string {
-  if (remote.startsWith("sc://")) {
-    return remote.slice("sc://".length);
-  }
-  return remote;
-}
 
 /**
  * Create a fully-wired SparkSession for Node.js.
  *
- * This is the primary entry point for @spark-connect-js/node. It creates a
- * SparkSession with GrpcTransport and ArrowDecoder pre-configured.
+ * Parses the full `sc://` connection string grammar, including reserved params
+ * (`token`, `use_ssl`, `user_id`, `user_agent`, `session_id`,
+ * `grpc_max_message_size`) and free-form params that pass through as gRPC
+ * metadata.
  *
  * @example
  *   import { connect, col, lit } from "@spark-connect-js/node";
  *
  *   const spark = connect("sc://localhost:15002");
- *   const df = spark.sql("SELECT * FROM my_table");
- *   const rows = await df.filter(col("age").gt(lit(30))).collect();
- *   await df.show();
+ *   const rows = await spark.sql("SELECT * FROM my_table").collect();
+ *
+ * @example
+ *   // TLS + bearer token
+ *   const spark = connect("sc://example.com:443/;token=abc;use_ssl=true");
  */
 export function connect(remote: string): SparkSession {
-  const endpoint = parseEndpoint(remote);
-  const transport = new GrpcTransport(endpoint);
-  return SparkSession.builder()
+  const parsed = parseConnectionString(remote);
+
+  const transport = new GrpcTransport({
+    host: parsed.host,
+    port: parsed.port,
+    useSsl: parsed.useSsl,
+    token: parsed.token,
+    userId: parsed.userId,
+    userAgent: parsed.userAgent,
+    metadata: parsed.headers,
+    grpcMaxMessageSize: parsed.grpcMaxMessageSize,
+  });
+
+  const builder = SparkSession.builder()
     .remote(remote)
     .transport(transport)
-    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks))
-    .getOrCreate();
+    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks));
+
+  if (parsed.sessionId !== undefined) {
+    builder.sessionId(parsed.sessionId);
+  }
+
+  return builder.getOrCreate();
 }
