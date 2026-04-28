@@ -169,6 +169,10 @@ export {
   Expression_SortOrderSchema,
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
+  type CommonInlineUserDefinedFunction,
+  CommonInlineUserDefinedFunctionSchema,
+  type JavaUDF,
+  JavaUDFSchema,
 } from "./gen/spark/connect/expressions_pb.js";
 
 // Window expression messages
