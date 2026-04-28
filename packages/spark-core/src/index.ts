@@ -59,6 +59,7 @@ export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
 export { StructType, StructField } from "./types/struct.js";
 export { Catalog } from "./catalog.js";
+export { UDFRegistration } from "./udf-registration.js";
 export { WindowSpec, Window } from "./window.js";
 export type { StorageLevel } from "./storage-level.js";
 export {

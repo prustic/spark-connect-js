@@ -42,6 +42,10 @@ import {
   WriteOperationV2Schema,
   WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
+  CommonInlineUserDefinedFunctionSchema,
+  JavaUDFSchema,
+  DataTypeSchema,
+  DataType_UnparsedSchema,
   type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
@@ -418,6 +422,35 @@ function buildCommandProto(command: Record<string, unknown>): Command {
         case: "writeOperationV2",
         value: writeV2,
       },
+    });
+  }
+
+  if (type === "registerFunction") {
+    const javaUdf = create(JavaUDFSchema, {
+      className: command.className as string,
+      aggregate: (command.aggregate as boolean) ?? false,
+      ...(command.returnType !== undefined
+        ? {
+            outputType: create(DataTypeSchema, {
+              kind: {
+                case: "unparsed",
+                value: create(DataType_UnparsedSchema, {
+                  dataTypeString: command.returnType as string,
+                }),
+              },
+            }),
+          }
+        : {}),
+    });
+    const udf = create(CommonInlineUserDefinedFunctionSchema, {
+      functionName: command.functionName as string,
+      deterministic: true,
+      arguments: [],
+      isDistinct: false,
+      function: { case: "javaUdf", value: javaUdf },
+    });
+    return create(CommandSchema, {
+      commandType: { case: "registerFunction", value: udf },
     });
   }
 
