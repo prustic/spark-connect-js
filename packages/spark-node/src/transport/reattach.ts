@@ -34,8 +34,16 @@ export interface ReattachIterationOptions {
   /**
    * Wrap raw gRPC errors into the project's typed error hierarchy. The wrap
    * happens only for terminal failures (non-retryable, or budget exhausted).
+   * May return a Promise so the wrapper can issue follow-up RPCs (e.g.
+   * `FetchErrorDetails` to enrich the error with the server's chain).
    */
-  wrapError?: (err: unknown) => unknown;
+  wrapError?: (err: unknown) => Promise<unknown>;
+  /**
+   * Called once per response before any data is yielded. Lets the caller
+   * capture per-response state (e.g. `serverSideSessionId` for stale-session
+   * detection) without inspecting the raw stream itself.
+   */
+  onResponse?: (response: ExecutePlanResponse) => void;
 }
 
 /**
@@ -46,7 +54,7 @@ export interface ReattachIterationOptions {
 export async function* iterateWithReattach(
   opts: ReattachIterationOptions,
 ): AsyncIterable<Uint8Array> {
-  const { initial, reattach, retryPolicy, sleep, wrapError = passThrough } = opts;
+  const { initial, reattach, retryPolicy, sleep, wrapError = passThrough, onResponse } = opts;
   let lastResponseId: string | undefined;
   let attempt = 0;
   let stream = initial();
@@ -54,6 +62,7 @@ export async function* iterateWithReattach(
   while (true) {
     try {
       for await (const response of stream) {
+        onResponse?.(response);
         if (response.responseId.length > 0) {
           lastResponseId = response.responseId;
         }
@@ -70,7 +79,7 @@ export async function* iterateWithReattach(
       return;
     } catch (err) {
       if (!isRetryable(err) || attempt >= retryPolicy.maxRetries) {
-        throw wrapError(err);
+        throw await wrapError(err);
       }
       const backoff = computeBackoff(attempt, retryPolicy);
       attempt++;
@@ -85,6 +94,6 @@ export async function* iterateWithReattach(
  * wrapper (e.g. {@link wrapGrpcError}) to convert raw gRPC errors into the
  * project's typed hierarchy.
  */
-function passThrough(err: unknown): unknown {
-  return err;
+function passThrough(err: unknown): Promise<unknown> {
+  return Promise.resolve(err);
 }

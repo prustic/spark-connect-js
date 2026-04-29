@@ -66,8 +66,12 @@ import {
   ReattachExecuteRequestSchema,
   StatusSchema,
   ErrorInfoSchema,
+  FetchErrorDetailsRequestSchema,
+  FetchErrorDetailsResponseSchema,
   type Status,
   type ErrorInfo,
+  type FetchErrorDetailsRequest,
+  type FetchErrorDetailsResponse,
   type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
@@ -146,6 +150,12 @@ export class GrpcTransport implements Transport {
   private readonly clientType: string;
   private readonly retryPolicy: RetryPolicy;
   private client: grpc.Client | null = null;
+  /**
+   * Server-side session IDs observed in responses, keyed by client session ID.
+   * Echoed back on subsequent requests so the server can detect a stale
+   * session (e.g. after a server restart) and reject the call early.
+   */
+  private readonly observedServerSideSessionIds = new Map<string, string>();
 
   constructor(options: GrpcTransportOptions) {
     if (!options.host) {
@@ -225,6 +235,7 @@ export class GrpcTransport implements Transport {
       plan: create(PlanSchema, { opType: plan }),
       clientType: this.clientType,
       tags: options?.tags ? Array.from(options.tags) : [],
+      ...this._observedSessionFor(sessionId),
       // Reattach must be requested on the initial ExecutePlan; if the
       // server-streaming connection drops, we use the operationId and the
       // last received responseId to pick up where we left off.
@@ -237,6 +248,30 @@ export class GrpcTransport implements Transport {
         }),
       ],
     });
+  }
+
+  /**
+   * @internal Spread a `clientObservedServerSideSessionId` field if we've
+   * captured one for this session; otherwise return an empty object so the
+   * field is omitted from the request.
+   */
+  private _observedSessionFor(sessionId: string): { clientObservedServerSideSessionId?: string } {
+    const observed = this.observedServerSideSessionIds.get(sessionId);
+    return observed !== undefined ? { clientObservedServerSideSessionId: observed } : {};
+  }
+
+  /**
+   * @internal Capture the server-side session id from a response so we can
+   * echo it back on subsequent requests as a stale-session detector.
+   */
+  private _captureServerSession(
+    sessionId: string,
+    response: { serverSideSessionId?: string } | undefined,
+  ): void {
+    const id = response?.serverSideSessionId;
+    if (id !== undefined && id.length > 0) {
+      this.observedServerSideSessionIds.set(sessionId, id);
+    }
   }
 
   /** @internal */
@@ -252,7 +287,12 @@ export class GrpcTransport implements Transport {
         this._openReattachStream(client, sessionId, operationId, lastResponseId),
       retryPolicy: this.retryPolicy,
       sleep,
-      wrapError: wrapGrpcError,
+      wrapError: (err) => this._wrapError(sessionId, err),
+      onResponse: (response) => {
+        if (response.serverSideSessionId.length > 0) {
+          this.observedServerSideSessionIds.set(sessionId, response.serverSideSessionId);
+        }
+      },
     });
   }
 
@@ -284,6 +324,7 @@ export class GrpcTransport implements Transport {
       userContext: this.userContext,
       clientType: this.clientType,
       operationId,
+      ...this._observedSessionFor(sessionId),
       ...(lastResponseId !== undefined ? { lastResponseId } : {}),
     });
     const serialize = (value: ReattachExecuteRequest): Buffer =>
@@ -307,6 +348,7 @@ export class GrpcTransport implements Transport {
       sessionId,
       userContext: this.userContext,
       clientType: this.clientType,
+      ...this._observedSessionFor(sessionId),
     });
 
     const serialize = (value: ReleaseSessionRequest): Buffer =>
@@ -323,10 +365,11 @@ export class GrpcTransport implements Transport {
             deserialize,
             request,
             this.metadata,
-            (err: grpc.ServiceError | null) => {
+            (err: grpc.ServiceError | null, response?: ReleaseSessionResponse) => {
               if (err) {
-                reject(wrapGrpcError(err));
+                this._wrapError(sessionId, err).then(reject, reject);
               } else {
+                this._captureServerSession(sessionId, response);
                 resolve();
               }
             },
@@ -348,6 +391,7 @@ export class GrpcTransport implements Transport {
       request,
       this.userContext,
       this.clientType,
+      this.observedServerSideSessionIds.get(sessionId),
     );
 
     const serialize = (value: AnalyzePlanRequest): Buffer =>
@@ -366,8 +410,9 @@ export class GrpcTransport implements Transport {
             this.metadata,
             (err: grpc.ServiceError | null, response?: AnalyzePlanResponse) => {
               if (err) {
-                reject(wrapGrpcError(err));
+                this._wrapError(sessionId, err).then(reject, reject);
               } else {
+                this._captureServerSession(sessionId, response);
                 resolve(extractAnalyzeResult(response!));
               }
             },
@@ -385,6 +430,7 @@ export class GrpcTransport implements Transport {
       sessionId,
       userContext: this.userContext,
       clientType: this.clientType,
+      ...this._observedSessionFor(sessionId),
       ...buildInterruptOneOf(request),
     });
 
@@ -404,8 +450,9 @@ export class GrpcTransport implements Transport {
             this.metadata,
             (err: grpc.ServiceError | null, response?: InterruptResponse) => {
               if (err) {
-                reject(wrapGrpcError(err));
+                this._wrapError(sessionId, err).then(reject, reject);
               } else {
+                this._captureServerSession(sessionId, response);
                 resolve(response!.interruptedIds);
               }
             },
@@ -423,6 +470,7 @@ export class GrpcTransport implements Transport {
       sessionId,
       userContext: this.userContext,
       clientType: this.clientType,
+      ...this._observedSessionFor(sessionId),
       operation: buildConfigOperation(operation),
     });
 
@@ -441,8 +489,9 @@ export class GrpcTransport implements Transport {
             this.metadata,
             (err: grpc.ServiceError | null, response?: ConfigResponse) => {
               if (err) {
-                reject(wrapGrpcError(err));
+                this._wrapError(sessionId, err).then(reject, reject);
               } else {
+                this._captureServerSession(sessionId, response);
                 resolve(extractConfigResult(response!));
               }
             },
@@ -450,6 +499,60 @@ export class GrpcTransport implements Transport {
         }),
       this.retryPolicy,
     );
+  }
+
+  /**
+   * @internal Wrap a raw gRPC error and, when the inline trailer carries an
+   * `errorId`, fetch the rich error chain via `FetchErrorDetails`. If the
+   * fetch fails, fall back to the inline-only wrap.
+   */
+  private async _wrapError(sessionId: string, err: unknown): Promise<SparkConnectError> {
+    if (err instanceof SparkConnectError) return err;
+    const grpcErr = err as RawGrpcError;
+    const errorInfo = grpcErr.metadata ? extractErrorInfo(grpcErr.metadata) : undefined;
+    const base = buildBasicSparkError(err, errorInfo);
+    const errorId = errorInfo?.metadata.errorId;
+    if (errorId === undefined || errorId.length === 0) return base;
+    try {
+      const response = await this._fetchErrorDetails(sessionId, errorId);
+      return enrichFromFetchResponse(base, response);
+    } catch {
+      return base;
+    }
+  }
+
+  private _fetchErrorDetails(
+    sessionId: string,
+    errorId: string,
+  ): Promise<FetchErrorDetailsResponse> {
+    const client = this._getClient();
+    const request = create(FetchErrorDetailsRequestSchema, {
+      sessionId,
+      userContext: this.userContext,
+      clientType: this.clientType,
+      ...this._observedSessionFor(sessionId),
+      errorId,
+    });
+    const serialize = (value: FetchErrorDetailsRequest): Buffer =>
+      Buffer.from(toBinary(FetchErrorDetailsRequestSchema, value));
+    const deserialize = (bytes: Buffer): FetchErrorDetailsResponse =>
+      fromBinary(FetchErrorDetailsResponseSchema, bytes);
+    return new Promise<FetchErrorDetailsResponse>((resolve, reject) => {
+      client.makeUnaryRequest<FetchErrorDetailsRequest, FetchErrorDetailsResponse>(
+        "/spark.connect.SparkConnectService/FetchErrorDetails",
+        serialize,
+        deserialize,
+        request,
+        this.metadata,
+        (err: grpc.ServiceError | null, response?: FetchErrorDetailsResponse) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(response!);
+          }
+        },
+      );
+    });
   }
 
   private _getClient(): grpc.Client {
@@ -637,21 +740,18 @@ const STATUS_NAMES: Record<number, string> = {
   16: "UNAUTHENTICATED",
 };
 
-function wrapGrpcError(err: unknown): SparkConnectError {
-  if (err instanceof SparkConnectError) return err;
+interface RawGrpcError {
+  code?: number;
+  details?: string;
+  message?: string;
+  metadata?: grpc.Metadata;
+}
 
-  const grpcErr = err as {
-    code?: number;
-    details?: string;
-    message?: string;
-    metadata?: grpc.Metadata;
-  };
+function buildBasicSparkError(err: unknown, errorInfo: ErrorInfo | undefined): SparkConnectError {
+  const grpcErr = err as RawGrpcError;
   const code = grpcErr.code ?? 2; // UNKNOWN
   const statusName = STATUS_NAMES[code] ?? `STATUS_${code}`;
   const details = grpcErr.details ?? grpcErr.message ?? "Unknown gRPC error";
-
-  const errorInfo = grpcErr.metadata ? extractErrorInfo(grpcErr.metadata) : undefined;
-
   return new SparkConnectError(`[${statusName}] ${details}`, {
     code,
     cause: err,
@@ -659,6 +759,33 @@ function wrapGrpcError(err: unknown): SparkConnectError {
     sqlState: errorInfo?.metadata.sqlState,
     messageParameters: errorInfo ? extractMessageParameters(errorInfo.metadata) : undefined,
   });
+}
+
+function enrichFromFetchResponse(
+  base: SparkConnectError,
+  response: FetchErrorDetailsResponse,
+): SparkConnectError {
+  const root = response.errors[response.rootErrorIdx ?? 0];
+  if (!root) return base;
+  return new SparkConnectError(root.message || base.message, {
+    code: base.code,
+    cause: base.cause,
+    errorClass: root.sparkThrowable?.errorClass ?? base.errorClass,
+    sqlState: root.sparkThrowable?.sqlState ?? base.sqlState,
+    messageParameters: root.sparkThrowable?.messageParameters ?? base.messageParameters,
+    errorTypeHierarchy: root.errorTypeHierarchy,
+    serverStackTrace: root.stackTrace.map(formatStackFrame),
+  });
+}
+
+function formatStackFrame(frame: {
+  declaringClass: string;
+  methodName: string;
+  fileName?: string;
+  lineNumber: number;
+}): string {
+  const location = frame.fileName ? `${frame.fileName}:${frame.lineNumber}` : "Unknown Source";
+  return `${frame.declaringClass}.${frame.methodName}(${location})`;
 }
 
 /**
@@ -879,6 +1006,7 @@ function buildAnalyzePlanRequest(
   request: Record<string, unknown>,
   userContext: UserContext,
   clientType: string,
+  observedServerSideSessionId: string | undefined,
 ): AnalyzePlanRequest {
   const type = request.type as string;
   const plan = request.plan as import("@spark-connect-js/core").LogicalPlan | undefined;
@@ -888,6 +1016,9 @@ function buildAnalyzePlanRequest(
     sessionId,
     userContext,
     clientType,
+    ...(observedServerSideSessionId !== undefined
+      ? { clientObservedServerSideSessionId: observedServerSideSessionId }
+      : {}),
   };
 
   if (type === "schema") {

@@ -26,4 +26,25 @@ describe("SparkConnectError trailer decoding", () => {
       "expected sqlState",
     );
   });
+
+  it("populates errorTypeHierarchy via FetchErrorDetails", async () => {
+    let caught: unknown;
+    try {
+      await spark().sql("SELECT another_missing FROM VALUES (1) AS t(id)").collect();
+    } catch (err) {
+      caught = err;
+    }
+
+    if (!(caught instanceof SparkConnectError)) {
+      throw new Error(`expected SparkConnectError, got ${String(caught)}`);
+    }
+    assert.ok(
+      Array.isArray(caught.errorTypeHierarchy) && caught.errorTypeHierarchy.length > 0,
+      "expected non-empty errorTypeHierarchy from FetchErrorDetails",
+    );
+    assert.ok(
+      caught.errorTypeHierarchy.some((c: string) => c.includes("AnalysisException")),
+      `expected AnalysisException in errorTypeHierarchy, got ${JSON.stringify(caught.errorTypeHierarchy)}`,
+    );
+  });
 });
