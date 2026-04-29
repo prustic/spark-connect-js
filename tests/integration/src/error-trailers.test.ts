@@ -14,12 +14,16 @@ describe("SparkConnectError trailer decoding", () => {
       caught = err;
     }
 
-    assert.ok(caught instanceof SparkConnectError, "expected SparkConnectError");
-    const e = caught;
+    if (!(caught instanceof SparkConnectError)) {
+      throw new Error(`expected SparkConnectError, got ${String(caught)}`);
+    }
     assert.ok(
-      typeof e.errorClass === "string" && e.errorClass.startsWith("UNRESOLVED_COLUMN"),
-      `expected errorClass to start with UNRESOLVED_COLUMN, got "${String(e.errorClass)}"`,
+      typeof caught.errorClass === "string" && caught.errorClass.startsWith("UNRESOLVED_COLUMN"),
+      `expected errorClass to start with UNRESOLVED_COLUMN, got "${String(caught.errorClass)}"`,
     );
-    assert.ok(typeof e.sqlState === "string" && e.sqlState.length > 0, "expected sqlState");
+    assert.ok(
+      typeof caught.sqlState === "string" && caught.sqlState.length > 0,
+      "expected sqlState",
+    );
   });
 });

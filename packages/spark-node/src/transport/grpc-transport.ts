@@ -657,8 +657,29 @@ function wrapGrpcError(err: unknown): SparkConnectError {
     cause: err,
     errorClass: errorInfo?.metadata.errorClass,
     sqlState: errorInfo?.metadata.sqlState,
-    messageParameters: errorInfo?.metadata,
+    messageParameters: errorInfo ? extractMessageParameters(errorInfo.metadata) : undefined,
   });
+}
+
+/**
+ * Strip reserved metadata keys so `messageParameters` carries only the
+ * format-string parameters the user can substitute into the error template.
+ * Mirrors PySpark's reserved set in `pyspark/errors/exceptions/connect.py`.
+ */
+const RESERVED_METADATA_KEYS = new Set([
+  "errorClass",
+  "sqlState",
+  "errorId",
+  "fragment",
+  "breakingChange",
+]);
+
+function extractMessageParameters(metadata: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(metadata)) {
+    if (!RESERVED_METADATA_KEYS.has(k)) out[k] = v;
+  }
+  return out;
 }
 
 /**
