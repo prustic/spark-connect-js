@@ -317,3 +317,17 @@ export {
   type StorageLevel as ProtoStorageLevel,
   StorageLevelSchema,
 } from "./gen/spark/connect/common_pb.js";
+
+// google.rpc error envelope (carried in grpc-status-details-bin trailer)
+export { type Status, StatusSchema } from "./gen/google/rpc/status_pb.js";
+export { type ErrorInfo, ErrorInfoSchema } from "./gen/google/rpc/error_details_pb.js";
+
+// Spark error detail message (decoded from FetchErrorDetailsResponse)
+export {
+  type FetchErrorDetailsResponse_Error,
+  FetchErrorDetailsResponse_ErrorSchema,
+  type FetchErrorDetailsResponse_SparkThrowable,
+  FetchErrorDetailsResponse_SparkThrowableSchema,
+  type FetchErrorDetailsResponse_StackTraceElement,
+  FetchErrorDetailsResponse_StackTraceElementSchema,
+} from "./gen/spark/connect/base_pb.js";

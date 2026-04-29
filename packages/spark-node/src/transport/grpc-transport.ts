@@ -64,6 +64,10 @@ import {
   ReattachOptionsSchema,
   ExecutePlanRequest_RequestOptionSchema,
   ReattachExecuteRequestSchema,
+  StatusSchema,
+  ErrorInfoSchema,
+  type Status,
+  type ErrorInfo,
   type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
@@ -636,16 +640,54 @@ const STATUS_NAMES: Record<number, string> = {
 function wrapGrpcError(err: unknown): SparkConnectError {
   if (err instanceof SparkConnectError) return err;
 
-  // gRPC errors from @grpc/grpc-js have `code`, `details`, and `metadata` props
-  const grpcErr = err as { code?: number; details?: string; message?: string };
+  const grpcErr = err as {
+    code?: number;
+    details?: string;
+    message?: string;
+    metadata?: grpc.Metadata;
+  };
   const code = grpcErr.code ?? 2; // UNKNOWN
   const statusName = STATUS_NAMES[code] ?? `STATUS_${code}`;
   const details = grpcErr.details ?? grpcErr.message ?? "Unknown gRPC error";
 
+  const errorInfo = grpcErr.metadata ? extractErrorInfo(grpcErr.metadata) : undefined;
+
   return new SparkConnectError(`[${statusName}] ${details}`, {
     code,
     cause: err,
+    errorClass: errorInfo?.metadata.errorClass,
+    sqlState: errorInfo?.metadata.sqlState,
+    messageParameters: errorInfo?.metadata,
   });
+}
+
+/**
+ * Decode the `grpc-status-details-bin` trailer into the Spark `ErrorInfo`.
+ * The Spark Connect server packs one `google.rpc.ErrorInfo` into
+ * `google.rpc.Status.details[]`; that ErrorInfo carries `errorClass`,
+ * `sqlState`, message parameters, and an `errorId` for richer fetches.
+ */
+function extractErrorInfo(metadata: grpc.Metadata): ErrorInfo | undefined {
+  const entries = metadata.get("grpc-status-details-bin");
+  if (entries.length === 0) return undefined;
+  const raw = entries[0];
+  const bytes = typeof raw === "string" ? Buffer.from(raw, "base64") : raw;
+  let status: Status;
+  try {
+    status = fromBinary(StatusSchema, bytes);
+  } catch {
+    return undefined;
+  }
+  for (const detail of status.details) {
+    if (detail.typeUrl.endsWith("/google.rpc.ErrorInfo")) {
+      try {
+        return fromBinary(ErrorInfoSchema, detail.value);
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return undefined;
 }
 
 // Command building

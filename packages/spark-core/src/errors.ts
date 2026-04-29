@@ -60,6 +60,16 @@ export class SparkConnectError extends Error {
   /** SQL state code if available (e.g. "42P01") */
   readonly sqlState?: string;
 
+  /** Server-supplied error message parameters keyed by name. */
+  readonly messageParameters?: Record<string, string>;
+
+  /**
+   * Server-side stack trace, populated only when the server has
+   * `spark.sql.connect.serverStacktrace.enabled=true`. Production deployments
+   * usually leave this disabled, so the field is empty in most cases.
+   */
+  readonly serverStackTrace?: readonly string[];
+
   constructor(
     message: string,
     options: {
@@ -67,6 +77,8 @@ export class SparkConnectError extends Error {
       cause?: unknown;
       errorClass?: string;
       sqlState?: string;
+      messageParameters?: Record<string, string>;
+      serverStackTrace?: readonly string[];
     },
   ) {
     super(message, { cause: options.cause });
@@ -74,6 +86,8 @@ export class SparkConnectError extends Error {
     this.code = options.code;
     this.errorClass = options.errorClass;
     this.sqlState = options.sqlState;
+    this.messageParameters = options.messageParameters;
+    this.serverStackTrace = options.serverStackTrace;
   }
 }
 
