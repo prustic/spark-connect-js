@@ -350,8 +350,9 @@ class SparkSessionBuilder {
   }
 
   /**
-   * Reuse an existing server-side session by ID. Must be a UUIDv4 string.
-   * If unset, a fresh UUID is generated on the client.
+   * Reuse an existing server-side session by ID. Must be a canonical UUID
+   * string in the form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`. If unset, a
+   * fresh UUID is generated on the client.
    */
   sessionId(id: string): this {
     validateUuid(id, "sessionId");

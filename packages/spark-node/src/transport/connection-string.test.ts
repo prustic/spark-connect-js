@@ -165,6 +165,13 @@ describe("parseConnectionString: error cases", () => {
     );
   });
 
+  it("rejects grpc_max_message_size=0", () => {
+    assert.throws(
+      () => parseConnectionString("sc://localhost:15002/;grpc_max_message_size=0"),
+      InvalidConfigError,
+    );
+  });
+
   it("rejects token together with explicit use_ssl=false (token first)", () => {
     assert.throws(
       () => parseConnectionString("sc://h:1/;token=t;use_ssl=false"),

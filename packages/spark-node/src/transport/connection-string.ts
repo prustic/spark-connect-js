@@ -16,7 +16,7 @@
  *   use_ssl                - "true" / "false"
  *   user_id                - server-side user identity
  *   user_agent             - client identifier (we append a canonical suffix)
- *   session_id             - UUIDv4 to reuse an existing server session
+ *   session_id             - UUID to reuse an existing server session
  *   grpc_max_message_size  - bytes; defaults to 128 MiB elsewhere
  *
  * @see https://github.com/apache/spark/blob/master/sql/connect/docs/client-connection-string.md
@@ -192,7 +192,13 @@ function applyParam(
           `grpc_max_message_size must be a positive integer: "${value}"`,
         );
       }
-      out.grpcMaxMessageSize = Number.parseInt(value, 10);
+      const size = Number.parseInt(value, 10);
+      if (!Number.isSafeInteger(size) || size <= 0) {
+        throw new InvalidConfigError(
+          `grpc_max_message_size must be a positive safe integer: "${value}"`,
+        );
+      }
+      out.grpcMaxMessageSize = size;
       break;
     }
     default:

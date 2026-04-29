@@ -84,7 +84,7 @@ describe("GrpcTransport: ExecutePlanRequest shape", () => {
     }
   });
 
-  it("carries the operation_id and tags onto the request", () => {
+  it("carries the operation_id and session_id onto the request", () => {
     const transport = new GrpcTransport({ host: "localhost", port: 15002 });
     const build = (transport as unknown as { _buildExecutePlanRequest: RequestBuilder })
       ._buildExecutePlanRequest;
