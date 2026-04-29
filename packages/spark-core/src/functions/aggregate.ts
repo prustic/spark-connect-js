@@ -6,6 +6,9 @@ import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js"
 
 /** Returns the number of items in a group. */
 export function count(column: ColOrName): Column {
+  if (column === "*") {
+    return new Column(fnExpr("count", _lit(1)._expr));
+  }
   return fn("count", column);
 }
 
