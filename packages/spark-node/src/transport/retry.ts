@@ -92,7 +92,7 @@ export async function withRetry<T>(
   }
 }
 
-/** Exponential backoff with jitter, capped at `maxBackoffMs`. */
+/** Exponential backoff capped at `maxBackoffMs`, plus jitter. */
 export function computeBackoff(attempt: number, policy: RetryPolicy): number {
   const exp = policy.initialBackoffMs * Math.pow(policy.backoffMultiplier, attempt);
   const capped = Math.min(exp, policy.maxBackoffMs);
