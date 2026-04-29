@@ -704,7 +704,7 @@ function extractErrorInfo(metadata: grpc.Metadata): ErrorInfo | undefined {
       try {
         return fromBinary(ErrorInfoSchema, detail.value);
       } catch {
-        return undefined;
+        continue;
       }
     }
   }
