@@ -122,6 +122,10 @@ describe("parseConnectionString: error cases", () => {
     assert.throws(() => parseConnectionString("sc://"), InvalidConfigError);
   });
 
+  it("rejects empty IPv6 host", () => {
+    assert.throws(() => parseConnectionString("sc://[]:15002"), InvalidConfigError);
+  });
+
   it("rejects non-numeric port", () => {
     assert.throws(() => parseConnectionString("sc://localhost:notaport"), InvalidConfigError);
   });

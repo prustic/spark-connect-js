@@ -464,8 +464,8 @@ function buildCredentials(opts: GrpcTransportOptions): grpc.ChannelCredentials {
   }
   if (opts.token !== undefined && opts.useSsl !== true) {
     throw new InvalidConfigError(
-      "Spark Connect token authentication requires useSsl=true " +
-        "(or use_ssl=true in a connection string). " +
+      "Spark Connect token authentication requires TLS. Either drop useSsl=false " +
+        "(in a connection string, drop use_ssl=false) or remove the token. " +
         "Token-over-insecure transports are rejected to avoid leaking credentials.",
     );
   }

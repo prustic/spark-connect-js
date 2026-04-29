@@ -100,6 +100,9 @@ function parseHostPort(input: string): ParsedConnectionString {
       throw new InvalidConfigError(`Invalid IPv6 host in Spark Connect URL: "${input}"`);
     }
     const host = input.slice(1, close);
+    if (host.length === 0) {
+      throw new InvalidConfigError(`Spark Connect URL is missing host: "${input}"`);
+    }
     const rest = input.slice(close + 1);
     let port = DEFAULT_PORT;
     if (rest.startsWith(":")) {
