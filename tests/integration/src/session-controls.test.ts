@@ -23,15 +23,18 @@ describe("SparkSession.conf", () => {
 
     assert.equal(await conf.isModifiable(key), true);
 
-    await conf.set(key, "16");
-    assert.equal(await conf.get(key), "16");
+    const original = await conf.get(key);
+    // Pick a value guaranteed to differ from whatever the server has set.
+    const override = original === "17" ? "23" : "17";
+
+    await conf.set(key, override);
+    assert.equal(await conf.get(key), override);
 
     const all = await conf.getAll();
-    assert.equal(all[key], "16");
+    assert.equal(all[key], override);
 
     await conf.unset(key);
-    // After unset the entry returns to its server-side default; what matters
-    // is that our session-level "16" override is gone.
-    assert.notEqual(await conf.get(key), "16");
+    // After unset, the entry returns to whatever the server had before.
+    assert.equal(await conf.get(key), original);
   });
 });

@@ -51,16 +51,16 @@ const RETRYABLE_CURSOR = "INVALID_CURSOR.DISCONNECTED";
  * argument can be a raw gRPC `ServiceError` or a wrapped {@link SparkConnectError}.
  */
 export function isRetryable(err: unknown): boolean {
-  // Pull a code/message regardless of whether wrapping has happened.
-  const grpcCode = (err as { code?: number }).code;
-  const message = (err as { message?: string }).message ?? "";
+  const e = err as { code?: number; details?: string; message?: string };
+  const grpcCode = e.code;
+  const text = e.details ?? e.message ?? "";
 
   if (grpcCode === grpc.status.UNAVAILABLE || grpcCode === GrpcStatusCode.UNAVAILABLE) {
     return true;
   }
   if (
     (grpcCode === grpc.status.INTERNAL || grpcCode === GrpcStatusCode.INTERNAL) &&
-    message.includes(RETRYABLE_CURSOR)
+    text.includes(RETRYABLE_CURSOR)
   ) {
     return true;
   }

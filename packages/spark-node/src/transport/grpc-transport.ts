@@ -462,13 +462,14 @@ function buildCredentials(opts: GrpcTransportOptions): grpc.ChannelCredentials {
   if (opts.channelCredentials !== undefined) {
     return opts.channelCredentials;
   }
+  if (opts.token !== undefined && opts.useSsl !== true) {
+    throw new InvalidConfigError(
+      "Spark Connect token authentication requires useSsl=true " +
+        "(or use_ssl=true in a connection string). " +
+        "Token-over-insecure transports are rejected to avoid leaking credentials.",
+    );
+  }
   if (opts.token !== undefined) {
-    if (opts.useSsl !== true) {
-      throw new InvalidConfigError(
-        "Spark Connect token authentication requires use_ssl=true. " +
-          "Token-over-insecure transports are rejected to avoid leaking credentials.",
-      );
-    }
     const token = opts.token;
     const callCreds = grpc.credentials.createFromMetadataGenerator((_params, callback) => {
       const md = new grpc.Metadata();
