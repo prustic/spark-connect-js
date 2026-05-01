@@ -156,6 +156,22 @@ describe("iterateWithReattach", () => {
     assert.equal(reattachCalls, fastPolicy.maxRetries);
   });
 
+  it("invokes onResponse for every response across initial and reattach streams", async () => {
+    const seen: string[] = [];
+    await collect(
+      iterateWithReattach({
+        initial: () => gen(arrowBatch("r1", [1]), arrowBatch("r2", [2]), transientError()),
+        reattach: () => gen(arrowBatch("r3", [3]), resultComplete("r4")),
+        retryPolicy: fastPolicy,
+        sleep: noSleep,
+        onResponse: (response) => {
+          seen.push(response.responseId);
+        },
+      }),
+    );
+    assert.deepStrictEqual(seen, ["r1", "r2", "r3", "r4"]);
+  });
+
   it("reattach receives undefined lastResponseId when no response was seen", async () => {
     const reattachCalls: (string | undefined)[] = [];
     await collect(
