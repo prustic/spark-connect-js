@@ -288,11 +288,7 @@ export class GrpcTransport implements Transport {
       retryPolicy: this.retryPolicy,
       sleep,
       wrapError: (err) => this._wrapError(sessionId, err),
-      onResponse: (response) => {
-        if (response.serverSideSessionId.length > 0) {
-          this.observedServerSideSessionIds.set(sessionId, response.serverSideSessionId);
-        }
-      },
+      onResponse: (response) => this._captureServerSession(sessionId, response),
     });
   }
 
@@ -365,11 +361,10 @@ export class GrpcTransport implements Transport {
             deserialize,
             request,
             this.metadata,
-            (err: grpc.ServiceError | null, response?: ReleaseSessionResponse) => {
+            (err: grpc.ServiceError | null) => {
               if (err) {
                 this._wrapError(sessionId, err).then(reject, reject);
               } else {
-                this._captureServerSession(sessionId, response);
                 this.observedServerSideSessionIds.delete(sessionId);
                 resolve();
               }

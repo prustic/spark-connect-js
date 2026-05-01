@@ -34,7 +34,7 @@ export interface ReattachIterationOptions {
   /**
    * Wrap raw gRPC errors into the project's typed error hierarchy. The wrap
    * happens only for terminal failures (non-retryable, or budget exhausted).
-   * May return a Promise so the wrapper can issue follow-up RPCs (e.g.
+   * Returns a Promise so the wrapper can issue follow-up RPCs (e.g.
    * `FetchErrorDetails` to enrich the error with the server's chain).
    */
   wrapError?: (err: unknown) => Promise<unknown>;
