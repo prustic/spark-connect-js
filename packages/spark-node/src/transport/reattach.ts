@@ -91,8 +91,7 @@ export async function* iterateWithReattach(
 
 /**
  * Default `wrapError`: leaves the error unchanged. Transports pass their own
- * wrapper (e.g. {@link wrapGrpcError}) to convert raw gRPC errors into the
- * project's typed hierarchy.
+ * wrapper to convert raw gRPC errors into the project's typed hierarchy.
  */
 function passThrough(err: unknown): Promise<unknown> {
   return Promise.resolve(err);

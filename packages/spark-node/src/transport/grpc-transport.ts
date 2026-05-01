@@ -370,6 +370,7 @@ export class GrpcTransport implements Transport {
                 this._wrapError(sessionId, err).then(reject, reject);
               } else {
                 this._captureServerSession(sessionId, response);
+                this.observedServerSideSessionIds.delete(sessionId);
                 resolve();
               }
             },
@@ -515,6 +516,7 @@ export class GrpcTransport implements Transport {
     if (errorId === undefined || errorId.length === 0) return base;
     try {
       const response = await this._fetchErrorDetails(sessionId, errorId);
+      this._captureServerSession(sessionId, response);
       return enrichFromFetchResponse(base, response);
     } catch {
       return base;
