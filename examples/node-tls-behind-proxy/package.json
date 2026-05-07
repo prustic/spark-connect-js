@@ -1,0 +1,29 @@
+{
+  "name": "@spark-connect-js/example-node-tls-behind-proxy",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Connect to Spark Connect over TLS via a Caddy reverse proxy",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "gen-cert": "mkdir -p certs && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout certs/key.pem -out certs/cert.pem -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'",
+    "start": "NODE_EXTRA_CA_CERTS=./certs/cert.pem node dist/main.js",
+    "clean": "git clean -xdf .cache .turbo dist *.tsbuildinfo node_modules certs",
+    "lint": "eslint",
+    "spark:up": "docker compose up -d --wait",
+    "spark:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@spark-connect-js/node": "workspace:*"
+  },
+  "devDependencies": {
+    "@spark-connect-js/eslint-config": "workspace:*",
+    "@spark-connect-js/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,30 @@
+services:
+  spark-connect:
+    image: apache/spark:4.0.0
+    command:
+      - /opt/spark/sbin/start-connect-server.sh
+    environment:
+      - SPARK_NO_DAEMONIZE=true
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/15002'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro
+    depends_on:
+      spark-connect:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://localhost:8443/ >/dev/null 2>&1 || exit 0"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

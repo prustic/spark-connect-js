@@ -15,6 +15,7 @@
     "@spark-connect-js/example-node-cache-pivot-stats",
     "@spark-connect-js/example-node-catalog",
     "@spark-connect-js/example-node-read-write",
+    "@spark-connect-js/example-node-tls-behind-proxy",
     "@spark-connect-js/integration-tests"
   ]
 }
