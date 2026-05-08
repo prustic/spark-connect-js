@@ -4,7 +4,7 @@ import * as net from "node:net";
  * In-process TCP forwarding proxy used by the reattach integration test.
  *
  * Listens on a random local port and forwards each accepted connection to
- * `upstreamPort` on localhost. Exposes two ways to drop the connection:
+ * `upstreamHost:upstreamPort`. Exposes two ways to drop the connection:
  *
  *   - `dropAll()` immediately destroys all open sockets.
  *   - `dropAfterUpstreamBytes(n)` arms a one-shot drop that fires the first
@@ -30,7 +30,7 @@ export interface TcpProxy {
   close: () => Promise<void>;
 }
 
-export function startTcpProxy(upstreamPort: number): Promise<TcpProxy> {
+export function startTcpProxy(upstreamHost: string, upstreamPort: number): Promise<TcpProxy> {
   const sockets = new Set<net.Socket>();
   let upstreamBytes = 0;
   let armed: { threshold: number; resolve: () => void; reject: (e: Error) => void } | null = null;
@@ -41,7 +41,7 @@ export function startTcpProxy(upstreamPort: number): Promise<TcpProxy> {
   };
 
   const server = net.createServer((client) => {
-    const upstream = net.connect(upstreamPort, "127.0.0.1");
+    const upstream = net.connect(upstreamPort, upstreamHost);
     sockets.add(client);
     sockets.add(upstream);
 

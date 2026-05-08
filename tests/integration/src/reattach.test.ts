@@ -5,10 +5,10 @@ import { startTcpProxy, type TcpProxy } from "./helpers/tcp-proxy.js";
 
 const UPSTREAM_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 
-function upstreamPort(remote: string): number {
-  const match = /^sc:\/\/[^:]+:(\d+)/.exec(remote);
-  if (!match) throw new Error(`unrecognised SPARK_REMOTE: ${remote}`);
-  return Number.parseInt(match[1], 10);
+function parseUpstream(remote: string): { host: string; port: number } {
+  const match = /^sc:\/\/([^:/]+):(\d+)/.exec(remote);
+  if (!match) throw new Error(`unrecognized SPARK_REMOTE: ${remote}`);
+  return { host: match[1], port: Number.parseInt(match[2], 10) };
 }
 
 describe("reattach survives a mid-query connection drop", () => {
@@ -21,7 +21,8 @@ describe("reattach survives a mid-query connection drop", () => {
   });
 
   it("collects all rows after a TCP RST mid-stream", async () => {
-    proxy = await startTcpProxy(upstreamPort(UPSTREAM_REMOTE));
+    const upstream = parseUpstream(UPSTREAM_REMOTE);
+    proxy = await startTcpProxy(upstream.host, upstream.port);
     session = connect(`sc://127.0.0.1:${String(proxy.port)}`);
 
     // Single-partition range so the server emits a deterministic stream of
