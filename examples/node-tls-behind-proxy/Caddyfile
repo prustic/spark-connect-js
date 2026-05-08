@@ -1,0 +1,4 @@
+:8443 {
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+    reverse_proxy h2c://spark-connect:15002
+}
