@@ -24,12 +24,12 @@
     "release": "turbo run build && changeset publish"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
     "@spark-connect-js/prettier-config": "workspace:*",
     "c8": "^11.0.0",
     "prettier": "catalog:",
-    "turbo": "^2.9.6",
+    "turbo": "^2.9.10",
     "typescript": "catalog:"
   },
   "prettier": "@spark-connect-js/prettier-config"
