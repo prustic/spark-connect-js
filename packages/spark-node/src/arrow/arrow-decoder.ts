@@ -79,7 +79,7 @@ function coerceValue(val: unknown): unknown {
     typeof val === "object" &&
     val !== null &&
     "toJSON" in val &&
-    typeof (val as { toJSON: unknown }).toJSON === "function"
+    typeof val.toJSON === "function"
   ) {
     return (val as { toJSON(): unknown }).toJSON();
   }

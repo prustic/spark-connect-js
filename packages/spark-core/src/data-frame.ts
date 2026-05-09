@@ -974,10 +974,12 @@ export class DataFrame {
 
     const fmt = (val: unknown): string => {
       if (val === null || val === undefined) return "null";
-      const s =
-        typeof val === "object"
-          ? JSON.stringify(val)
-          : String(val as string | number | boolean | bigint);
+      if (typeof val === "object") {
+        const s = JSON.stringify(val);
+        return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      const s = String(val);
       return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
     };
 
