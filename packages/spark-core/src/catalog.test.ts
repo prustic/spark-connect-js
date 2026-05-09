@@ -16,8 +16,10 @@ function makeCatalog(): Catalog {
 
 /** Extract the CatalogOperation from the DataFrame plan. */
 function planOp(df: DataFrame): CatalogOperation {
-  assert.equal(df._plan.type, "catalog");
-  return (df._plan as { type: "catalog"; operation: CatalogOperation }).operation;
+  if (df._plan.type !== "catalog") {
+    throw new Error(`expected catalog plan, got ${df._plan.type}`);
+  }
+  return df._plan.operation;
 }
 
 describe("Catalog — sync DataFrame methods", () => {

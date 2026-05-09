@@ -121,7 +121,7 @@ function parseProtoField(field: ProtoField): StructField {
     field.name ?? "",
     resolveProtoDataType(field.dataType),
     field.nullable ?? true,
-    (field.metadata as Record<string, unknown>) ?? {},
+    field.metadata ?? {},
   );
 }
 
