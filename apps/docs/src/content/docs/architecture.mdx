@@ -120,7 +120,9 @@ The client itself keeps very little:
 - the Arrow decoder,
 - connection parameters, for reconnect.
 
-A disconnected client can reattach by constructing a new session with the same `session_id`, provided the server hasn't already reaped it.
+A transient gRPC drop during a server-streaming `ExecutePlan` is handled in-process: the transport tracks `responseId` on every received response and, on a retryable failure (`UNAVAILABLE`, or `INTERNAL` carrying `INVALID_CURSOR.DISCONNECTED`), opens a `ReattachExecute(operation_id, last_response_id)` to resume the stream from after the last acknowledged batch. The retry budget and backoff are configurable via `RetryPolicy`.
+
+A whole-session loss (driver restart, idle reap) is recoverable too, by constructing a new session with the same `session_id` while the server's session cache still has the entry.
 
 ### Lifecycle
 

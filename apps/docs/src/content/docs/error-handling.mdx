@@ -9,14 +9,19 @@ When the Spark Connect server rejects a plan or the transport fails, the client 
 
 ```ts
 class SparkConnectError extends Error {
-  readonly code: number;         // gRPC status code
-  readonly errorClass?: string;  // not populated yet
-  readonly sqlState?: string;    // not populated yet
-  readonly cause?: unknown;      // the raw @grpc/grpc-js error
+  readonly code: number;                            // gRPC status code
+  readonly errorClass?: string;                     // e.g. "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+  readonly sqlState?: string;                       // e.g. "42703"
+  readonly messageParameters?: Record<string, string>; // template variables from the server
+  readonly errorTypeHierarchy?: readonly string[];  // JVM exception class chain, root-most first
+  readonly serverStackTrace?: readonly string[];    // populated when spark.sql.connect.serverStacktrace.enabled
+  readonly cause?: unknown;                         // the raw @grpc/grpc-js error
 }
 ```
 
-`code` and `message` are always set. `errorClass` and `sqlState` are declared but the transport doesn't decode the server's response trailers yet, so distinguish failures by `code` and by matching `message`.
+`code` and `message` are always set. `errorClass` and `sqlState` are decoded from the server's `grpc-status-details-bin` trailer for any plan that fails analysis or execution. `errorTypeHierarchy` and `serverStackTrace` come from a follow-up `FetchErrorDetails` RPC the transport issues automatically when the inline trailer is incomplete. `serverStackTrace` is empty unless the server runs with `spark.sql.connect.serverStacktrace.enabled=true`, which most production deployments leave off.
+
+Match on `errorClass` first, fall back to `code` for transport-layer failures (`UNAVAILABLE`, `DEADLINE_EXCEEDED`, etc.) where the server never produced an error class.
 
 ## Failure modes
 
@@ -76,5 +81,5 @@ return runQuery().catch(classify);
 
 ## Reference
 
-- Spark's error-condition catalogue: [`error-conditions.json`](https://github.com/apache/spark/blob/master/common/utils/src/main/resources/error/error-conditions.json). Those identifiers are what `errorClass` will carry once trailer parsing lands.
+- Spark's error-condition catalogue: [`error-conditions.json`](https://github.com/apache/spark/blob/master/common/utils/src/main/resources/error/error-conditions.json). Those identifiers are exactly what `errorClass` carries.
 - gRPC status codes: [grpc.io/docs/guides/status-codes](https://grpc.github.io/grpc/core/md_doc_statuscodes.html).

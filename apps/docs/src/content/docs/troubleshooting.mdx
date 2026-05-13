@@ -57,7 +57,7 @@ Run the same string in `spark-sql` if you have access to a shell; the two parser
 
 ### `INVALID_ARGUMENT` with no error class
 
-Some Spark errors come through without a structured `errorClass`. The message is your best clue. Common causes:
+Most analyzer failures come back with a populated `errorClass`. A few paths still don't (some legacy DataSourceV1 plumbing, certain catalog-side rejections), and the message is the only handle. Common causes for those:
 
 - Plan references a catalog the server doesn't have configured (Iceberg, Delta).
 - Writing to a path without permission.

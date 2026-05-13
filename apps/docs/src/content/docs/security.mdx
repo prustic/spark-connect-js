@@ -1,33 +1,67 @@
 ---
 title: Security
-description: What the client does and does not do for transport security and authentication today.
+description: "Transport security and authentication: what the client supports today and the residual gaps."
 ---
 
-The transport is plaintext gRPC at `sc://host:port`. Standard Node networking applies, so anything you can do at the OS or container level (SSH tunnels, service meshes, sidecar proxies) works the same.
+The full `sc://` connection-string grammar is parsed: TLS via `use_ssl=true`, bearer tokens, `user_id`, `user_agent`, `session_id`, `grpc_max_message_size`, plus arbitrary `key=value` pairs that pass through as gRPC metadata on every RPC. Token-over-insecure is rejected unconditionally to avoid leaking credentials.
 
-## Gaps
+## TLS
 
-| Feature | What's missing |
-| ------- | -------------- |
-| TLS (`scc://`) | URL parser doesn't recognize the scheme. Channels use `credentials.createInsecure()`. |
-| Bearer tokens | URL parser ignores `;token=`; no `.token()` on the builder; no `authorization` header sent. |
-| Mutual TLS | No public way to supply client certificates. |
-| `user_id` propagation | `sessionId` exists internally but no user metadata attaches to outgoing RPCs. |
-| User-agent customization | Uses the `@grpc/grpc-js` default. |
-| Request IDs / trace propagation | No `x-request-id` or `grpc-trace-bin` headers. |
+Spark Connect 4.0's gRPC server listens in plaintext. Production deployments terminate TLS at a reverse proxy in front of the port, and `use_ssl=true` on the connection string makes spark-js do the TLS handshake against that proxy. Spark itself never sees the encrypted bytes.
 
-If you need any of this today, front the Spark Connect server with a proxy that terminates TLS and handles authentication, and route plaintext gRPC from your Node process to the proxy over a private network. The [roadmap](/spark-connect-js/roadmap/) tracks when each gap closes.
+```ts
+connect("sc://spark.internal:443/;use_ssl=true");
+```
+
+`use_ssl=true` swaps the underlying gRPC channel to `grpc.credentials.createSsl()`, which trusts whatever roots Node's TLS layer trusts (the bundled Mozilla CA list plus anything in `NODE_EXTRA_CA_CERTS`). For a self-signed or private-CA cert, point `NODE_EXTRA_CA_CERTS` at the CA bundle before starting the process. For a custom `ChannelCredentials` (mTLS, custom verify callback), drop down to `GrpcTransportOptions.channelCredentials`; see the [Node integration page](/spark-connect-js/integrations/runtimes/node/).
+
+The [`node-tls-behind-proxy` example](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy) demonstrates the full deployment topology end to end with Caddy in front of `apache/spark:4.0.0`.
+
+## Bearer tokens
+
+```ts
+connect("sc://spark.internal:443/;token=abc;use_ssl=true");
+```
+
+The token is attached as `authorization: Bearer <token>` on every RPC via `combineChannelCredentials(createSsl(), createFromMetadataGenerator(...))`. The presence of `token=` implicitly enables TLS; an explicit `use_ssl=false` together with `token=` is rejected at parse time.
+
+### Token rotation
+
+Once a session is built, the bearer token is sealed into the channel and can't be swapped in place. To rotate, build a new session with the new token, drain in-flight queries on the old session, then call `stop()` on it.
+
+```ts
+const stale = oldSession;
+const fresh = connect(`sc://spark.internal:443/;token=${newToken};use_ssl=true`);
+await drain(stale);
+await stale.stop();
+```
+
+## Custom metadata
+
+Any unreserved `;key=value` pair on the URL is attached to every RPC as gRPC metadata. Use it for tenant tags or proxy-auth headers your reverse proxy expects.
+
+```ts
+connect("sc://spark.internal:443/;use_ssl=true;tenant=acme;x-deploy=blue");
+```
+
+Reserved keys are `token`, `user_id`, `session_id`, `use_ssl`, `user_agent`, and `grpc_max_message_size`.
 
 ## What goes on the wire
 
-Each RPC carries whatever `@grpc/grpc-js` attaches by default (a `user-agent` and the gRPC framing headers) plus the serialized `spark.connect.Plan` in the request body. The client adds no application-level metadata.
+Each RPC carries the `spark.connect.Plan` (or analyze/config/interrupt request) in the body, plus metadata:
 
-## Secrets in logs
+- `user-agent`: `<your prefix> spark-connect-js/<version> (node <version>; <platform>)`.
+- `authorization: Bearer <token>` if a token is configured.
+- `client_observed_server_side_session_id`: the most recent `serverSideSessionId` the server has emitted for this session, echoed back so the server can detect a stale-session mismatch. Cleared on `ReleaseSession`.
+- Any unreserved connection-string params, as-is.
 
-The client itself doesn't log. Two things to watch in your own code:
+## Residual gaps
 
-- `df.explain()` output includes the query text, SQL string literals included. Sanitize before logging if your SQL embeds secrets.
-- Once token support lands, connection URLs will carry the token in URL form. Scrub URLs before logging.
+| Feature | Status |
+| ------- | ------ |
+| Mutual TLS via the public `connect()` URL | Not implemented. Achievable today through `GrpcTransportOptions.channelCredentials` directly. |
+| Request IDs / trace propagation (`x-request-id`, `grpc-trace-bin`) | Not implemented. Set them yourself via custom metadata params if a proxy needs them. |
+| OAuth refresh-token flows | Not implemented. Wrap your token source in code that builds a new session when the bearer expires. |
 
 ## Reporting a vulnerability
 

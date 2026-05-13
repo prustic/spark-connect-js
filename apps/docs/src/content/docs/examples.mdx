@@ -29,6 +29,12 @@ Broader workload: aggregation, pivoting, caching, windowed stats. Closer to a re
 
 Covers: `groupBy`, `pivot`, `rollup`, `Window`, `df.cache()`, `unpersist`, statistical functions.
 
+### [`node-tls-behind-proxy`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy)
+
+Connects to a Spark Connect server over TLS by terminating TLS at a Caddy reverse proxy in front of `apache/spark:4.0.0`. Covers the production deployment topology, since Spark Connect 4.0 has no native server-side TLS.
+
+Covers: `use_ssl=true`, self-signed certs via `NODE_EXTRA_CA_CERTS`, Caddy `reverse_proxy h2c://`.
+
 ## Running an example
 
 Each example has a `docker-compose.yml` that brings up a Spark 3.5 Connect server on `localhost:15002`. From inside an example directory:

@@ -5,19 +5,33 @@ description: Connection strings, builder options, and data-source options.
 
 ## The connection URL
 
-Today the client accepts exactly one URL shape:
+The client accepts the full `sc://` connection-string grammar:
 
 ```
-sc://host:port
+sc://host:port[/[;key=value][;key=value]...]
 ```
 
-Only the scheme, host, and port are read. Any path, query string, or `;`-separated parameters are ignored. TLS (`scc://`), bearer tokens, `user_id`, `user_agent`, and `session_id` aren't implemented yet; see the [roadmap](/spark-connect-js/roadmap/).
+Reserved keys with first-class handling:
+
+| Key | Meaning |
+| --- | --- |
+| `use_ssl` | `true` swaps the channel to `grpc.credentials.createSsl()`. The presence of `token` implies `use_ssl=true`. |
+| `token` | Bearer token. Attached as `authorization: Bearer <token>` on every RPC. Token-over-insecure (`use_ssl=false` with `token`) is rejected. |
+| `user_id` | Sent as `userContext.userId` on every RPC. |
+| `user_agent` | Prefix to the canonical user-agent string `<your prefix> spark-connect-js/<ver> (node <ver>; <platform>)`. |
+| `session_id` | Reuse an existing server-side session by UUID. Validated at parse time. |
+| `grpc_max_message_size` | Override the gRPC max-message-size in bytes for both inbound and outbound. |
+
+Any unreserved `;key=value` pair is attached as gRPC metadata on every outgoing RPC.
 
 ### Examples
 
 ```ts
 connect("sc://localhost:15002");
-connect("sc://spark.internal:15002");
+connect("sc://spark.internal:443/;use_ssl=true");
+connect("sc://spark.internal:443/;token=abc;use_ssl=true");
+connect("sc://spark.internal:443/;use_ssl=true;tenant=acme;x-deploy=blue");
+connect("sc://localhost:15002/;session_id=550e8400-e29b-41d4-a716-446655440000");
 ```
 
 To skip the URL string, use the builder directly:
@@ -32,17 +46,18 @@ const spark = SparkSession.builder()
 
 ## Builder methods
 
-The builder currently exposes four methods:
-
 ```ts
 SparkSession.builder()
   .remote("sc://localhost:15002")   // required, connection URL
+  .sessionId("550e8400-e29b-41d4-a716-446655440000") // optional, reuse a server-side session
   .transport(customTransport)       // optional, plug in a custom transport
   .arrowDecoder(customDecoder)      // optional, plug in a custom Arrow decoder
   .getOrCreate();                   // return the session
 ```
 
 `getOrCreate()` constructs the session without opening the channel. The channel opens lazily on the first RPC.
+
+For low-level transport tuning (custom `ChannelCredentials`, retry policy override, max-message-size override) construct a `GrpcTransport` directly and inject it via `.transport(...)`. The `GrpcTransportOptions` shape is documented in the [API reference](/spark-connect-js/api/).
 
 ## Data-source options
 
@@ -99,12 +114,17 @@ Reader and writer options pass through to Spark unchanged. The full list is in t
 
 ## Runtime configuration
 
-`session.conf.get("spark.sql.shuffle.partitions")` and related runtime-configuration APIs are not yet exposed. For now, set Spark configuration on the server: `spark-defaults.conf`, or `--conf` flags on the launch command.
+`session.conf` mirrors PySpark's `spark.conf`, routed through Spark Connect's `Config` RPC. Every method is async because each call is a server roundtrip.
 
-```bash
-./sbin/start-connect-server.sh \
-  --conf spark.sql.shuffle.partitions=50 \
-  --conf spark.sql.adaptive.enabled=true
+```ts
+await spark.conf.set("spark.sql.shuffle.partitions", "50");
+const v = await spark.conf.get("spark.sql.shuffle.partitions"); // "50"
+const all = await spark.conf.getAll();                          // Record<string, string>
+const allShuffle = await spark.conf.getAll("spark.sql.shuffle.");
+const ok = await spark.conf.isModifiable("spark.sql.shuffle.partitions"); // true
+await spark.conf.unset("spark.sql.shuffle.partitions");
 ```
 
-A TypeScript `RuntimeConfig` that mirrors `spark.conf.*` in Scala and PySpark is on the [roadmap](/spark-connect-js/roadmap/).
+`get` returns `string | undefined`; the server returns `undefined` for unset keys.
+
+Server-side defaults still live in `spark-defaults.conf` or `--conf` flags on `start-connect-server.sh`. `session.conf` is for per-session overrides made from client code.
