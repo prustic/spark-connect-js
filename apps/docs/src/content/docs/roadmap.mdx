@@ -5,37 +5,37 @@ description: Planned releases and what lands in each.
 
 import Mermaid from '../../components/Mermaid.astro';
 
+Dated entries have shipped. Entries with no date are planned for the indicated release.
+
 <Mermaid code={`
 timeline TD
-  section Shipped
-    0.1.0 · 9 Mar 2026 : Core DataFrame & Column
-                       : SparkSession
-                       : Built-in functions
-    0.2.0 · 15 Mar 2026 : Caching & repartitioning
-                        : cube / rollup / pivot / unpivot
-                        : DataFrameStat
-    0.3.0 · 29 Mar 2026 : DataFrameReader/Writer shortcuts
-                        : DataFrameWriterV2
-                        : Typed error hierarchy
-    0.4.0 · pending release : Documentation site
-                            : Catalog parity with PySpark
-                            : TLS, bearer token, connection string
-                            : Reattach, retry, interrupts
-                            : RuntimeConfig (spark.conf)
-                            : Error trailer decode + FetchErrorDetails
-                            : Java UDF / UDAF registration via spark.udf
-  section Planned
-    0.5.0 : Structured Streaming
-           : StreamingQuery & Manager
-           : Listener callbacks
-    0.6.0 : MERGE INTO builder
-           : Session controls & artifacts
-           : ~120 more functions
-           : DataFrame long-tail
-    0.7.0 : Arrow batch UDFs
-           : Table-valued functions
-    0.8.0 : Managed platform connectors, Databricks, EMR, possibly more
-    0.9.0 : Additional runtime & framework integrations
+  0.1.0 · 9 Mar 2026 : Core DataFrame & Column
+                     : SparkSession
+                     : Built-in functions
+  0.2.0 · 15 Mar 2026 : Caching & repartitioning
+                      : cube / rollup / pivot / unpivot
+                      : DataFrameStat
+  0.3.0 · 29 Mar 2026 : DataFrameReader/Writer shortcuts
+                      : DataFrameWriterV2
+                      : Typed error hierarchy
+  0.4.0 · pending release : Documentation site
+                          : Catalog parity with PySpark
+                          : TLS, bearer token, connection string
+                          : Reattach, retry, interrupts
+                          : RuntimeConfig (spark.conf)
+                          : Error trailer decode + FetchErrorDetails
+                          : Java UDF / UDAF registration via spark.udf
+  0.5.0 : Structured Streaming
+         : StreamingQuery & Manager
+         : Listener callbacks
+  0.6.0 : MERGE INTO builder
+         : Session controls & artifacts
+         : ~120 more functions
+         : DataFrame long-tail
+  0.7.0 : Arrow batch UDFs
+         : Table-valued functions
+  0.8.0 : Managed platform connectors, Databricks, EMR, possibly more
+  0.9.0 : Additional runtime & framework integrations
 `} />
 
 ## Shipped
