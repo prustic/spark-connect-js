@@ -1,5 +1,26 @@
 # @spark-connect-js/node
 
+## 0.4.0
+
+### Minor Changes
+
+- [#61](https://github.com/prustic/spark-connect-js/pull/61) [`aa22cc6`](https://github.com/prustic/spark-connect-js/commit/aa22cc675cc3531056d5fc2f9715198b4b89dd2f) Thanks [@prustic](https://github.com/prustic)!
+  - Full `sc://` connection-string grammar parsed: TLS via `use_ssl=true`, bearer `token`, `user_id`, `user_agent`, `session_id` (UUID), `grpc_max_message_size`, plus arbitrary `key=value` pairs that pass through as gRPC metadata on every RPC
+  - Bearer token attached as `authorization: Bearer <token>` via `combineChannelCredentials(createSsl(), createFromMetadataGenerator(...))`
+  - Canonical `user_agent` suffix: `<your prefix> spark-connect-js/<ver> (node <ver>; <platform>)`.
+  - Per-request operation IDs (UUIDv4) on every `ExecutePlan` request
+  - `ReattachExecute` iterator resumes server-streaming responses after transient gRPC drops (`UNAVAILABLE`, `INTERNAL` with `INVALID_CURSOR.DISCONNECTED`) without re-executing the plan
+  - Configurable retry policy via `GrpcTransportOptions.retryPolicy`; default mirrors PySpark (`maxRetries=15`, `initialBackoffMs=50`, `maxBackoffMs=60_000`, `backoffMultiplier=4`, `jitterMs=500`)
+  - Error trailers: decode `grpc-status-details-bin` (`google.rpc.Status` + `ErrorInfo`) to populate `errorClass`, `sqlState`, `messageParameters` on `SparkConnectError`, with fallback to a `FetchErrorDetails` RPC for `errorTypeHierarchy` and `serverStackTrace` when the inline trailer is incomplete
+  - `client_observed_server_side_session_id` captured from every response and echoed back on subsequent RPCs for stale-session detection; cleared on `ReleaseSession`
+  - `Config` and `Interrupt` RPCs wired (consumed by `spark.conf` and `interrupt*` on core)
+
+### Patch Changes
+
+- Updated dependencies [[`aa22cc6`](https://github.com/prustic/spark-connect-js/commit/aa22cc675cc3531056d5fc2f9715198b4b89dd2f), [`aa22cc6`](https://github.com/prustic/spark-connect-js/commit/aa22cc675cc3531056d5fc2f9715198b4b89dd2f)]:
+  - @spark-connect-js/core@0.4.0
+  - @spark-connect-js/connect@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
