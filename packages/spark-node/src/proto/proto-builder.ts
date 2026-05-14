@@ -144,11 +144,12 @@ export function buildRelation(plan: LogicalPlan): Relation {
               case: "dataSource",
               value: create(Read_DataSourceSchema, {
                 format: plan.format,
-                paths: [plan.path],
+                paths: plan.isStreaming === true && plan.path === "" ? [] : [plan.path],
                 options: plan.options,
                 ...(plan.schema != null && { schema: plan.schema }),
               }),
             },
+            ...(plan.isStreaming === true && { isStreaming: true }),
           }),
         },
       });
@@ -165,6 +166,7 @@ export function buildRelation(plan: LogicalPlan): Relation {
                 options: plan.options,
               }),
             },
+            ...(plan.isStreaming === true && { isStreaming: true }),
           }),
         },
       });

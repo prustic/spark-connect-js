@@ -5,6 +5,7 @@ import { RuntimeConfig } from "./runtime-config.js";
 import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from "./errors.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
+import { DataStreamReader } from "./streaming/data-stream-reader.js";
 
 // crypto.randomUUID() is available globally in Node 19+, Deno, and all modern
 // browsers, but TypeScript's ES2023 lib doesn't include it since it's a Web
@@ -44,6 +45,22 @@ export interface Transport {
     command: Record<string, unknown>,
     options?: ExecuteOptions,
   ): Promise<void>;
+
+  /**
+   * Execute a command and collect any non-Arrow result payloads from the
+   * `ExecutePlanResponse` stream. Used by streaming commands (e.g.
+   * `WriteStreamOperationStart`, `StreamingQueryCommand`) where the server
+   * returns a structured result.
+   *
+   * Each entry in the returned array is a JSON-like shape carrying a `type`
+   * discriminator (e.g. `"writeStreamOperationStartResult"`,
+   * `"streamingQueryCommandResult"`) plus the decoded payload fields.
+   */
+  executeCommandResponses?(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): Promise<Record<string, unknown>[]>;
 
   /** Send an AnalyzePlan request (schema, explain, etc.) and return the response. */
   analyzePlan?(
@@ -166,6 +183,15 @@ export class SparkSession {
     return new DataFrameReader(this);
   }
 
+  /**
+   * Returns a {@link DataStreamReader} for building streaming Read plans.
+   * The resulting {@link DataFrame} carries `isStreaming: true` and can only
+   * be consumed via `df.writeStream`.
+   */
+  get readStream(): DataStreamReader {
+    return new DataStreamReader(this);
+  }
+
   /** Execute a SQL query. */
   sql(query: string): DataFrame {
     return DataFrame._fromPlan(this, {
@@ -229,6 +255,22 @@ export class SparkSession {
       );
     }
     await this.transport.executeCommand(this.sessionId, command, this._executeOptions());
+  }
+
+  /**
+   * @internal Used by streaming classes (DataStreamWriter, StreamingQuery) to
+   * issue commands that return structured non-Arrow result payloads.
+   */
+  async _executeCommandResponses(
+    command: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    if (!this.transport.executeCommandResponses) {
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support executeCommandResponses. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports streaming commands.",
+      );
+    }
+    return this.transport.executeCommandResponses(this.sessionId, command, this._executeOptions());
   }
 
   /** @internal Snapshot of per-call options at the time of dispatch. */
