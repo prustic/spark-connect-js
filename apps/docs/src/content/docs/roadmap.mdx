@@ -6,7 +6,7 @@ description: Planned releases and what lands in each.
 import Mermaid from '../../components/Mermaid.astro';
 
 <Mermaid code={`
-timeline
+timeline TD
   0.1.0 · 9 Mar 2026 : Core DataFrame & Column
                      : SparkSession
                      : Built-in functions
@@ -16,22 +16,22 @@ timeline
   0.3.0 · 29 Mar 2026 : DataFrameReader/Writer shortcuts
                       : DataFrameWriterV2
                       : Typed error hierarchy
-  0.4.0 · pending release : Documentation site
-                          : Catalog parity with PySpark
-                          : TLS, bearer token, connection string
-                          : Reattach, retry, interrupts
-                          : RuntimeConfig (spark.conf)
-                          : Error trailer decode + FetchErrorDetails
-                          : Java UDF / UDAF registration via spark.udf
+  0.4.0 : Documentation site
+        : Catalog parity with PySpark
+        : TLS, bearer token, connection string
+        : Reattach, retry, interrupts
+        : RuntimeConfig (spark.conf)
+        : Error trailer decode + FetchErrorDetails
+        : Java UDF / UDAF registration via spark.udf
   0.5.0 : Structured Streaming
-         : StreamingQuery & Manager
-         : Listener callbacks
+        : StreamingQuery & Manager
+        : Listener callbacks
   0.6.0 : MERGE INTO builder
-         : Session controls & artifacts
-         : ~120 more functions
-         : DataFrame long-tail
+        : Session controls & artifacts
+        : ~120 more functions
+        : DataFrame long-tail
   0.7.0 : Arrow batch UDFs
-         : Table-valued functions
+        : Table-valued functions
   0.8.0 : Managed platform connectors, Databricks, EMR, possibly more
   0.9.0 : Additional runtime & framework integrations
 `} />
@@ -43,7 +43,8 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 - **[0.1.0](/spark-connect-js/changelog/#010)** · 9 March 2026 · core DataFrame, Column, SparkSession, built-in functions
 - **[0.2.0](/spark-connect-js/changelog/#020)** · 15 March 2026 · caching, repartitioning, `cube`/`rollup`/`pivot`/`unpivot`, `DataFrameStat`
 - **[0.3.0](/spark-connect-js/changelog/#030)** · 29 March 2026 · reader/writer shortcuts, `DataFrameWriterV2`, typed error hierarchy
-- **0.4.0** · feature-complete, pending release · catalog parity, docs site, transport (TLS, bearer, retry, reattach, interrupts), `RuntimeConfig`, error-trailer decoding, Java UDF registration
+
+## Planned
 
 ### 0.4.0 · Catalog parity, docs site, transport
 
@@ -57,8 +58,6 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 - Error-trailer decoding: `errorClass`, `sqlState`, `messageParameters`, plus `FetchErrorDetails` fallback for `errorTypeHierarchy` and `serverStackTrace`.
 - `client_observed_server_side_session_id` echo for stale-session detection.
 - `node-tls-behind-proxy` example.
-
-## Planned
 
 ### 0.5.0 · Structured Streaming
 
