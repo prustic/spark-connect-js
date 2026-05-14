@@ -7,7 +7,7 @@
 
 TypeScript client for [Apache Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html). Talks to Spark over gRPC and decodes results with Apache Arrow. No JVM in your Node process.
 
-> **Note:** This project is in early development (v0.3.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> **Note:** This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## Install
 

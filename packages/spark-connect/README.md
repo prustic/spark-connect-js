@@ -6,7 +6,7 @@
 
 Generated TypeScript types and service definitions from the [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html) protobuf spec. Internal to the [`@spark-connect-js`](https://github.com/prustic/spark-connect-js) packages; **most users don't install this directly.**
 
-> **Note:** This project is in early development (v0.3.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> **Note:** This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 If you're building an application against Spark Connect, use [`@spark-connect-js/node`](https://www.npmjs.com/package/@spark-connect-js/node). This package is what `node` and [`@spark-connect-js/core`](https://www.npmjs.com/package/@spark-connect-js/core) use internally to encode and decode the wire protocol.
 
