@@ -1,22 +1,18 @@
 /**
- * Error types for spark-connect-js.
+ * @packageDocumentation
+ *
+ * Error types for `@spark-connect-js/core`.
  *
  * Two error families:
  *
- * 1. **SparkConnectError** - server-side / transport errors. Wraps gRPC status
- *    codes and Spark error classes from the JVM server.
+ * - {@link SparkConnectError}: server-side or transport failures. Wraps gRPC
+ *   status codes and Spark error classes from the JVM server.
+ * - {@link SparkClientError}: client-side failures raised before any RPC is
+ *   made. Concrete subclasses: {@link InvalidConfigError},
+ *   {@link InvalidInputError}, {@link UnsupportedOperationError}.
  *
- * 2. **Client-side errors** - raised before any RPC is made:
- *    - `InvalidConfigError` - session/builder misconfiguration
- *    - `InvalidInputError` - bad arguments to public API methods
- *    - `UnsupportedOperationError` - feature not available on the current transport
- *
- * All client-side errors extend a shared `SparkClientError` base so callers
- * can catch either the specific subclass or the whole family.
- *
- * @see Spark error classes: common/utils/src/main/resources/error/error-conditions.json
- * @see gRPC status codes: https://grpc.github.io/grpc/core/md_doc_statuscodes.html
- * @see FetchErrorDetails RPC: connector/connect/common/src/main/protobuf/spark/connect/base.proto
+ * @see [Spark error class catalogue](https://github.com/apache/spark/blob/master/common/utils/src/main/resources/error/error-conditions.json)
+ * @see [gRPC status codes](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
  */
 
 // ---------------------------------------------------------------------------
@@ -24,8 +20,21 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Maps gRPC status codes to human-readable names.
- * Only includes codes commonly seen from Spark Connect.
+ * Well-known gRPC status codes commonly seen from Spark Connect.
+ *
+ * Use this object for comparisons against {@link SparkConnectError.code}
+ * instead of magic numbers.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await df.collect();
+ * } catch (err) {
+ *   if (err instanceof SparkConnectError && err.code === GrpcStatusCode.UNAVAILABLE) {
+ *     // retry or surface a degraded-mode error
+ *   }
+ * }
+ * ```
  */
 export const GrpcStatusCode = {
   OK: 0,
@@ -50,6 +59,24 @@ export type GrpcStatusCode = (typeof GrpcStatusCode)[keyof typeof GrpcStatusCode
 // Server-side / transport error
 // ---------------------------------------------------------------------------
 
+/**
+ * An error returned by the Spark Connect server or raised at the gRPC
+ * transport layer.
+ *
+ * Carries the gRPC `code`, and when available the Spark `errorClass`
+ * (for example `"TABLE_OR_VIEW_NOT_FOUND"`) and SQL state code.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await spark.sql("SELECT * FROM missing").collect();
+ * } catch (err) {
+ *   if (err instanceof SparkConnectError && err.errorClass === "TABLE_OR_VIEW_NOT_FOUND") {
+ *     // handle known error class
+ *   }
+ * }
+ * ```
+ */
 export class SparkConnectError extends Error {
   /** gRPC status code (0 = OK, 14 = UNAVAILABLE, etc.) */
   readonly code: number;

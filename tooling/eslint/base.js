@@ -4,11 +4,11 @@ import prettierPlugin from "eslint-plugin-prettier";
 import tseslint from "typescript-eslint";
 
 /**
- * Shared ESLint flat config for all spark-js packages.
+ * Shared ESLint flat config for all spark-connect-js packages.
  *
  * Uses typescript-eslint v8+ with type-aware linting.  This catches real
  * bugs that plain TypeScript misses: floating promises, unsafe `any` usage,
- * and incorrect async patterns — all critical when building a gRPC streaming
+ * and incorrect async patterns, all critical when building a gRPC streaming
  * client that juggles Arrow buffers and async iterables.
  *
  * Prettier is integrated via eslint-plugin-prettier so formatting violations
@@ -36,7 +36,7 @@ export default tseslint.config(
       ],
       // We use explicit any in Transport/gRPC boundary code intentionally
       "@typescript-eslint/no-explicit-any": "warn",
-      // Require awaiting floating promises — critical for gRPC stream safety
+      // Require awaiting floating promises, critical for gRPC stream safety
       "@typescript-eslint/no-floating-promises": "error",
       // Disallow .then() when async/await is available
       "@typescript-eslint/no-misused-promises": "error",

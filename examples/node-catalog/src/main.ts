@@ -63,7 +63,7 @@ await catalog.cacheTable("employees");
 await catalog.clearCache();
 console.log("Is cached after clearCache?", await catalog.isCached("employees"));
 
-// Refresh metadata (smoke test — no error means success)
+// Refresh metadata (smoke test: no error means success)
 await employees.createOrReplaceTempView("employees");
 await catalog.refreshTable("employees");
 console.log("refreshTable('employees') succeeded");

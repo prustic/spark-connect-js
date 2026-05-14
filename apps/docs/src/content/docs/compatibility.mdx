@@ -1,0 +1,44 @@
+---
+title: Compatibility
+description: Supported Spark versions, Node.js versions, runtimes, dependencies, and stability promises.
+---
+
+In short: **Node.js 22+** on the client, **Spark 3.4+** (recommended: 4.0) on the server.
+
+The client speaks the [Spark Connect gRPC protocol](https://spark.apache.org/docs/latest/spark-connect-overview.html), so what actually works against any given server depends on which protobuf messages that server's version implements.
+
+## Spark server versions
+
+| Spark | Status                | Notes                                                                                                  |
+| ----- | --------------------- | ------------------------------------------------------------------------------------------------------ |
+| 4.0   | Recommended    | Latest tested target.                                                                                  |
+| 3.5   | Supported      | Tested in CI.                                                                                          |
+| 3.4   | Partial        | Proto messages added after 3.4 (some catalog APIs, for example) are rejected by the server's analyzer. |
+| < 3.4 | Not&nbsp;supported | Spark Connect did not exist before 3.4.                                                                |
+
+## Node.js versions
+
+| Node.js | Status                       | Notes                                                  |
+| ------- | ---------------------------- | ------------------------------------------------------ |
+| 24.x    | Tested&nbsp;in&nbsp;CI    |                                                        |
+| 22 LTS  | Tested&nbsp;in&nbsp;CI    | Minimum supported version.                             |
+| 20 LTS  | Not&nbsp;supported        | End of maintenance upstream.                           |
+| 18 LTS  | Not&nbsp;supported        | Missing globals the client relies on.                  |
+
+Node 22 is the active LTS line and what CI tests. The code only formally requires globals available in Node 19+, but anything below 22 is unsupported.
+
+## Other runtimes
+
+Node.js is the only runtime currently shipped. `@spark-connect-js/core` is platform-agnostic and dependency-free, so additional runtime adapters (Bun, Deno, the browser) ship as separate packages without changes to the public API. See [Integrations](/spark-connect-js/integrations/) for what's available and what's planned.
+
+## TypeScript
+
+Type definitions ship with every package. Consuming the types from a TS project requires **TypeScript 5.0 or later**.
+
+## Runtime dependencies
+
+| Package                     | Runtime dependencies                                                                                                                                                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@spark-connect-js/core`    | None                                                                                                                                                                                                                                |
+| `@spark-connect-js/node`    | [`@grpc/grpc-js`](https://www.npmjs.com/package/@grpc/grpc-js), [`apache-arrow`](https://www.npmjs.com/package/apache-arrow), [`@bufbuild/protobuf`](https://www.npmjs.com/package/@bufbuild/protobuf)                          |
+| `@spark-connect-js/connect` | [`@bufbuild/protobuf`](https://www.npmjs.com/package/@bufbuild/protobuf)                                                                                                                                                            |

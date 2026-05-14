@@ -1,0 +1,162 @@
+---
+title: Troubleshooting
+description: Common errors, what usually caused them, and how to recover.
+---
+
+A list of issues you *might* run into and what *might* be causing them.
+
+When a server-side error is opaque, `df.explain("extended")` prints the resolved plan with types and is usually the first useful thing to look at. See [Error handling](/spark-connect-js/error-handling/) for the error hierarchy.
+
+## Cannot connect at all
+
+### `UNAVAILABLE` immediately on `connect(...)`
+
+The client doesn't open the channel until the first RPC, so a bad URL fails on your first `.collect()` or `.sql(...)`. If the first action errors with `SparkConnectError` and `code === GrpcStatusCode.UNAVAILABLE`, one of:
+
+- The server isn't running. Check with `lsof -i :15002` or `curl http://<host>:15002`.
+- The server is running but bound to localhost and you're connecting from another host. Start it with `--host 0.0.0.0` if you meant to.
+- A firewall or security group is dropping the connection. Try `nc -zv <host> 15002` from the client machine to confirm the port is reachable.
+
+### `DEADLINE_EXCEEDED` on every RPC
+
+- Server is up but overloaded or garbage-collecting. Check the driver logs on the server.
+- Network path has packet loss. `mtr <host>` or equivalent.
+- Your own timeout is set too aggressively. Try without a signal first; if it works, raise the timeout.
+
+## Server rejects the query
+
+### `TABLE_OR_VIEW_NOT_FOUND`
+
+- The table doesn't exist. `await spark.catalog.tableExists("name")` to verify.
+- The table exists in a different database. Run `await spark.catalog.currentDatabase()` and check.
+- You created it as a temp view in one session and are querying from another. Temp views are session-scoped; use `createOrReplaceGlobalTempView` or register the table properly.
+
+### `UNRESOLVED_COLUMN`
+
+- Typo in the column name. `await df.columns()` prints the actual names.
+- You built the DataFrame against a different schema than the current one. Schema mismatch is the top cause; re-fetch the table.
+- The column is in a nested struct. Use `col("parent.child")` or `col("parent").getField("child")`.
+- Backticks needed. Names with dashes or reserved words require backtick quoting: `df.select("\`order-id\`")`.
+
+### `PARSE_SYNTAX_ERROR`
+
+The SQL string is malformed. The error message includes the token where parsing failed. Check for:
+
+- Unterminated string literals (unmatched quotes).
+- Missing commas in `SELECT` lists.
+- `COUNT(*) AS` not followed by an identifier.
+- Keywords used as identifiers without backticks: `from`, `order`, `group`.
+
+Run the same string in `spark-sql` if you have access to a shell; the two parsers are identical.
+
+### `DATATYPE_MISMATCH` / `UNRESOLVED_FUNCTION`
+
+- Function doesn't exist in Spark. Check the [built-in function list](https://spark.apache.org/docs/latest/api/sql/) for your server version.
+- Function exists but you're passing the wrong type. Common: passing a raw JS string where a `Column` is expected, or mixing `int` and `string` in arithmetic.
+- Cast the arguments explicitly: `col("x").cast("double").plus(col("y").cast("double"))`.
+
+### `INVALID_ARGUMENT` with no error class
+
+Most analyzer failures come back with a populated `errorClass`. A few paths still don't (some legacy DataSourceV1 plumbing, certain catalog-side rejections), and the message is the only handle. Common causes for those:
+
+- Plan references a catalog the server doesn't have configured (Iceberg, Delta).
+- Writing to a path without permission.
+- Using a DataSourceV2 feature (`writeTo(...)`) against a source that only supports v1.
+
+## Results look wrong
+
+### `LONG` values come back as strings / BigInt
+
+They come back as `bigint`. JS `number` can't represent the full int64 range. See the [type mapping in architecture](/spark-connect-js/architecture/#type-mapping).
+
+```ts
+const row = await df.first();
+const count = Number(row!.n);  // if you know it fits in a JS number
+```
+
+### Decimals come back as strings
+
+JS has no arbitrary-precision decimal; returning `Decimal(18, 2)` as `number` would lose precision. Parse with a decimal library if you need arithmetic, or cast on the server: `SELECT CAST(amount AS DOUBLE)`.
+
+### Timestamps lost microseconds
+
+JS `Date` has millisecond resolution. Spark timestamps have microsecond resolution. Sub-millisecond precision is truncated. If you need it, cast to string on the server: `SELECT CAST(ts AS STRING)`.
+
+### `collect()` returned nothing, but I expected rows
+
+- Filter is more selective than you think. Run `await df.count()` first.
+- You queried a Hive-partitioned table that needs partition discovery. Run `await spark.catalog.recoverPartitions("table")`.
+- The reader's `schema` strips rows with `mode="DROPMALFORMED"`. Check your `option("mode", ...)`.
+
+## Actions hang
+
+### Action hangs forever
+
+- Cluster is healthy but your query is slow. `df.explain("extended")` shows what Catalyst planned. Look for large Cartesian products, broadcast of huge tables, skewed joins.
+- Connect server is waiting for the JVM driver to respond. Check the server-side logs.
+- You're iterating `toLocalIterator()` but not consuming batches. The gRPC channel applies backpressure; if your consumer is slow, the server pauses.
+
+### `collect()` uses all the memory
+
+`collect()` materializes every row as a plain JS object. For large results, use `toLocalIterator()`:
+
+```ts
+for await (const row of df.toLocalIterator()) {
+  await process(row);
+}
+```
+
+Or, if you just want to process and forget, use `forEach`:
+
+```ts
+await df.forEach((row) => {
+  process(row);
+});
+```
+
+## Session state issues
+
+### Temp view disappeared
+
+- Session ended when the process exited. Temp views are session-scoped and don't survive a fresh `connect(...)`.
+- Server reaped the session after idle timeout. Managed services typically reap idle sessions after minutes, not hours.
+- You called `stop()` explicitly somewhere, and a later action rebuilt the session from scratch.
+
+### `CREATE TABLE` succeeded, but `SELECT` says not found
+
+- Default database mismatch. `await spark.catalog.currentDatabase()` to check.
+- The create happened in a different catalog. `await spark.catalog.currentCatalog()` to check.
+
+### Cached table is no longer cached
+
+- `spark.catalog.clearCache()` was called elsewhere.
+- The server evicted it under memory pressure. Check Spark UI's Storage tab.
+- The underlying storage changed; Spark silently invalidates caches for mutated paths.
+
+## Build and deployment
+
+### `Error: Cannot find module '@grpc/grpc-js'`
+
+You imported from `@spark-connect-js/core` in a runtime context. Core has no transport. Install and import [`@spark-connect-js/node`](/spark-connect-js/integrations/runtimes/node/) instead.
+
+### Works locally, fails in Docker with `UNAVAILABLE`
+
+- IPv6 vs IPv4. Connect servers usually bind IPv4 only; some Docker images prefer IPv6. Force IPv4 with `node --dns-result-order=ipv4first` or set the URL to a bare IPv4 address.
+- DNS resolution in the container; try a raw IP to confirm.
+
+### Works locally, fails in a Lambda / short-lived env
+
+- The first RPC includes server-side analyzer time, which can take a few seconds. If your function timeout is short, that race fails. Increase the function timeout past the Spark analyzer's P99 response time.
+
+## Getting help
+
+When filing an issue, include:
+
+1. Client version (`@spark-connect-js/node` from `package.json`).
+2. Node version (`node --version`).
+3. Spark server version (`spark.sql("SELECT version()").show()`).
+4. Minimal reproduction, ideally a single SQL string or a 10-line script.
+5. Full error including `errorClass`, `code`, `sqlState`, and `message`.
+6. Output of `df.explain("extended")` if the error is from a plan.
+
+Open issues at [github.com/prustic/spark-connect-js/issues](https://github.com/prustic/spark-connect-js/issues).

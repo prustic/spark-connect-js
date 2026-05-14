@@ -1,0 +1,61 @@
+---
+/**
+ * IntegrationCard.astro
+ *
+ * A clickable card with a Starlight icon, a title, and a description.
+ * Modeled on Starlight's LinkCard but with an icon slot up top.
+ */
+
+import { Icon } from "@astrojs/starlight/components";
+import type { StarlightIcon } from "@astrojs/starlight/components/Icons";
+
+interface Props {
+  icon: StarlightIcon;
+  title: string;
+  description?: string;
+  href: string;
+}
+
+const { icon, title, description, href } = Astro.props;
+---
+
+<a class="integration-card" href={href}>
+  <Icon name={icon} size="2.5rem" class="integration-card-icon" />
+  <span class="integration-card-title">{title}</span>
+  {description && <span class="integration-card-desc">{description}</span>}
+</a>
+
+<style>
+  .integration-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background: var(--sl-color-bg-nav);
+    text-decoration: none;
+    color: var(--sl-color-white);
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      transform 0.15s ease;
+  }
+  .integration-card:hover {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-gray-6, var(--sl-color-bg-nav));
+  }
+  .integration-card-icon {
+    color: var(--sl-color-accent);
+  }
+  .integration-card-title {
+    font-weight: 600;
+    font-size: var(--sl-text-lg);
+    line-height: 1.2;
+  }
+  .integration-card-desc {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-2);
+    line-height: 1.4;
+  }
+</style>

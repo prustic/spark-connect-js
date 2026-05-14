@@ -1,0 +1,38 @@
+name: Bug report
+description: Something is wrong with spark-connect-js
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw and what you expected.
+      placeholder: |
+        Calling `df.foo()` returns X, but I expected Y.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A minimal SQL string or short script that triggers it.
+      render: typescript
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: spark-connect-js, Node, and Spark server.
+      placeholder: spark-connect-js 0.3.0, Node 22.13, Spark 3.5.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: Full error (`errorClass`, `code`, `sqlState`, `message`). Include `df.explain("extended")` if the error is from a plan.
+      render: text

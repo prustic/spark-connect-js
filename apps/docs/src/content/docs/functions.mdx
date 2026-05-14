@@ -1,0 +1,174 @@
+---
+title: Functions
+description: Built-in functions for aggregation, strings, dates, math, collections, and more.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside>
+  The full built-in function catalog is documented in the [Apache Spark SQL functions reference](https://spark.apache.org/docs/latest/api/sql/).
+</Aside>
+
+`@spark-connect-js/node` re-exports the built-in SQL functions. They build `Column` expressions that the Spark server evaluates as part of the logical plan.
+
+```ts
+import {
+  col, lit,
+  count, sum, avg, max,
+  upper, concat, substring, regexp_replace,
+  year, month, date_add,
+  when, coalesce,
+} from "@spark-connect-js/node";
+```
+
+Every function exported by `@spark-connect-js/node` is listed in the [API reference](/spark-connect-js/api/) with its full signature. The sections below show the most common ones grouped by category.
+
+## Aggregate
+
+Aggregate functions produce a single value per group (or per DataFrame if used without `groupBy`).
+
+```ts
+import { count, sum, avg, max, min, stddev, collect_list, approx_count_distinct } from "@spark-connect-js/node";
+
+df.groupBy("department").agg(
+  count("*").alias("headcount"),
+  sum("salary").alias("payroll"),
+  avg("salary").alias("avg_salary"),
+  max("salary").alias("top"),
+  min("salary").alias("bottom"),
+  stddev("salary").alias("salary_stddev"),
+  collect_list("name").alias("names"),
+  approx_count_distinct("email", 0.05).alias("unique_emails"),
+);
+```
+
+Full set: `count`, `count_distinct`, `sum`, `sum_distinct`, `avg`, `mean`, `max`, `min`, `max_by`, `min_by`, `first`, `last`, `collect_list`, `collect_set`, `stddev`, `stddev_samp`, `stddev_pop`, `variance`, `var_samp`, `var_pop`, `skewness`, `kurtosis`, `corr`, `covar_pop`, `covar_samp`, `approx_count_distinct`, `approx_percentile`, `percentile_approx`, `grouping`, `grouping_id`, `bit_and`, `bit_or`, `bit_xor`, `bool_and`, `bool_or`, `every`, `any`, `some`, `mode`, `median`, and the `regr_*` family.
+
+## Strings
+
+```ts
+import { upper, lower, trim, concat, concat_ws, substring, split, regexp_replace, length, lpad } from "@spark-connect-js/node";
+
+df.select(
+  upper(col("name")).alias("name_upper"),
+  concat(col("first"), lit(" "), col("last")).alias("full_name"),
+  concat_ws(",", col("tag1"), col("tag2"), col("tag3")).alias("tags"),
+  substring(col("phone"), 1, 3).alias("area_code"),
+  split(col("path"), "/").alias("segments"),
+  regexp_replace(col("body"), "\\s+", " ").alias("normalized"),
+  lpad(col("id").cast("string"), 8, "0").alias("padded_id"),
+);
+```
+
+Full set: `upper`, `lower`, `trim`, `ltrim`, `rtrim`, `btrim`, `length`, `char_length`, `octet_length`, `bit_length`, `concat`, `concat_ws`, `substring`, `regexp_replace`, `contains`, `startswith`, `endswith`, `split`, `initcap`, `lpad`, `rpad`, `repeat`, `reverse`, `instr`, `locate`, `translate`, `ascii`, `format_number`, `format_string`, `base64`, `unbase64`, `soundex`, `levenshtein`, `overlay`, `left`, `right`, `decode`, `encode`.
+
+## Date and timestamp
+
+```ts
+import { year, month, dayofmonth, hour, date_trunc, date_add, datediff, to_timestamp, current_timestamp } from "@spark-connect-js/node";
+
+df.select(
+  year(col("ts")).alias("y"),
+  month(col("ts")).alias("m"),
+  date_trunc("hour", col("ts")).alias("hour"),
+  date_add(col("event_date"), 7).alias("due"),
+  datediff(col("end"), col("start")).alias("days"),
+  to_timestamp(col("raw_ts"), "yyyy-MM-dd HH:mm:ss").alias("parsed"),
+  current_timestamp().alias("now"),
+);
+```
+
+Full set: `year`, `month`, `dayofmonth`, `dayofweek`, `dayofyear`, `weekofyear`, `quarter`, `hour`, `minute`, `second`, `current_date`, `current_timestamp`, `datediff`, `date_add`, `date_sub`, `months_between`, `next_day`, `last_day`, `add_months`, `date_format`, `to_date`, `to_timestamp`, `from_unixtime`, `unix_timestamp`, `date_trunc`, `trunc`, `extract`, `date_part`.
+
+## Math
+
+```ts
+import { abs, round, sqrt, pow, log, log2, exp, greatest, least, rand } from "@spark-connect-js/node";
+
+df.select(
+  abs(col("delta")).alias("abs_delta"),
+  round(col("price"), 2).alias("rounded"),
+  sqrt(col("variance")).alias("stddev"),
+  pow(col("base"), lit(2)).alias("sq"),
+  greatest(col("a"), col("b"), col("c")).alias("max_val"),
+  rand(42).alias("noise"),
+);
+```
+
+Full set covers the usual arithmetic, trigonometry, logarithms, and `ceil` / `floor` / `bround`, plus `rand`, `randn`, `greatest`, `least`, and `degrees` / `radians`.
+
+## Conditional
+
+```ts
+import { when, coalesce, isnull, isnotnull, nvl, nullif, cast, expr } from "@spark-connect-js/node";
+
+df.select(
+  when(col("score").gt(lit(90)), lit("A"))
+    .when(col("score").gt(lit(80)), lit("B"))
+    .otherwise(lit("C"))
+    .alias("grade"),
+  coalesce(col("preferred_name"), col("full_name"), lit("unknown")).alias("name"),
+  nullif(col("ssn"), lit("000-00-0000")).alias("ssn"),
+  cast(col("raw"), "decimal(18,2)").alias("amount"),
+  expr("CASE WHEN age < 18 THEN 'minor' ELSE 'adult' END").alias("tier"),
+);
+```
+
+Chain one or more `.when(condition, value)` calls and finish with `.otherwise(default)`. The whole expression evaluates to a single `Column`.
+
+## Collections
+
+```ts
+import { array, struct, explode, posexplode, map_keys, map_values, element_at, size, flatten } from "@spark-connect-js/node";
+
+df.select(
+  array(col("a"), col("b"), col("c")).alias("as_array"),
+  struct(col("x"), col("y")).alias("point"),
+  element_at(col("tags"), 1).alias("first_tag"),
+  size(col("tags")).alias("tag_count"),
+);
+
+// explode turns an array column into one row per element:
+df.select(col("id"), explode(col("tags")).alias("tag"));
+```
+
+Full set includes `array`, `struct`, `map`, `create_map`, `explode`, `explode_outer`, `posexplode`, `posexplode_outer`, `flatten`, `array_contains`, `array_distinct`, `array_intersect`, `array_union`, `array_except`, `array_min`, `array_max`, `array_sort`, `array_position`, `array_remove`, `size`, `map_keys`, `map_values`, `map_entries`, `element_at`, `sequence`, `zip_with`, `transform`, `filter`, `exists`, `forall`.
+
+## Hash, JSON, CSV, bitwise
+
+```ts
+import { md5, sha2, xxhash64 } from "@spark-connect-js/node";
+df.select(md5(col("id")).alias("h"), sha2(col("payload"), 256).alias("digest"));
+
+import { from_json, to_json, get_json_object, schema_of_json } from "@spark-connect-js/node";
+df.withColumn("parsed", from_json(col("raw_json"), "name STRING, age INT"));
+
+import { from_csv, to_csv } from "@spark-connect-js/node";
+df.withColumn("csv_row", to_csv(struct(col("a"), col("b"))));
+
+import { shiftleft, shiftright, bitwise_not } from "@spark-connect-js/node";
+df.withColumn("flags", shiftleft(col("mask"), lit(2)));
+```
+
+## Window
+
+Window functions are covered in depth on the [Window functions](/spark-connect-js/window-functions/) page.
+
+```ts
+import { row_number, rank, lag, lead, ntile } from "@spark-connect-js/node";
+```
+
+## Sort helpers
+
+`asc`, `desc`, `asc_nulls_first`, `asc_nulls_last`, `desc_nulls_first`, `desc_nulls_last` are free functions; the same behavior is available as methods on `Column`. Use whichever reads better.
+
+```ts
+df.sort(desc_nulls_last(col("salary")));
+df.sort(col("salary").desc_nulls_last());
+```
+
+## Escape hatches
+
+- `expr("...")`: any SQL expression as a Column. Useful for Spark features that do not yet have a named wrapper.
+- `selectExpr("...", "...")`: same idea, applied in a `select`.
+- Raw SQL: `spark.sql(...)` always works.

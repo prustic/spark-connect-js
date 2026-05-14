@@ -1,0 +1,141 @@
+---
+import nodePackage from "../../../../packages/spark-node/package.json";
+
+const version = nodePackage.version;
+---
+
+<div
+  id="sl-early-banner"
+  class="sl-early-banner"
+  data-version={version}
+  hidden
+>
+  <span>
+    This project is in early development (v{version}) and is not recommended for production usage, but feedback is very welcome on <a
+      href="https://github.com/prustic/spark-connect-js/issues">GitHub</a>.
+  </span>
+  <button
+    type="button"
+    id="sl-early-banner-close"
+    aria-label="Dismiss banner"
+  >
+    ×
+  </button>
+</div>
+
+<script>
+  const TTL_MS = 24 * 60 * 60 * 1000;
+
+  const storageKey = (banner: HTMLElement) =>
+    `sl-early-banner-dismissed-until-v${banner.dataset["version"] ?? "unknown"}`;
+
+  const isDismissed = (banner: HTMLElement) => {
+    try {
+      const ts = Number(localStorage.getItem(storageKey(banner)) ?? 0);
+      return Number.isFinite(ts) && Date.now() < ts;
+    } catch {
+      return false;
+    }
+  };
+
+  const setDismissed = (banner: HTMLElement) => {
+    try {
+      localStorage.setItem(storageKey(banner), String(Date.now() + TTL_MS));
+    } catch {
+      // Storage unavailable (private mode, blocked, etc.); ignore.
+    }
+  };
+
+  const sync = () => {
+    const banner = document.getElementById("sl-early-banner");
+    if (!banner) return;
+
+    const dismissed = isDismissed(banner);
+    banner.hidden = dismissed;
+    document.body.classList.toggle("has-early-banner", !dismissed);
+
+    const closeButton = document.getElementById("sl-early-banner-close");
+    if (closeButton && !closeButton.dataset["bound"]) {
+      closeButton.dataset["bound"] = "1";
+      closeButton.addEventListener("click", () => {
+        setDismissed(banner);
+        sync();
+      });
+    }
+  };
+
+  sync();
+  document.addEventListener("astro:page-load", sync);
+</script>
+
+<style>
+  .sl-early-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.5rem 3rem 0.5rem 1rem;
+    text-align: center;
+    font-size: var(--sl-text-sm);
+    background: var(--sl-color-orange-low, #4a2c00);
+    color: var(--sl-color-orange-high, #ffd8a8);
+    border-bottom: 1px solid var(--sl-color-orange, #e08c3f);
+  }
+
+  .sl-early-banner[hidden] {
+    display: none;
+  }
+
+  .sl-early-banner a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .sl-early-banner button {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.15rem 0.5rem;
+    z-index: 10000;
+  }
+
+  .sl-early-banner button:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+</style>
+
+<style is:global>
+  body.has-early-banner {
+    --sl-early-banner-height: 2.5rem;
+  }
+
+  body.has-early-banner header.header {
+    top: var(--sl-early-banner-height);
+  }
+
+  body.has-early-banner .main-frame {
+    padding-top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height) + var(--sl-early-banner-height));
+  }
+
+  body.has-early-banner .sidebar-pane {
+    inset-block: calc(var(--sl-nav-height) + var(--sl-early-banner-height)) 0;
+  }
+
+  body.has-early-banner .right-sidebar {
+    top: var(--sl-early-banner-height);
+    height: calc(100vh - var(--sl-early-banner-height));
+  }
+</style>

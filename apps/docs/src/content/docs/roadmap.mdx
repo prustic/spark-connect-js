@@ -1,0 +1,96 @@
+---
+title: Roadmap
+description: Planned releases and what lands in each.
+---
+
+import Mermaid from '../../components/Mermaid.astro';
+
+<Mermaid code={`
+timeline TD
+  0.1.0 · 9 Mar 2026 : Core DataFrame & Column
+                     : SparkSession
+                     : Built-in functions
+  0.2.0 · 15 Mar 2026 : Caching & repartitioning
+                      : cube / rollup / pivot / unpivot
+                      : DataFrameStat
+  0.3.0 · 29 Mar 2026 : DataFrameReader/Writer shortcuts
+                      : DataFrameWriterV2
+                      : Typed error hierarchy
+  0.4.0 : Documentation site
+        : Catalog parity with PySpark
+        : TLS, bearer token, connection string
+        : Reattach, retry, interrupts
+        : RuntimeConfig (spark.conf)
+        : Error trailer decode + FetchErrorDetails
+        : Java UDF / UDAF registration via spark.udf
+  0.5.0 : Structured Streaming
+        : StreamingQuery & Manager
+        : Listener callbacks
+  0.6.0 : MERGE INTO builder
+        : Session controls & artifacts
+        : ~120 more functions
+        : DataFrame long-tail
+  0.7.0 : Arrow batch UDFs
+        : Table-valued functions
+  0.8.0 : Managed platform connectors, Databricks, EMR, possibly more
+  0.9.0 : Additional runtime & framework integrations
+`} />
+
+## Shipped
+
+See the [Changelog](/spark-connect-js/changelog/) for full details on each release.
+
+- **[0.1.0](/spark-connect-js/changelog/#010)** · 9 March 2026 · core DataFrame, Column, SparkSession, built-in functions
+- **[0.2.0](/spark-connect-js/changelog/#020)** · 15 March 2026 · caching, repartitioning, `cube`/`rollup`/`pivot`/`unpivot`, `DataFrameStat`
+- **[0.3.0](/spark-connect-js/changelog/#030)** · 29 March 2026 · reader/writer shortcuts, `DataFrameWriterV2`, typed error hierarchy
+
+## Planned
+
+### 0.4.0 · Catalog parity, docs site, transport
+
+- Catalog parity with PySpark: the full `spark.catalog` surface.
+- `spark.udf.registerJavaFunction` and `registerJavaUDAF` for binding Java UDFs already on the server's classpath to a SQL function name.
+- Documentation site (this site).
+- Full `sc://` connection-string grammar: `use_ssl=true` for TLS, bearer `token`, `user_id`, `user_agent`, `session_id`, `grpc_max_message_size`, plus arbitrary metadata pass-through. Token-over-insecure rejected.
+- Resilience for long-running queries: per-request operation IDs, `ReattachExecute` iterator that resumes server-streaming responses after transient gRPC drops, configurable `RetryPolicy`, and interrupts (`interruptAll`, `interruptTag`, `interruptOperation`).
+- `RuntimeConfig` on `spark.conf` (`get`, `set`, `unset`, `getAll`, `isModifiable`).
+- `SparkSession.version()`.
+- Error-trailer decoding: `errorClass`, `sqlState`, `messageParameters`, plus `FetchErrorDetails` fallback for `errorTypeHierarchy` and `serverStackTrace`.
+- `client_observed_server_side_session_id` echo for stale-session detection.
+- `node-tls-behind-proxy` example.
+
+### 0.5.0 · Structured Streaming
+
+- `readStream` and `writeStream` builders.
+- `StreamingQuery`: `id`, `runId`, `name`, `isActive`, `stop`, `awaitTermination`, `status`, `lastProgress`, `recentProgress`, `processAllAvailable`, `exception`, `explain`.
+- `StreamingQueryManager`: `active`, `get`, `awaitAnyTermination`, `resetTerminated`, `addListener`/`removeListener`.
+- Listener callbacks: `onQueryStarted`, `onQueryProgress`, `onQueryIdle`, `onQueryTerminated`.
+
+### 0.6.0 · Advanced Features
+
+- **`DataFrameWriterV2.mergeInto`**: fluent `MERGE INTO` builder with `whenMatched`/`whenNotMatched`/`whenNotMatchedBySource` and schema evolution.
+- **SparkSession enhancements**: `newSession`, `active()`/`getActiveSession()`, `addArtifact`/`addArtifacts`, `copyFromLocalToFs`, progress handlers, `executionInfo`.
+- **`DataFrame` long-tail**: `checkpoint`, `localCheckpoint`, `observe`, `withWatermark`, `withMetadata`, `inputFiles`, `isLocal`, `transpose`, `sampleBy`, `colRegex`, `to(schema)`, `lateralJoin`, `toArrow()`, `toJSON()`.
+- **~120 additional built-in functions**: Variant, XML, URL, geospatial, partition transforms, bitmap and sketch aggregates, extra time helpers, regex variants, `try_*` variants.
+- **Integration coverage for the remaining file formats**: extend `tests/integration/` to round-trip Avro, XML, JDBC, and Hive via the generic `.format()` path. Currently only CSV / JSON / Parquet / ORC / text are exercised end-to-end; the I/O guide carries an "untested" caveat that this item lifts.
+
+### 0.7.0 · UDFs and Table Functions
+
+- Arrow batch UDFs, contingent on Spark Connect protocol support without a JS runtime on executors.
+- Table-valued function helpers: `explode`, `inline`, `posexplode`, `json_tuple`, `range`, `stack`, variants, `collations`, `sql_keywords`.
+- `TableArg` with `partitionBy`/`orderBy`/`withSinglePartition`.
+
+`callFunction(name, ...cols)` already works for server-side UDFs registered by name; closure-based UDFs are what this milestone adds.
+
+### 0.8.0 · Managed platform connectors
+
+Support for managed Spark Connect deployments. Confirmed in scope: **Databricks** and **AWS EMR**, possibly more depending on demand and what the transport layer needs per provider.
+
+The work here is per-provider auth, transport, and connection-string plumbing rather than new DataFrame surface. Every supported provider ships with a runnable, CI-tested example. No example, no support claim.
+
+### 0.9.0 · Additional runtime & framework integrations
+
+Runtime and framework integrations beyond Node.js. 
+
+Which runtimes and frameworks land here depends on user demand and what the session/lifecycle API needs from each. The list isn't fixed yet.
+

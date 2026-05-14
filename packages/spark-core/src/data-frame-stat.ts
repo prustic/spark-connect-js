@@ -1,8 +1,18 @@
 import { DataFrame } from "./data-frame.js";
 
 /**
- * Statistic functions for DataFrames.
- * Accessed via `df.stat`.
+ * Statistical and approximate-query operations on a {@link DataFrame}.
+ *
+ * Obtained via {@link DataFrame.stat}. Mirrors `DataFrameStatFunctions` in
+ * the JVM Spark API.
+ *
+ * @example
+ * ```ts
+ * const c = await df.stat.corr("height", "weight");
+ * const quantiles = await df.stat.approxQuantile("latency", [0.5, 0.95, 0.99], 0.01);
+ * ```
+ *
+ * @see [Spark source: DataFrameStatFunctions.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/DataFrameStatFunctions.scala)
  */
 export class DataFrameStat {
   private readonly _df: DataFrame;

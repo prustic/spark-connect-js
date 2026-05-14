@@ -1,0 +1,102 @@
+---
+title: Overview
+description: A TypeScript client for Apache Spark that speaks the Spark Connect protocol.
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: |
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "spark-connect-js",
+        "description": "A TypeScript client for Apache Spark that speaks the Spark Connect protocol. Runs in Node.js, no JVM in your process.",
+        "url": "https://prustic.github.io/spark-connect-js/",
+        "codeRepository": "https://github.com/prustic/spark-connect-js",
+        "programmingLanguage": "TypeScript",
+        "runtimePlatform": "Node.js",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "keywords": "Apache Spark, Spark Connect, TypeScript, Node.js, DataFrame, gRPC, Arrow"
+      }
+---
+
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+spark-connect-js lets Node.js applications drive [Apache Spark](https://spark.apache.org/) over [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), without a JVM in the same process.
+
+<Aside type="note" title="Not affiliated with the Apache Software Foundation">
+  This is an independent open-source project. It is not endorsed by or affiliated with the Apache Software Foundation or the Apache Spark project. "Apache", "Apache Spark", and "Spark" are trademarks of the Apache Software Foundation.
+</Aside>
+
+## Packages
+
+- [`@spark-connect-js/core`](https://www.npmjs.com/package/@spark-connect-js/core): the platform-agnostic DataFrame API and plan builder. Zero runtime dependencies. Install this directly only when writing your own runtime adapter.
+- [`@spark-connect-js/node`](https://www.npmjs.com/package/@spark-connect-js/node): the Node.js runtime. Bundles `core` with a gRPC transport ([`@grpc/grpc-js`](https://www.npmjs.com/package/@grpc/grpc-js)) and an Arrow IPC decoder ([`apache-arrow`](https://www.npmjs.com/package/apache-arrow)). The only package most applications need.
+- [`@spark-connect-js/connect`](https://www.npmjs.com/package/@spark-connect-js/connect): generated protobuf types. Pulled in transitively as an implementation detail.
+
+Other runtimes are covered on the [Integrations](/spark-connect-js/integrations/) page.
+
+## Install
+
+<Tabs syncKey="pkg">
+  <TabItem label="npm">
+    ```bash
+    npm install @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="bun">
+    ```bash
+    bun add @spark-connect-js/node
+    ```
+  </TabItem>
+</Tabs>
+
+You need Node.js 22 or later on the client and a reachable Spark 3.4 or newer server. The full matrix is on the [compatibility](/spark-connect-js/compatibility/) page.
+
+## A first query
+
+```ts
+import { connect } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+
+const rows = await spark.sql("SELECT 1 AS n").collect();
+console.log(rows); // [ { n: 1 } ]
+
+await spark.stop();
+```
+
+`connect(url)` returns a `SparkSession`. DataFrame methods are lazy; the plan leaves the client only on an action such as `collect`, `count`, `show`, or a `DataFrameWriter` save method.
+
+```ts
+import { col, lit, sum } from "@spark-connect-js/node";
+
+const df = spark.read
+  .parquet("s3a://events/2026/")
+  .filter(col("status").eq(lit("active")))
+  .groupBy("region")
+  .agg(sum("revenue").alias("revenue"));
+
+await df.show();
+```
+
+The [Quickstart](/spark-connect-js/quickstart/) covers starting a local Connect server and a longer example. Runnable scripts live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Quickstart" description="Start a local Spark Connect server and run your first query." href="/spark-connect-js/quickstart/" />
+  <LinkCard title="SQL and DataFrame guide" description="Transformations, actions, and lazy evaluation." href="/spark-connect-js/sql-and-dataframe-guide/" />
+  <LinkCard title="API reference" description="Generated from source." href="/spark-connect-js/api/" />
+  <LinkCard title="Architecture" description="What happens on the wire." href="/spark-connect-js/architecture/" />
+</CardGrid>

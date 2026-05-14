@@ -1,0 +1,189 @@
+---
+title: Comparison to PySpark
+description: Differences between spark-connect-js and PySpark, and where they come from.
+---
+
+spark-connect-js tracks PySpark closely; the differences come from TypeScript vs Python and from the Spark Connect client model itself.
+
+## At a glance
+
+The same query in both clients.
+
+```python
+# PySpark
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, sum, desc
+
+spark = SparkSession.builder.remote("sc://localhost:15002").getOrCreate()
+
+result = (
+    spark.table("events")
+        .filter(col("status") == "active")
+        .group_by("region")
+        .agg(sum("revenue").alias("total"))
+        .sort(desc("total"))
+        .collect()
+)
+
+spark.stop()
+```
+
+```ts
+// spark-connect-js
+import { connect, col, lit, sum, desc } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+
+const result = await spark
+  .table("events")
+  .filter(col("status").eq(lit("active")))
+  .groupBy("region")
+  .agg(sum("revenue").alias("total"))
+  .sort(desc("total"))
+  .collect();
+
+await spark.stop();
+```
+
+## Imports
+
+PySpark spreads its public API across submodules. spark-connect-js exports everything from one entry point.
+
+```python
+# PySpark
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import col, lit, when, sum, count, regexp_replace
+from pyspark.sql.types import StructType, StructField
+```
+
+```ts
+// spark-connect-js
+import {
+  connect, Window,
+  col, lit, when, sum, count, regexp_replace,
+  StructType, StructField,
+} from "@spark-connect-js/node";
+```
+
+## Method names are camelCase
+
+PySpark exposes both `groupBy` and `group_by`. spark-connect-js only ships the camelCase spelling.
+
+```python
+# PySpark
+df.group_by("department").agg(count("*").alias("n"))
+df.with_column_renamed("old", "new")
+df.create_or_replace_temp_view("events")
+```
+
+```ts
+// spark-connect-js
+df.groupBy("department").agg(count("*").alias("n"));
+df.withColumnRenamed("old", "new");
+df.createOrReplaceTempView("events");
+```
+
+## Column operators are methods
+
+TypeScript has no operator overloading, so comparisons and arithmetic on `Column` are methods. Literals go through `lit(...)`.
+
+```python
+# PySpark
+df.filter((col("age") > 30) & (col("country") == "US"))
+df.withColumn("total", col("price") * col("qty"))
+df.sort(col("salary").desc())
+```
+
+```ts
+// spark-connect-js
+df.filter(col("age").gt(lit(30)).and(col("country").eq(lit("US"))));
+df.withColumn("total", col("price").multiply(col("qty")));
+df.sort(col("salary").desc());
+```
+
+| PySpark                 | spark-connect-js                                            |
+| ----------------------- | ----------------------------------------------------------- |
+| `==` / `!=`             | `.eq()` / `.notEqual()` (also `.eqNullSafe()` for `<=>`)    |
+| `>` / `>=`              | `.gt()` / `.gte()`                                          |
+| `<` / `<=`              | `.lt()` / `.lte()`                                          |
+| `&` / `\|` / `~`         | `.and()` / `.or()` / `.not()`                               |
+| `+` / `-` / `*` / `/`   | `.plus()` / `.minus()` / `.multiply()` / `.divide()`        |
+
+Passing a raw JS value where a `Column` is expected is a compile-time error. PySpark surfaces the same mistake only at runtime.
+
+## Every action is async
+
+Actions return `Promise<T>`. Transformations stay synchronous because they only build the plan.
+
+```python
+# PySpark
+rows = df.collect()
+df.show()
+n = df.count()
+```
+
+```ts
+// spark-connect-js
+const rows = await df.collect();
+await df.show();
+const n = await df.count();
+```
+
+The action set is the same as PySpark: `collect`, `count`, `show`, `first`, `head`, `take`, `isEmpty`, plus the `DataFrameWriter` save methods.
+
+## Row output is a plain object
+
+`collect()` returns `Record<string, unknown>[]`, not instances of a `Row` class. There's no `row.asDict()` because a row already is one.
+
+```python
+# PySpark
+row = df.first()
+row["name"]
+row.name
+row.asDict()
+```
+
+```ts
+// spark-connect-js
+const row = await df.first();
+row?.name;
+row?.["name"];
+```
+
+## Sessions need an explicit stop
+
+PySpark relies on interpreter shutdown to close the session. A long-running Node process doesn't get that for free.
+
+```ts
+const spark = connect("sc://localhost:15002");
+try {
+  await doWork(spark);
+} finally {
+  await spark.stop();
+}
+```
+
+`stop()` releases server-side session state (temp views, cached tables, in-flight queries) and closes the gRPC channel.
+
+## Errors
+
+PySpark raises `AnalysisException`, `ParseException`, `IllegalArgumentException`, and friends. spark-connect-js folds all server-side failures into one type, `SparkConnectError`, carrying a gRPC status code (`INVALID_ARGUMENT`, `INTERNAL`, `UNAVAILABLE`, ...). Errors thrown locally before any RPC are `SparkClientError` subclasses (`InvalidConfigError`, `InvalidInputError`, `UnsupportedOperationError`).
+
+See [Error handling](/spark-connect-js/error-handling/) for the full hierarchy.
+
+## Type coercion at the edges
+
+Some Arrow types don't round-trip cleanly into JavaScript. The full mapping is in [architecture](/spark-connect-js/architecture/#type-mapping); three notable mismatches:
+
+| Spark type        | PySpark               | spark-connect-js |
+| ----------------- | --------------------- | ---------------- |
+| `LONG` / `BIGINT` | `int`                 | `bigint`         |
+| `DECIMAL(p, s)`   | `Decimal`             | `string`         |
+| `TIMESTAMP`       | `datetime` (μs)       | `Date` (ms)      |
+
+Cast on the server (`CAST(amount AS DOUBLE)`, `CAST(ts AS STRING)`) when you need different representations.
+
+## Not in spark-connect-js
+
+- `toPandas()`, `pandas_api`, `mapInPandas`, `mapInArrow`, `DataFrame.plot`: Python-specific. Use `await df.collect()` for plain JS objects and any JS charting library for visualisation.
+- Arbitrary closure UDFs: a JS runtime on Spark executors is a cluster change, not a client change. Java UDFs already on the server's classpath can be bound to a SQL function name via `spark.udf.registerJavaFunction(...)` / `registerJavaUDAF(...)`, and any SQL function (built-in or registered) is callable from a DataFrame via `callFunction`.

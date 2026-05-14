@@ -1,0 +1,10 @@
+# AI usage policy for spark-connect-js documentation
+# https://spawning.ai/ai-txt
+
+User-Agent: *
+Allow: *
+Disallow:
+
+# This documentation is open-source and intended to be readable by both
+# humans and AI systems. Attribution is appreciated but not required.
+# Source: https://github.com/prustic/spark-connect-js

@@ -1,18 +1,3 @@
-/**
- * Catalog
- *
- * Provides access to Spark's catalog API for inspecting databases, tables,
- * functions, and columns.
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/catalog/Catalog.scala
- * @see Spark Connect: The catalog operations are sent as Relation.Catalog
- *   protobuf messages, and the server returns the results as DataFrames.
- *
- * Catalog operations are executed via ExecutePlan (not AnalyzePlan) because
- * in Spark Connect, catalog queries are modeled as Relations that return
- * tabular results.
- */
-
 import { DataFrame } from "./data-frame.js";
 import type { SparkSession } from "./spark-session.js";
 import type { Row } from "./types/row.js";
@@ -20,6 +5,21 @@ import type { CatalogOperation } from "./plan/logical-plan.js";
 import type { StructType } from "./types/struct.js";
 import type { StorageLevel } from "./storage-level.js";
 
+/**
+ * Access to Spark's catalog for inspecting and managing databases, tables,
+ * functions, views, and cached tables.
+ *
+ * Obtained via {@link SparkSession.catalog}.
+ *
+ * @example
+ * ```ts
+ * const dbs = await spark.catalog.listDatabases();
+ * const tables = await spark.catalog.listTables("analytics");
+ * await spark.catalog.cacheTable("analytics.events");
+ * ```
+ *
+ * @see [Spark source: Catalog.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/catalog/Catalog.scala)
+ */
 export class Catalog {
   /** @internal */
   private readonly _session: SparkSession;
@@ -220,7 +220,7 @@ export class Catalog {
   /**
    * @internal Extract the first column value from the first row.
    * Spark Connect catalog operations return single-column DataFrames
-   * with varying column names — this avoids hardcoding column names.
+   * with varying column names, so this avoids hardcoding column names.
    */
   private _firstValue(rows: Row[]): unknown {
     if (rows.length === 0) return undefined;

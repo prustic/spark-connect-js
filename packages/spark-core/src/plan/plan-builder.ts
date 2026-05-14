@@ -1,15 +1,13 @@
 /**
- * PlanBuilder
- *
  * Serialises the TypeScript LogicalPlan tree into the wire format expected by
  * Spark Connect's protobuf schema.
  *
  * The Spark Connect protobuf schema lives in the Spark repo at:
- *   connector/connect/common/src/main/protobuf/spark/connect/relations.proto
- *   connector/connect/common/src/main/protobuf/spark/connect/expressions.proto
+ *   sql/connect/common/src/main/protobuf/spark/connect/relations.proto
+ *   sql/connect/common/src/main/protobuf/spark/connect/expressions.proto
  *
- * @see Spark Connect proto (Relation): connector/connect/common/src/main/protobuf/spark/connect/relations.proto
- * @see Spark Connect proto (Expression): connector/connect/common/src/main/protobuf/spark/connect/expressions.proto
+ * @see [Spark Connect proto: relations.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/relations.proto)
+ * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  *
  * This builder walks our plan tree and produces plain objects matching the
  * proto message shapes.  Actual protobuf serialisation (to binary) is handled
