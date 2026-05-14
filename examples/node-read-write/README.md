@@ -1,6 +1,6 @@
 # node-read-write
 
-Round-trips an in-memory sensor dataset through every file format spark-connect-js has shortcut methods for (CSV, JSON, Parquet, ORC, text), reads CSV back with a DDL schema, writes a bucketed `saveAsTable`, and appends to it with `insertInto`.
+Round-trips a small in-memory DataFrame through every file format spark-connect-js has shortcut methods for (CSV, JSON, Parquet, ORC, text), reads CSV back with a DDL schema, writes a bucketed `saveAsTable`, and appends to it with `insertInto`.
 
 ## Run
 

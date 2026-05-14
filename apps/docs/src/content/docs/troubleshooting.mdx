@@ -15,7 +15,7 @@ The client doesn't open the channel until the first RPC, so a bad URL fails on y
 
 - The server isn't running. Check with `lsof -i :15002` or `curl http://<host>:15002`.
 - The server is running but bound to localhost and you're connecting from another host. Start it with `--host 0.0.0.0` if you meant to.
-- A firewall or security group is dropping the connection. `nc -zv <host> 15002` will tell you.
+- A firewall or security group is dropping the connection. Try `nc -zv <host> 15002` from the client machine to confirm the port is reachable.
 
 ### `DEADLINE_EXCEEDED` on every RPC
 

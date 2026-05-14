@@ -3,11 +3,11 @@ title: Security
 description: "Transport security and authentication: what the client supports today and the residual gaps."
 ---
 
-The full `sc://` connection-string grammar is parsed: TLS via `use_ssl=true`, bearer tokens, `user_id`, `user_agent`, `session_id`, `grpc_max_message_size`, plus arbitrary `key=value` pairs that pass through as gRPC metadata on every RPC. Token-over-insecure is rejected unconditionally to avoid leaking credentials.
+spark-connect-js handles TLS and bearer-token authentication through the connection string. Token-over-insecure is rejected unconditionally; anything beyond that (custom CAs, mTLS, custom verify callbacks) drops down to `GrpcTransportOptions`. The full URL parameter reference lives in [Configuration](/spark-connect-js/configuration/).
 
 ## TLS
 
-Spark Connect 4.0's gRPC server listens in plaintext. Production deployments terminate TLS at a reverse proxy in front of the port, and `use_ssl=true` on the connection string makes spark-js do the TLS handshake against that proxy. Spark itself never sees the encrypted bytes.
+Spark Connect 4.0's gRPC server listens in plaintext. Production deployments terminate TLS at a reverse proxy in front of the port, and `use_ssl=true` on the connection string makes spark-connect-js do the TLS handshake against that proxy. Spark itself never sees the encrypted bytes.
 
 ```ts
 connect("sc://spark.internal:443/;use_ssl=true");

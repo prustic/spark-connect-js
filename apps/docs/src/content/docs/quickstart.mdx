@@ -140,5 +140,5 @@ Three more scripts covering streaming, writes, and Arrow-batch iteration live in
 
 ## Connecting to a remote cluster
 
-The URL syntax accepted today is `sc://host:port`. TLS, bearer tokens, and `user_id` propagation aren't wired through the transport yet (see the [roadmap](/spark-connect-js/roadmap/)). To reach a remote cluster over the public internet, front the Spark Connect server with a proxy that terminates TLS and handles authentication, and route plaintext gRPC from your Node process to the proxy over a private network.
+`connect("sc://host:443/;use_ssl=true;token=abc")` opens a TLS connection with a bearer token. Spark Connect itself listens in plaintext, so production deployments put a reverse proxy in front to terminate TLS; the client connects through it. The [Configuration](/spark-connect-js/configuration/) page covers every URL parameter, and the [`node-tls-behind-proxy`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy) example shows the proxy setup.
 

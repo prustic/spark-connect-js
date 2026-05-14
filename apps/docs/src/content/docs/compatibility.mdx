@@ -11,19 +11,19 @@ The client speaks the [Spark Connect gRPC protocol](https://spark.apache.org/doc
 
 | Spark | Status                | Notes                                                                                                  |
 | ----- | --------------------- | ------------------------------------------------------------------------------------------------------ |
-| 4.0   | ✅&nbsp;Recommended    | Latest tested target.                                                                                  |
-| 3.5   | ✅&nbsp;Supported      | Tested in CI.                                                                                          |
-| 3.4   | 🚧&nbsp;Partial        | Proto messages added after 3.4 (some catalog APIs, for example) are rejected by the server's analyzer. |
-| < 3.4 | ❌&nbsp;Not&nbsp;supported | Spark Connect did not exist before 3.4.                                                                |
+| 4.0   | Recommended    | Latest tested target.                                                                                  |
+| 3.5   | Supported      | Tested in CI.                                                                                          |
+| 3.4   | Partial        | Proto messages added after 3.4 (some catalog APIs, for example) are rejected by the server's analyzer. |
+| < 3.4 | Not&nbsp;supported | Spark Connect did not exist before 3.4.                                                                |
 
 ## Node.js versions
 
 | Node.js | Status                       | Notes                                                  |
 | ------- | ---------------------------- | ------------------------------------------------------ |
-| 24.x    | ✅&nbsp;Tested&nbsp;in&nbsp;CI    |                                                        |
-| 22 LTS  | ✅&nbsp;Tested&nbsp;in&nbsp;CI    | Minimum supported version.                             |
-| 20 LTS  | ❌&nbsp;Not&nbsp;supported        | End of maintenance upstream.                           |
-| 18 LTS  | ❌&nbsp;Not&nbsp;supported        | Missing globals the client relies on.                  |
+| 24.x    | Tested&nbsp;in&nbsp;CI    |                                                        |
+| 22 LTS  | Tested&nbsp;in&nbsp;CI    | Minimum supported version.                             |
+| 20 LTS  | Not&nbsp;supported        | End of maintenance upstream.                           |
+| 18 LTS  | Not&nbsp;supported        | Missing globals the client relies on.                  |
 
 Node 22 is the active LTS line and what CI tests. The code only formally requires globals available in Node 19+, but anything below 22 is unsupported.
 

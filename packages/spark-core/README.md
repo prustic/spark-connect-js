@@ -32,7 +32,7 @@ const df = spark
   .sort(desc("total"));
 ```
 
-Provides `SparkSession`, `DataFrame`, `Column`, `Catalog`, `WindowSpec`, `DataFrameWriter`, `DataFrameWriterV2`, `GroupedData`, `DataFrameStat`, the typed error hierarchy, and the built-in function set. Plans are serialized to Spark Connect protobuf, but no I/O happens here. Bring your own `Transport` implementation, or use [`@spark-connect-js/node`](https://www.npmjs.com/package/@spark-connect-js/node) which wires everything together.
+Provides `SparkSession`, `DataFrame`, `Column`, `Catalog`, `WindowSpec`, `DataFrameWriter`, `DataFrameWriterV2`, `GroupedData`, `DataFrameStat`, the typed error hierarchy, and the built-in function set. Plans are serialized to Spark Connect protobuf, but no I/O happens here; you supply the `Transport`.
 
 ## The `Transport` interface
 

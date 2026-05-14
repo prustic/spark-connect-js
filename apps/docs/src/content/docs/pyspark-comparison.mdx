@@ -185,6 +185,5 @@ Cast on the server (`CAST(amount AS DOUBLE)`, `CAST(ts AS STRING)`) when you nee
 
 ## Not in spark-connect-js
 
-- `toPandas()`, `pandas_api`, `mapInPandas`, `mapInArrow`, `DataFrame.plot`: Python-specific. Use `await df.collect()` for plain JS objects.
+- `toPandas()`, `pandas_api`, `mapInPandas`, `mapInArrow`, `DataFrame.plot`: Python-specific. Use `await df.collect()` for plain JS objects and any JS charting library for visualisation.
 - Arbitrary closure UDFs: a JS runtime on Spark executors is a cluster change, not a client change. Java UDFs already on the server's classpath can be bound to a SQL function name via `spark.udf.registerJavaFunction(...)` / `registerJavaUDAF(...)`, and any SQL function (built-in or registered) is callable from a DataFrame via `callFunction`.
-- Structured Streaming: [on the roadmap](/spark-connect-js/roadmap/).

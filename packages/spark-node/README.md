@@ -37,13 +37,11 @@ DataFrame methods build a logical plan locally. The plan is sent to the server o
 
 ## Compatibility
 
-| Component                   | Required                              |
-| --------------------------- | ------------------------------------- |
-| Node.js                     | 22 LTS or 24.x                        |
-| Spark Connect server        | Spark 3.4+ (recommended: 4.0+)        |
-| Connection scheme           | `sc://host:port` (plaintext gRPC)     |
-
-TLS, bearer tokens, and `user_id` propagation aren't wired through the transport yet; see the [roadmap](https://prustic.github.io/spark-connect-js/roadmap/).
+| Component            | Required                                            |
+| -------------------- | --------------------------------------------------- |
+| Node.js              | 22 LTS or 24.x                                      |
+| Spark Connect server | Spark 3.4+ (recommended: 4.0+)                      |
+| Connection scheme    | `sc://host:port[/;use_ssl=true][;token=...][;...]`  |
 
 ## Package layout
 
