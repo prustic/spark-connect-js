@@ -131,7 +131,7 @@ const w = Window.partitionBy("department").orderBy(col("salary").desc());
 
 const topThree = employees
   .withColumn("rank", row_number().over(w))
-  .filter(col("rank").leq(3))
+  .filter(col("rank").lte(3))
   .drop("rank");
 
 console.table(await topThree.collect());
