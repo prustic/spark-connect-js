@@ -1,5 +1,11 @@
 # @spark-connect-js/connect
 
+## 0.4.0
+
+### Minor Changes
+
+- [#61](https://github.com/prustic/spark-connect-js/pull/61) [`aa22cc6`](https://github.com/prustic/spark-connect-js/commit/aa22cc675cc3531056d5fc2f9715198b4b89dd2f) Thanks [@prustic](https://github.com/prustic)! - - Vendored `google.rpc.Status` and `google.rpc.ErrorInfo` proto definitions, plus regenerated bindings for `FetchErrorDetailsRequest`/`Response`, consumed by `@spark-connect-js/node` for error-trailer decoding
+
 ## 0.3.0
 
 ### Minor Changes
