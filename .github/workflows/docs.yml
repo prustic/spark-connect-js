@@ -19,8 +19,8 @@ on:
 
 permissions:
   contents: read
-  # pages: write
-  # id-token: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -51,22 +51,18 @@ jobs:
 
       - run: pnpm turbo docs:build
 
-      # Deployment to GitHub Pages disabled for now. Re-enable by uncommenting
-      # the upload-pages-artifact step below, the `deploy` job, and the
-      # `pages: write` / `id-token: write` permissions above.
-      #
-      # - uses: actions/upload-pages-artifact@v3
-      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      #   with:
-      #     path: apps/docs/dist
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: apps/docs/dist
 
-  # deploy:
-  #   needs: build
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: github-pages
-  #     url: ${{ steps.deployment.outputs.page_url }}
-  #   steps:
-  #     - id: deployment
-  #       uses: actions/deploy-pages@v4
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
