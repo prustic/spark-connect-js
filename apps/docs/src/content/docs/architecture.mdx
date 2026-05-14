@@ -57,11 +57,11 @@ Every DataFrame method maps to a node in the [Spark Connect proto schema](https:
 
 ```ts
 type LogicalPlan =
-  | { kind: "Read"; ... }
-  | { kind: "Project"; child: LogicalPlan; expressions: Expression[] }
-  | { kind: "Filter"; child: LogicalPlan; condition: Expression }
-  | { kind: "Aggregate"; child: LogicalPlan; groupingExpressions: Expression[]; aggregateExpressions: Expression[] }
-  | { kind: "Join"; left: LogicalPlan; right: LogicalPlan; ... }
+  | { type: "read"; format: string; path: string; options: Record<string, string>; schema?: string }
+  | { type: "project"; child: LogicalPlan; expressions: Expression[] }
+  | { type: "filter"; child: LogicalPlan; condition: Expression }
+  | { type: "aggregate"; child: LogicalPlan; groupingExpressions: Expression[]; aggregateExpressions: Expression[] }
+  | { type: "join"; left: LogicalPlan; right: LogicalPlan; condition?: Expression; joinType: "inner" | "left_outer" | ... }
   | ...
 ```
 
@@ -73,14 +73,15 @@ Plans are plain data, so they serialize cleanly, compare structurally via `df.sa
 
 ```ts
 type Expression =
-  | { kind: "UnresolvedAttribute"; name: string }
-  | { kind: "Literal"; value: ...; dataType: DataType }
-  | { kind: "UnresolvedFunction"; name: string; args: Expression[] }
-  | { kind: "BinaryOp"; op: string; left: Expression; right: Expression }
+  | { type: "unresolvedAttribute"; name: string }
+  | { type: "literal"; value: string | number | boolean | bigint | null }
+  | { type: "unresolvedFunction"; name: string; arguments: Expression[]; isDistinct?: boolean }
+  | { type: "gt"; left: Expression; right: Expression }
+  | { type: "and"; left: Expression; right: Expression }
   | ...
 ```
 
-Expressions stay unresolved on the client. The server's analyzer binds `UnresolvedAttribute` against the upstream plan's schema and `UnresolvedFunction` against the function registry, so server-side schema changes don't invalidate expressions you've already built.
+Expressions stay unresolved on the client. The server's analyzer binds `unresolvedAttribute` against the upstream plan's schema and `unresolvedFunction` against the function registry, so server-side schema changes don't invalidate expressions you've already built.
 
 ## Arrow over the wire
 
