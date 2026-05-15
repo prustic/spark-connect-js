@@ -6,9 +6,6 @@ on:
     paths:
       - "apps/docs/**"
       - "packages/*/src/**"
-      # Release version bumps (changesets) only touch package.json; the
-      # EarlyBanner reads the version from spark-node's manifest at build
-      # time, so a bump must re-trigger the docs build/deploy.
       - "packages/*/package.json"
       - "docs/**"
       - ".github/workflows/docs.yml"
