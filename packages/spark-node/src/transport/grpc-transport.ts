@@ -766,8 +766,13 @@ function extractConfigResult(response: ConfigResponse): Record<string, unknown> 
  * Decode a streaming-command response payload into a JSON-like shape the
  * core package can interpret. Returns `undefined` for response types that
  * are not streaming results (Arrow batches, `resultComplete`, etc.).
+ *
+ * @internal Exported for unit testing; not part of the package's public API
+ * (not re-exported from `index.ts`).
  */
-function decodeCommandResponse(response: ExecutePlanResponse): Record<string, unknown> | undefined {
+export function decodeCommandResponse(
+  response: ExecutePlanResponse,
+): Record<string, unknown> | undefined {
   const r = response.responseType;
   if (r.case === "writeStreamOperationStartResult") {
     return decodeWriteStreamStartResult(r.value);
@@ -988,7 +993,13 @@ const WRITE_V2_MODE_MAP: Record<string, WriteOperationV2_Mode> = {
   overwritePartitions: WriteOperationV2_Mode.OVERWRITE_PARTITIONS,
 };
 
-function buildCommandProto(command: Record<string, unknown>): Command {
+/**
+ * Map a core-side command record onto a Spark Connect `Command` protobuf.
+ *
+ * @internal Exported for unit testing; not part of the package's public API
+ * (not re-exported from `index.ts`).
+ */
+export function buildCommandProto(command: Record<string, unknown>): Command {
   const type = command.type as string;
 
   if (type === "writeOperation") {

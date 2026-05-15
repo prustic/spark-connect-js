@@ -157,6 +157,14 @@ describe("DataStreamWriter", () => {
     assert.equal(query.name, undefined);
   });
 
+  it("rejects start() with neither format nor a sink destination", async () => {
+    const t = capturingTransport();
+    const spark = newSession(t);
+    const df = spark.readStream.format("rate").load();
+    await assert.rejects(() => df.writeStream.start(), InvalidInputError);
+    assert.equal(t.commands.length, 0);
+  });
+
   it("throws SparkClientError when the server returns no start result", async () => {
     const t = capturingTransport();
     t.setResponses([]);

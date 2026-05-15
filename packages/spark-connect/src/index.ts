@@ -325,10 +325,15 @@ export {
   type StreamingQueryCommandResult,
   StreamingQueryCommandResultSchema,
   type StreamingQueryCommandResult_StatusResult,
+  StreamingQueryCommandResult_StatusResultSchema,
   type StreamingQueryCommandResult_RecentProgressResult,
+  StreamingQueryCommandResult_RecentProgressResultSchema,
   type StreamingQueryCommandResult_ExplainResult,
+  StreamingQueryCommandResult_ExplainResultSchema,
   type StreamingQueryCommandResult_ExceptionResult,
+  StreamingQueryCommandResult_ExceptionResultSchema,
   type StreamingQueryCommandResult_AwaitTerminationResult,
+  StreamingQueryCommandResult_AwaitTerminationResultSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

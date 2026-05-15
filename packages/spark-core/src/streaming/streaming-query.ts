@@ -85,7 +85,7 @@ export class StreamingQuery {
     const { recentProgressJson = [] } = await this._exec("lastProgress");
     return recentProgressJson.length === 0
       ? null
-      : (JSON.parse(recentProgressJson[recentProgressJson.length - 1]) as StreamingQueryProgress);
+      : parseProgress(recentProgressJson[recentProgressJson.length - 1], "lastProgress");
   }
 
   /**
@@ -94,7 +94,7 @@ export class StreamingQuery {
    */
   async recentProgress(): Promise<StreamingQueryProgress[]> {
     const { recentProgressJson = [] } = await this._exec("recentProgress");
-    return recentProgressJson.map((s) => JSON.parse(s) as StreamingQueryProgress);
+    return recentProgressJson.map((s) => parseProgress(s, "recentProgress"));
   }
 
   /**
@@ -146,6 +146,12 @@ export class StreamingQuery {
    * - Without a timeout: blocks forever and returns `undefined` once the
    *   query terminates.
    *
+   * @remarks
+   * The timeout is in **milliseconds**, matching the Scala client and the
+   * Spark Connect `timeout_ms` wire field. PySpark's `awaitTermination`
+   * takes **seconds** — porting `awaitTermination(10)` from PySpark gives
+   * 10ms here, not 10s. Pass `10_000` for the PySpark `10` equivalent.
+   *
    * @throws SparkConnectError if the query terminated with an exception.
    */
   async awaitTermination(timeoutMs?: number): Promise<boolean | undefined> {
@@ -179,5 +185,21 @@ export class StreamingQuery {
       );
     }
     return match as unknown as StreamingQueryCommandResultPayload;
+  }
+}
+
+/**
+ * Parse a server-sent progress JSON string, surfacing a malformed payload as
+ * a {@link SparkClientError} rather than a raw `SyntaxError` — keeps the
+ * class's failure modes within the typed error hierarchy.
+ */
+function parseProgress(json: string, op: string): StreamingQueryProgress {
+  try {
+    return JSON.parse(json) as StreamingQueryProgress;
+  } catch (cause) {
+    throw new SparkClientError(
+      `StreamingQuery.${op}: server returned a progress report that is not valid JSON: ${json}`,
+      { cause },
+    );
   }
 }

@@ -98,6 +98,32 @@ describe("StreamingQuery", () => {
     assert.equal(t.commands[0]["op"], "lastProgress");
   });
 
+  it("lastProgress() throws SparkClientError on malformed progress JSON", async () => {
+    const t = capturingTransport();
+    t.setResponses([
+      {
+        type: "streamingQueryCommandResult",
+        resultType: "recentProgress",
+        recentProgressJson: ["{not valid json"],
+      },
+    ]);
+    const query = makeQuery(t);
+    await assert.rejects(() => query.lastProgress(), SparkClientError);
+  });
+
+  it("recentProgress() throws SparkClientError on malformed progress JSON", async () => {
+    const t = capturingTransport();
+    t.setResponses([
+      {
+        type: "streamingQueryCommandResult",
+        resultType: "recentProgress",
+        recentProgressJson: ['{"batchId":0}', "garbage"],
+      },
+    ]);
+    const query = makeQuery(t);
+    await assert.rejects(() => query.recentProgress(), SparkClientError);
+  });
+
   it("lastProgress() returns null when the server reports no progress", async () => {
     const t = capturingTransport();
     t.setResponses([
