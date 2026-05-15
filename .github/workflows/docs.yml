@@ -6,6 +6,10 @@ on:
     paths:
       - "apps/docs/**"
       - "packages/*/src/**"
+      # Release version bumps (changesets) only touch package.json; the
+      # EarlyBanner reads the version from spark-node's manifest at build
+      # time, so a bump must re-trigger the docs build/deploy.
+      - "packages/*/package.json"
       - "docs/**"
       - ".github/workflows/docs.yml"
   pull_request:
@@ -13,6 +17,7 @@ on:
     paths:
       - "apps/docs/**"
       - "packages/*/src/**"
+      - "packages/*/package.json"
       - "docs/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
@@ -50,13 +55,13 @@ jobs:
       - run: pnpm turbo docs:build
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
           path: apps/docs/dist
 
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       pages: write
