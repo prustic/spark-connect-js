@@ -172,4 +172,12 @@ describe("DataStreamWriter", () => {
     const df = spark.readStream.format("rate").load();
     await assert.rejects(() => df.writeStream.format("memory").start(), SparkClientError);
   });
+
+  it("throws SparkClientError when the start result has no queryId", async () => {
+    const t = capturingTransport();
+    t.setResponses([{ type: "writeStreamOperationStartResult", name: "q1" }]);
+    const spark = newSession(t);
+    const df = spark.readStream.format("rate").load();
+    await assert.rejects(() => df.writeStream.format("memory").start(), SparkClientError);
+  });
 });

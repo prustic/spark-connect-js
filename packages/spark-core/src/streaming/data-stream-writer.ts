@@ -127,7 +127,7 @@ export class DataStreamWriter {
       plan: this._df._plan,
       format: this._format,
       options: { ...this._options },
-      partitioningColumnNames: this._partitionBy,
+      partitioningColumnNames: [...this._partitionBy],
       ...(this._trigger !== undefined && { trigger: this._trigger }),
       ...(this._outputMode !== undefined && { outputMode: this._outputMode }),
       ...(this._queryName !== undefined && { queryName: this._queryName }),
