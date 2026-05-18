@@ -103,13 +103,11 @@ export class StreamingQuery {
    */
   async exception(): Promise<StreamingQueryException | null> {
     const { exception } = await this._exec("exception");
-    if (exception === undefined) return null;
+    // Key on the message, like PySpark/Scala: no message, no exception.
+    if (exception?.exceptionMessage === undefined) return null;
     const { exceptionMessage, errorClass, stackTrace } = exception;
-    if (exceptionMessage === undefined && errorClass === undefined && stackTrace === undefined) {
-      return null;
-    }
     return {
-      ...(exceptionMessage !== undefined && { message: exceptionMessage }),
+      message: exceptionMessage,
       ...(errorClass !== undefined && { errorClass }),
       ...(stackTrace !== undefined && { stackTrace }),
     };

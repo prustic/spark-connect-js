@@ -162,6 +162,19 @@ describe("buildCommandProto: streamingQueryCommand", () => {
     assert.equal(c.value.timeoutMs, undefined);
   });
 
+  it("rejects a non-integer awaitTermination timeoutMs (defense-in-depth)", () => {
+    assert.throws(
+      () =>
+        buildCommandProto({
+          type: "streamingQueryCommand",
+          queryId,
+          op: "awaitTermination",
+          timeoutMs: 1000.5,
+        }),
+      UnsupportedOperationError,
+    );
+  });
+
   it("throws UnsupportedOperationError on an unknown op", () => {
     assert.throws(
       () => buildCommandProto({ type: "streamingQueryCommand", queryId, op: "bogus" }),

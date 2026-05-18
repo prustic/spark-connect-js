@@ -160,6 +160,32 @@ describe("StreamingQuery", () => {
     assert.equal(await query.exception(), null);
   });
 
+  it("exception() returns null when only errorClass is set (keys on message, like PySpark/Scala)", async () => {
+    const t = capturingTransport();
+    t.setResponses([
+      {
+        type: "streamingQueryCommandResult",
+        resultType: "exception",
+        exception: { errorClass: "SOME_CLASS" },
+      },
+    ]);
+    const query = makeQuery(t);
+    assert.equal(await query.exception(), null);
+  });
+
+  it("exception() returns the message with optional errorClass/stackTrace omitted", async () => {
+    const t = capturingTransport();
+    t.setResponses([
+      {
+        type: "streamingQueryCommandResult",
+        resultType: "exception",
+        exception: { exceptionMessage: "boom" },
+      },
+    ]);
+    const query = makeQuery(t);
+    assert.deepEqual(await query.exception(), { message: "boom" });
+  });
+
   it("exception() decodes message/errorClass/stackTrace", async () => {
     const t = capturingTransport();
     t.setResponses([

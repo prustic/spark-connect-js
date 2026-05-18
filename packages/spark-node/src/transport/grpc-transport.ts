@@ -1228,6 +1228,12 @@ function buildStreamingQueryOpProto(
       };
     case "awaitTermination": {
       const timeoutMs = command.timeoutMs as number | undefined;
+      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
+        throw new UnsupportedOperationError(
+          `streamingQueryCommand awaitTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
+        );
+      }
       return {
         case: "awaitTermination",
         value: create(StreamingQueryCommand_AwaitTerminationCommandSchema, {

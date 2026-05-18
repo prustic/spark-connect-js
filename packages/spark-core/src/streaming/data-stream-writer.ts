@@ -117,6 +117,7 @@ export class DataStreamWriter {
   private async _start(
     sink: { kind: "path"; value: string } | { kind: "table"; value: string } | undefined,
   ): Promise<StreamingQuery> {
+    // Reject early, unlike PySpark/Scala: no destination can never succeed.
     if (this._format.length === 0 && sink === undefined) {
       throw new InvalidInputError(
         "DataStreamWriter requires either format(...) or a sink destination via start(path) / toTable(name).",
