@@ -142,6 +142,21 @@ describe("DataStreamWriter", () => {
     });
   });
 
+  it("options() stringifies non-string values", async () => {
+    const t = capturingTransport();
+    const spark = newSession(t);
+    const df = spark.readStream.format("rate").load();
+    await df.writeStream
+      .format("memory")
+      .options({ truncate: false, numRows: 20, mode: "append" })
+      .start();
+    assert.deepEqual(t.commands[0]["options"], {
+      truncate: "false",
+      numRows: "20",
+      mode: "append",
+    });
+  });
+
   it('name="" in response is normalized to undefined on the StreamingQuery', async () => {
     const t = capturingTransport();
     t.setResponses([

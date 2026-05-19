@@ -52,9 +52,9 @@ export class DataStreamWriter {
     return this;
   }
 
-  /** Set multiple sink options at once. */
-  options(opts: Record<string, string>): this {
-    Object.assign(this._options, opts);
+  /** Set multiple sink options at once. Non-string values are stringified. */
+  options(opts: Record<string, string | number | boolean>): this {
+    for (const [k, v] of Object.entries(opts)) this._options[k] = String(v);
     return this;
   }
 

@@ -86,6 +86,20 @@ describe("DataStreamReader", () => {
     assert.equal(plan.options["includeTimestamp"], "true");
   });
 
+  it("options() stringifies non-string values too", () => {
+    const spark = newSession();
+    const df = spark.readStream
+      .format("rate")
+      .options({ rowsPerSecond: 5, includeTimestamp: true, region: "us" })
+      .load();
+    const plan = df._plan as ReadPlan;
+    assert.deepEqual(plan.options, {
+      rowsPerSecond: "5",
+      includeTimestamp: "true",
+      region: "us",
+    });
+  });
+
   it("table(name) builds a streaming readTable plan", () => {
     const spark = newSession();
     const df = spark.readStream.table("events");

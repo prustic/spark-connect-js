@@ -69,9 +69,9 @@ export class DataStreamReader {
     return this;
   }
 
-  /** Set multiple source options at once. */
-  options(opts: Record<string, string>): this {
-    Object.assign(this._options, opts);
+  /** Set multiple source options at once. Non-string values are stringified. */
+  options(opts: Record<string, string | number | boolean>): this {
+    for (const [k, v] of Object.entries(opts)) this._options[k] = String(v);
     return this;
   }
 
