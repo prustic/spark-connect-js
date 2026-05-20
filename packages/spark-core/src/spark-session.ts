@@ -6,6 +6,7 @@ import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { DataStreamReader } from "./streaming/data-stream-reader.js";
+import { StreamingQueryManager } from "./streaming/streaming-query-manager.js";
 
 // crypto.randomUUID() is available globally in Node 19+, Deno, and all modern
 // browsers, but TypeScript's ES2023 lib doesn't include it since it's a Web
@@ -190,6 +191,11 @@ export class SparkSession {
    */
   get readStream(): DataStreamReader {
     return new DataStreamReader(this);
+  }
+
+  /** Manage the streaming queries running on this session (`active`, `get`, …). */
+  get streams(): StreamingQueryManager {
+    return new StreamingQueryManager(this);
   }
 
   /** Execute a SQL query. */

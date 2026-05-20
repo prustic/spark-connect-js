@@ -1,6 +1,7 @@
 export { DataStreamReader } from "./data-stream-reader.js";
 export { DataStreamWriter } from "./data-stream-writer.js";
 export { StreamingQuery } from "./streaming-query.js";
+export { StreamingQueryManager } from "./streaming-query-manager.js";
 export { Trigger } from "./trigger.js";
 export type {
   StreamingOutputMode,

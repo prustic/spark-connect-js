@@ -334,6 +334,19 @@ export {
   StreamingQueryCommandResult_ExceptionResultSchema,
   type StreamingQueryCommandResult_AwaitTerminationResult,
   StreamingQueryCommandResult_AwaitTerminationResultSchema,
+  // Streaming — Manager (Phase B)
+  type StreamingQueryManagerCommand,
+  StreamingQueryManagerCommandSchema,
+  type StreamingQueryManagerCommand_AwaitAnyTerminationCommand,
+  StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema,
+  type StreamingQueryManagerCommandResult,
+  StreamingQueryManagerCommandResultSchema,
+  type StreamingQueryManagerCommandResult_ActiveResult,
+  StreamingQueryManagerCommandResult_ActiveResultSchema,
+  type StreamingQueryManagerCommandResult_StreamingQueryInstance,
+  StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema,
+  type StreamingQueryManagerCommandResult_AwaitAnyTerminationResult,
+  StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

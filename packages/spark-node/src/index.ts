@@ -56,6 +56,7 @@ export {
   DataStreamReader,
   DataStreamWriter,
   StreamingQuery,
+  StreamingQueryManager,
   Trigger,
   StructType,
   StructField,

@@ -66,6 +66,10 @@ import {
   type WriteStreamOperationStartResult,
   type StreamingQueryCommand,
   type StreamingQueryCommandResult,
+  StreamingQueryManagerCommandSchema,
+  StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema,
+  type StreamingQueryManagerCommand,
+  type StreamingQueryManagerCommandResult,
   CommonInlineUserDefinedFunctionSchema,
   JavaUDFSchema,
   DataTypeSchema,
@@ -780,6 +784,9 @@ export function decodeCommandResponse(
   if (r.case === "streamingQueryCommandResult") {
     return decodeStreamingQueryCommandResult(r.value);
   }
+  if (r.case === "streamingQueryManagerCommandResult") {
+    return decodeStreamingQueryManagerCommandResult(r.value);
+  }
   return undefined;
 }
 
@@ -853,6 +860,52 @@ function decodeStreamingQueryCommandResult(
     default:
       // No result_type set (stop / processAllAvailable acks); just the queryId.
       return { type: "streamingQueryCommandResult", queryId };
+  }
+}
+
+function decodeStreamingQueryManagerCommandResult(
+  result: StreamingQueryManagerCommandResult,
+): Record<string, unknown> {
+  const r = result.resultType;
+  switch (r.case) {
+    case "active":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "active",
+        activeQueries: r.value.activeQueries.map((q) => ({
+          id: q.id?.id ?? "",
+          runId: q.id?.runId ?? "",
+          name: q.name,
+        })),
+      };
+    case "query":
+      // Server returns the resolved query (or the case is absent on miss).
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "query",
+        query: r.value.id
+          ? { id: r.value.id.id, runId: r.value.id.runId, name: r.value.name }
+          : undefined,
+      };
+    case "awaitAnyTermination":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "awaitAnyTermination",
+        terminated: r.value.terminated,
+      };
+    case "resetTerminated":
+    case "addListener":
+    case "removeListener":
+      // Boolean acks.
+      return { type: "streamingQueryManagerCommandResult", resultType: r.case };
+    case "listListeners":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "listListeners",
+        listenerIds: r.value.listenerIds,
+      };
+    default:
+      return { type: "streamingQueryManagerCommandResult" };
   }
 }
 
@@ -1116,6 +1169,10 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
     return buildStreamingQueryCommand(command);
   }
 
+  if (type === "streamingQueryManagerCommand") {
+    return buildStreamingQueryManagerCommand(command);
+  }
+
   if (type === "registerFunction") {
     const javaUdf = create(JavaUDFSchema, {
       className: command.className as string,
@@ -1258,6 +1315,51 @@ function buildStreamingQueryCommand(command: Record<string, unknown>): Command {
           runId: queryId.runId,
         }),
         command: buildStreamingQueryOpProto(op, command),
+      }),
+    },
+  });
+}
+
+function buildStreamingQueryManagerOpProto(
+  op: string,
+  command: Record<string, unknown>,
+): StreamingQueryManagerCommand["command"] {
+  switch (op) {
+    case "active":
+      return { case: "active", value: true };
+    case "getQuery":
+      return { case: "getQuery", value: command.id as string };
+    case "resetTerminated":
+      return { case: "resetTerminated", value: true };
+    case "listListeners":
+      return { case: "listListeners", value: true };
+    case "awaitAnyTermination": {
+      const timeoutMs = command.timeoutMs as number | undefined;
+      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
+        throw new UnsupportedOperationError(
+          `streamingQueryManagerCommand awaitAnyTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
+        );
+      }
+      return {
+        case: "awaitAnyTermination",
+        value: create(StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema, {
+          ...(timeoutMs !== undefined && { timeoutMs: BigInt(timeoutMs) }),
+        }),
+      };
+    }
+    default:
+      throw new UnsupportedOperationError(`Unsupported streamingQueryManagerCommand op: ${op}`);
+  }
+}
+
+function buildStreamingQueryManagerCommand(command: Record<string, unknown>): Command {
+  const op = command.op as string;
+  return create(CommandSchema, {
+    commandType: {
+      case: "streamingQueryManagerCommand",
+      value: create(StreamingQueryManagerCommandSchema, {
+        command: buildStreamingQueryManagerOpProto(op, command),
       }),
     },
   });

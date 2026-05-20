@@ -15,7 +15,13 @@
 
 export { SparkSession, SparkSessionBuilder, DataFrameReader } from "./spark-session.js";
 export { DataFrame } from "./data-frame.js";
-export { DataStreamReader, DataStreamWriter, StreamingQuery, Trigger } from "./streaming/index.js";
+export {
+  DataStreamReader,
+  DataStreamWriter,
+  StreamingQuery,
+  StreamingQueryManager,
+  Trigger,
+} from "./streaming/index.js";
 export type {
   StreamingOutputMode,
   StreamingQueryStatus,
