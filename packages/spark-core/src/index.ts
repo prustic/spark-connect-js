@@ -20,7 +20,14 @@ export {
   DataStreamWriter,
   StreamingQuery,
   StreamingQueryManager,
+  StreamingQueryListenerBase,
   Trigger,
+} from "./streaming/index.js";
+export type {
+  StreamingQueryListener,
+  QueryStartedEvent,
+  QueryIdleEvent,
+  QueryTerminatedEvent,
 } from "./streaming/index.js";
 export type {
   StreamingOutputMode,

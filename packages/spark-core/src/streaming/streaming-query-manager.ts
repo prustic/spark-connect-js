@@ -1,6 +1,7 @@
 import { InvalidInputError, SparkClientError } from "../errors.js";
 import type { SparkSession } from "../spark-session.js";
 import { StreamingQuery } from "./streaming-query.js";
+import type { StreamingQueryListener } from "./streaming-query-listener.js";
 
 /**
  * Decoded `StreamingQueryManagerCommandResult` payload as the transport hands
@@ -103,6 +104,36 @@ export class StreamingQueryManager {
   /** Clear the "any query terminated" flag so the next call blocks again. */
   async resetTerminated(): Promise<void> {
     await this._exec("resetTerminated");
+  }
+
+  /**
+   * Subscribe a listener to the streaming-query event bus. Lazy-opens a
+   * server-side subscription on the first call; subsequent listeners share
+   * the same subscription. Resolves once the server acknowledges
+   * registration.
+   *
+   * @remarks Callbacks are dispatched serially per session. On a
+   *   non-recoverable subscription drop the bus clears all listeners and
+   *   warns to `console.warn`; the user must `addListener` again to restart.
+   */
+  async addListener(listener: StreamingQueryListener): Promise<void> {
+    await this._session._getOrCreateListenerBus().add(listener);
+  }
+
+  /**
+   * Remove a previously-added listener. No-op if it isn't registered. When
+   * the last listener is removed, tears down the subscription.
+   */
+  async removeListener(listener: StreamingQueryListener): Promise<void> {
+    const bus = this._session._peekListenerBus();
+    if (bus === undefined) return;
+    await bus.remove(listener);
+  }
+
+  /** Server-side listener IDs (one per `addListener`-registered listener). */
+  async listListeners(): Promise<string[]> {
+    const { listenerIds = [] } = await this._exec("listListeners");
+    return listenerIds;
   }
 
   private async _exec(

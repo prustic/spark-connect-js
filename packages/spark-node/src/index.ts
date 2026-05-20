@@ -57,6 +57,7 @@ export {
   DataStreamWriter,
   StreamingQuery,
   StreamingQueryManager,
+  StreamingQueryListenerBase,
   Trigger,
   StructType,
   StructField,
@@ -353,6 +354,10 @@ export type {
   StreamingQueryStatus,
   StreamingQueryProgress,
   StreamingQueryException,
+  StreamingQueryListener,
+  QueryStartedEvent,
+  QueryIdleEvent,
+  QueryTerminatedEvent,
 } from "@spark-connect-js/core";
 
 // Convenience: fully-wired session factory

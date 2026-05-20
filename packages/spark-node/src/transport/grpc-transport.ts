@@ -70,6 +70,10 @@ import {
   StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema,
   type StreamingQueryManagerCommand,
   type StreamingQueryManagerCommandResult,
+  StreamingQueryListenerBusCommandSchema,
+  type StreamingQueryListenerBusCommand,
+  type StreamingQueryListenerEventsResult,
+  StreamingQueryEventType,
   CommonInlineUserDefinedFunctionSchema,
   JavaUDFSchema,
   DataTypeSchema,
@@ -259,6 +263,82 @@ export class GrpcTransport implements Transport {
       // captured above; nothing is yielded from this iterator.
     }
     return responses;
+  }
+
+  /**
+   * Execute a command and yield decoded non-Arrow result frames incrementally.
+   * Used by the streaming-query listener bus, which consumes a long-running
+   * `ExecutePlan` subscription.
+   */
+  async *executeCommandStream(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): AsyncIterable<Record<string, unknown>> {
+    const operationId = newOperationId();
+    const commandProto = buildCommandProto(command);
+    const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
+      case: "command",
+      value: commandProto,
+    });
+
+    // The underlying `_streamWithReattach` yields Arrow bytes only. Non-Arrow
+    // result frames surface via the `onResponse` hook, so we bridge them into
+    // an async-iterable through a Promise-gated queue.
+    const queue: Record<string, unknown>[] = [];
+    // Boxed so closures share the slot; bare `let` would let TS narrow each
+    // closure to a non-callable variant.
+    const state: { wake: (() => void) | null; done: boolean; err: Error | null } = {
+      wake: null,
+      done: false,
+      err: null,
+    };
+    const capture = (response: ExecutePlanResponse): void => {
+      const decoded = decodeCommandResponse(response);
+      if (decoded === undefined) return;
+      queue.push(decoded);
+      const w = state.wake;
+      state.wake = null;
+      if (w !== null) w();
+    };
+    const driver = (async () => {
+      try {
+        for await (const _ of this._streamWithReattach(sessionId, operationId, request, capture)) {
+          // discard Arrow bytes (subscriptions never emit them)
+        }
+      } catch (e) {
+        // wrapError in iterateWithReattach already lifts gRPC errors to
+        // SparkConnectError; anything else gets wrapped here for the rethrow.
+        state.err = e instanceof Error ? e : new Error(String(e));
+      } finally {
+        state.done = true;
+        const w = state.wake;
+        state.wake = null;
+        if (w !== null) w();
+      }
+    })();
+
+    try {
+      while (true) {
+        if (queue.length > 0) {
+          yield queue.shift()!;
+          continue;
+        }
+        if (state.done) {
+          if (state.err !== null) throw state.err;
+          return;
+        }
+        await new Promise<void>((r) => {
+          state.wake = r;
+        });
+      }
+    } finally {
+      // If the consumer breaks the loop without the server closing first,
+      // the driver keeps running until the server eventually does. The
+      // listener-bus driver always issues `removeListenerBusListener`, which
+      // makes the server close — so this path completes promptly.
+      await driver.catch(() => undefined);
+    }
   }
 
   /** @internal Build an ExecutePlanRequest with reattach enabled. */
@@ -787,6 +867,9 @@ export function decodeCommandResponse(
   if (r.case === "streamingQueryManagerCommandResult") {
     return decodeStreamingQueryManagerCommandResult(r.value);
   }
+  if (r.case === "streamingQueryListenerEventsResult") {
+    return decodeStreamingQueryListenerEventsResult(r.value);
+  }
   return undefined;
 }
 
@@ -907,6 +990,28 @@ function decodeStreamingQueryManagerCommandResult(
     default:
       return { type: "streamingQueryManagerCommandResult" };
   }
+}
+
+const EVENT_TYPE_NAME: Record<StreamingQueryEventType, string> = {
+  [StreamingQueryEventType.QUERY_PROGRESS_UNSPECIFIED]: "unspecified",
+  [StreamingQueryEventType.QUERY_PROGRESS_EVENT]: "progress",
+  [StreamingQueryEventType.QUERY_TERMINATED_EVENT]: "terminated",
+  [StreamingQueryEventType.QUERY_IDLE_EVENT]: "idle",
+};
+
+function decodeStreamingQueryListenerEventsResult(
+  result: StreamingQueryListenerEventsResult,
+): Record<string, unknown> {
+  return {
+    type: "streamingQueryListenerEventsResult",
+    events: result.events.map((e) => ({
+      eventType: EVENT_TYPE_NAME[e.eventType] ?? "unspecified",
+      eventJson: e.eventJson,
+    })),
+    ...(result.listenerBusListenerAdded !== undefined && {
+      listenerBusListenerAdded: result.listenerBusListenerAdded,
+    }),
+  };
 }
 
 // Error wrapping
@@ -1173,6 +1278,10 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
     return buildStreamingQueryManagerCommand(command);
   }
 
+  if (type === "streamingQueryListenerBusCommand") {
+    return buildStreamingQueryListenerBusCommand(command);
+  }
+
   if (type === "registerFunction") {
     const javaUdf = create(JavaUDFSchema, {
       className: command.className as string,
@@ -1360,6 +1469,31 @@ function buildStreamingQueryManagerCommand(command: Record<string, unknown>): Co
       case: "streamingQueryManagerCommand",
       value: create(StreamingQueryManagerCommandSchema, {
         command: buildStreamingQueryManagerOpProto(op, command),
+      }),
+    },
+  });
+}
+
+function buildStreamingQueryListenerBusOpProto(
+  op: string,
+): StreamingQueryListenerBusCommand["command"] {
+  switch (op) {
+    case "addListenerBusListener":
+      return { case: "addListenerBusListener", value: true };
+    case "removeListenerBusListener":
+      return { case: "removeListenerBusListener", value: true };
+    default:
+      throw new UnsupportedOperationError(`Unsupported streamingQueryListenerBusCommand op: ${op}`);
+  }
+}
+
+function buildStreamingQueryListenerBusCommand(command: Record<string, unknown>): Command {
+  const op = command.op as string;
+  return create(CommandSchema, {
+    commandType: {
+      case: "streamingQueryListenerBusCommand",
+      value: create(StreamingQueryListenerBusCommandSchema, {
+        command: buildStreamingQueryListenerBusOpProto(op),
       }),
     },
   });

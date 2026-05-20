@@ -347,6 +347,16 @@ export {
   StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema,
   type StreamingQueryManagerCommandResult_AwaitAnyTerminationResult,
   StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema,
+  type StreamingQueryManagerCommandResult_ListStreamingQueryListenerResult,
+  StreamingQueryManagerCommandResult_ListStreamingQueryListenerResultSchema,
+  // Streaming — Listener bus (Phase B)
+  type StreamingQueryListenerBusCommand,
+  StreamingQueryListenerBusCommandSchema,
+  type StreamingQueryListenerEvent,
+  StreamingQueryListenerEventSchema,
+  type StreamingQueryListenerEventsResult,
+  StreamingQueryListenerEventsResultSchema,
+  StreamingQueryEventType,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)
