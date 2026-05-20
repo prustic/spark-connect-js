@@ -53,6 +53,10 @@ export {
   GrpcStatusCode,
   DataFrameWriter,
   DataFrameWriterV2,
+  DataStreamReader,
+  DataStreamWriter,
+  StreamingQuery,
+  Trigger,
   StructType,
   StructField,
   Catalog,
@@ -344,6 +348,10 @@ export type {
   CatalogOperation,
   WindowFrame,
   FrameBoundary,
+  StreamingOutputMode,
+  StreamingQueryStatus,
+  StreamingQueryProgress,
+  StreamingQueryException,
 } from "@spark-connect-js/core";
 
 // Convenience: fully-wired session factory

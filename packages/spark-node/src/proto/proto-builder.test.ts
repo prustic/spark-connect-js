@@ -24,11 +24,63 @@ describe("buildRelation()", () => {
     const rel = buildRelation(plan);
     assert.equal(rel.relType.case, "read");
     if (rel.relType.case === "read") {
+      assert.equal(rel.relType.value.isStreaming, false);
       assert.equal(rel.relType.value.readType.case, "dataSource");
       if (rel.relType.value.readType.case === "dataSource") {
         assert.equal(rel.relType.value.readType.value.format, "parquet");
         assert.deepStrictEqual(rel.relType.value.readType.value.paths, ["/data/users"]);
       }
+    }
+  });
+
+  it("preserves an empty path for non-streaming reads (no silent behavior change)", () => {
+    const plan: LogicalPlan = {
+      type: "read",
+      format: "noop",
+      path: "",
+      options: {},
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "read");
+    if (rel.relType.case === "read") {
+      assert.equal(rel.relType.value.isStreaming, false);
+      if (rel.relType.value.readType.case === "dataSource") {
+        assert.deepStrictEqual(rel.relType.value.readType.value.paths, [""]);
+      }
+    }
+  });
+
+  it("builds a streaming Read with isStreaming=true and omits empty path", () => {
+    const plan: LogicalPlan = {
+      type: "read",
+      format: "rate",
+      path: "",
+      options: { rowsPerSecond: "5" },
+      isStreaming: true,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "read");
+    if (rel.relType.case === "read") {
+      assert.equal(rel.relType.value.isStreaming, true);
+      if (rel.relType.value.readType.case === "dataSource") {
+        assert.equal(rel.relType.value.readType.value.format, "rate");
+        assert.deepStrictEqual(rel.relType.value.readType.value.paths, []);
+      }
+    }
+  });
+
+  it("builds a streaming readTable with isStreaming=true", () => {
+    const plan: LogicalPlan = {
+      type: "readTable",
+      tableName: "events",
+      options: {},
+      isStreaming: true,
+    };
+    const rel = buildRelation(plan);
+    assert.equal(rel.relType.case, "read");
+    if (rel.relType.case === "read") {
+      assert.equal(rel.relType.value.isStreaming, true);
+      assert.equal(rel.relType.value.readType.case, "namedTable");
     }
   });
 

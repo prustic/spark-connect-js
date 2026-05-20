@@ -140,6 +140,7 @@ export interface ReadPlan {
   path: string;
   options: Record<string, string>;
   schema?: string;
+  isStreaming?: boolean;
 }
 
 /**
@@ -151,6 +152,7 @@ export interface ReadTablePlan {
   type: "readTable";
   tableName: string;
   options: Record<string, string>;
+  isStreaming?: boolean;
 }
 
 /**

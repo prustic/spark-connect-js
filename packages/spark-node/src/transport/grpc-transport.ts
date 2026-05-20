@@ -57,6 +57,15 @@ import {
   WriteOperationV2Schema,
   WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
+  WriteStreamOperationStartSchema,
+  StreamingQueryInstanceIdSchema,
+  StreamingQueryCommandSchema,
+  StreamingQueryCommand_ExplainCommandSchema,
+  StreamingQueryCommand_AwaitTerminationCommandSchema,
+  type WriteStreamOperationStart,
+  type WriteStreamOperationStartResult,
+  type StreamingQueryCommand,
+  type StreamingQueryCommandResult,
   CommonInlineUserDefinedFunctionSchema,
   JavaUDFSchema,
   DataTypeSchema,
@@ -219,6 +228,35 @@ export class GrpcTransport implements Transport {
     }
   }
 
+  /**
+   * Execute a command and collect non-Arrow result responses (streaming
+   * commands return `WriteStreamOperationStartResult` /
+   * `StreamingQueryCommandResult` instead of Arrow batches).
+   */
+  async executeCommandResponses(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): Promise<Record<string, unknown>[]> {
+    const operationId = newOperationId();
+    const commandProto = buildCommandProto(command);
+    const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
+      case: "command",
+      value: commandProto,
+    });
+    const responses: Record<string, unknown>[] = [];
+    const capture = (response: ExecutePlanResponse): void => {
+      const decoded = decodeCommandResponse(response);
+      if (decoded !== undefined) responses.push(decoded);
+    };
+    for await (const _ of this._streamWithReattach(sessionId, operationId, request, capture)) {
+      // Drain the stream so the onResponse hook fires for every result frame.
+      // Streaming commands carry their result in non-Arrow response frames
+      // captured above; nothing is yielded from this iterator.
+    }
+    return responses;
+  }
+
   /** @internal Build an ExecutePlanRequest with reattach enabled. */
   private _buildExecutePlanRequest(
     sessionId: string,
@@ -279,6 +317,7 @@ export class GrpcTransport implements Transport {
     sessionId: string,
     operationId: string,
     request: ExecutePlanRequest,
+    onResponse?: (response: ExecutePlanResponse) => void,
   ): AsyncIterable<Uint8Array> {
     const client = this._getClient();
     return iterateWithReattach({
@@ -288,7 +327,10 @@ export class GrpcTransport implements Transport {
       retryPolicy: this.retryPolicy,
       sleep,
       wrapError: (err) => this._wrapError(sessionId, err),
-      onResponse: (response) => this._captureServerSession(sessionId, response),
+      onResponse: (response) => {
+        this._captureServerSession(sessionId, response);
+        onResponse?.(response);
+      },
     });
   }
 
@@ -718,6 +760,102 @@ function extractConfigResult(response: ConfigResponse): Record<string, unknown> 
   };
 }
 
+// Streaming command response decoding
+
+/**
+ * Decode a streaming-command response payload into a JSON-like shape the
+ * core package can interpret. Returns `undefined` for response types that
+ * are not streaming results (Arrow batches, `resultComplete`, etc.).
+ *
+ * @internal Exported for unit testing; not part of the package's public API
+ * (not re-exported from `index.ts`).
+ */
+export function decodeCommandResponse(
+  response: ExecutePlanResponse,
+): Record<string, unknown> | undefined {
+  const r = response.responseType;
+  if (r.case === "writeStreamOperationStartResult") {
+    return decodeWriteStreamStartResult(r.value);
+  }
+  if (r.case === "streamingQueryCommandResult") {
+    return decodeStreamingQueryCommandResult(r.value);
+  }
+  return undefined;
+}
+
+function decodeWriteStreamStartResult(
+  result: WriteStreamOperationStartResult,
+): Record<string, unknown> {
+  return {
+    type: "writeStreamOperationStartResult",
+    queryId: result.queryId ? { id: result.queryId.id, runId: result.queryId.runId } : undefined,
+    name: result.name,
+    ...(result.queryStartedEventJson !== undefined
+      ? { queryStartedEventJson: result.queryStartedEventJson }
+      : {}),
+  };
+}
+
+function decodeStreamingQueryCommandResult(
+  result: StreamingQueryCommandResult,
+): Record<string, unknown> {
+  const queryId = result.queryId
+    ? { id: result.queryId.id, runId: result.queryId.runId }
+    : undefined;
+  const r = result.resultType;
+  switch (r.case) {
+    case "status":
+      return {
+        type: "streamingQueryCommandResult",
+        queryId,
+        resultType: "status",
+        status: {
+          statusMessage: r.value.statusMessage,
+          isDataAvailable: r.value.isDataAvailable,
+          isTriggerActive: r.value.isTriggerActive,
+          isActive: r.value.isActive,
+        },
+      };
+    case "recentProgress":
+      return {
+        type: "streamingQueryCommandResult",
+        queryId,
+        resultType: "recentProgress",
+        recentProgressJson: r.value.recentProgressJson,
+      };
+    case "explain":
+      return {
+        type: "streamingQueryCommandResult",
+        queryId,
+        resultType: "explain",
+        explain: r.value.result,
+      };
+    case "exception": {
+      const { exceptionMessage, errorClass, stackTrace } = r.value;
+      return {
+        type: "streamingQueryCommandResult",
+        queryId,
+        resultType: "exception",
+        exception: {
+          ...(exceptionMessage !== undefined && { exceptionMessage }),
+          ...(errorClass !== undefined && { errorClass }),
+          ...(stackTrace !== undefined && { stackTrace }),
+        },
+      };
+    }
+    case "awaitTermination":
+      return {
+        type: "streamingQueryCommandResult",
+        queryId,
+        resultType: "awaitTermination",
+        terminated: r.value.terminated,
+      };
+    default:
+      // No result_type set (stop / processAllAvailable acks); just the queryId.
+      return { type: "streamingQueryCommandResult", queryId };
+  }
+}
+
 // Error wrapping
 
 /** Human-readable gRPC status code names. */
@@ -855,7 +993,13 @@ const WRITE_V2_MODE_MAP: Record<string, WriteOperationV2_Mode> = {
   overwritePartitions: WriteOperationV2_Mode.OVERWRITE_PARTITIONS,
 };
 
-function buildCommandProto(command: Record<string, unknown>): Command {
+/**
+ * Map a core-side command record onto a Spark Connect `Command` protobuf.
+ *
+ * @internal Exported for unit testing; not part of the package's public API
+ * (not re-exported from `index.ts`).
+ */
+export function buildCommandProto(command: Record<string, unknown>): Command {
   const type = command.type as string;
 
   if (type === "writeOperation") {
@@ -964,6 +1108,14 @@ function buildCommandProto(command: Record<string, unknown>): Command {
     });
   }
 
+  if (type === "writeStreamOperationStart") {
+    return buildWriteStreamStartCommand(command);
+  }
+
+  if (type === "streamingQueryCommand") {
+    return buildStreamingQueryCommand(command);
+  }
+
   if (type === "registerFunction") {
     const javaUdf = create(JavaUDFSchema, {
       className: command.className as string,
@@ -994,6 +1146,121 @@ function buildCommandProto(command: Record<string, unknown>): Command {
   }
 
   throw new UnsupportedOperationError(`Unsupported command type: ${type}`);
+}
+
+// Streaming command building
+
+// Mirrors the public `Trigger` discriminated union from
+// `@spark-connect-js/core`. Defined here (rather than imported) so the
+// transport stays decoupled from streaming-specific exports.
+type TriggerSpec =
+  | { kind: "processingTime"; interval: string }
+  | { kind: "availableNow" }
+  | { kind: "once" }
+  | { kind: "continuous"; interval: string };
+
+interface SinkSpec {
+  kind: "path" | "table";
+  value: string;
+}
+
+function buildTriggerProto(trigger: TriggerSpec | undefined): WriteStreamOperationStart["trigger"] {
+  if (trigger === undefined) return { case: undefined, value: undefined };
+  switch (trigger.kind) {
+    case "processingTime":
+      return { case: "processingTimeInterval", value: trigger.interval };
+    case "availableNow":
+      return { case: "availableNow", value: true };
+    case "once":
+      return { case: "once", value: true };
+    case "continuous":
+      return { case: "continuousCheckpointInterval", value: trigger.interval };
+  }
+}
+
+function buildSinkProto(sink: SinkSpec | undefined): WriteStreamOperationStart["sinkDestination"] {
+  if (sink === undefined) return { case: undefined, value: undefined };
+  return sink.kind === "path"
+    ? { case: "path", value: sink.value }
+    : { case: "tableName", value: sink.value };
+}
+
+function buildWriteStreamStartCommand(command: Record<string, unknown>): Command {
+  const plan = command.plan as LogicalPlan;
+  const start = create(WriteStreamOperationStartSchema, {
+    input: buildRelation(plan),
+    format: (command.format as string) ?? "",
+    options: (command.options as Record<string, string>) ?? {},
+    partitioningColumnNames: (command.partitioningColumnNames as string[]) ?? [],
+    trigger: buildTriggerProto(command.trigger as TriggerSpec | undefined),
+    outputMode: (command.outputMode as string) ?? "",
+    queryName: (command.queryName as string) ?? "",
+    sinkDestination: buildSinkProto(command.sink as SinkSpec | undefined),
+  });
+  return create(CommandSchema, {
+    commandType: { case: "writeStreamOperationStart", value: start },
+  });
+}
+
+function buildStreamingQueryOpProto(
+  op: string,
+  command: Record<string, unknown>,
+): StreamingQueryCommand["command"] {
+  switch (op) {
+    case "status":
+      return { case: "status", value: true };
+    case "lastProgress":
+      return { case: "lastProgress", value: true };
+    case "recentProgress":
+      return { case: "recentProgress", value: true };
+    case "stop":
+      return { case: "stop", value: true };
+    case "processAllAvailable":
+      return { case: "processAllAvailable", value: true };
+    case "exception":
+      return { case: "exception", value: true };
+    case "explain":
+      return {
+        case: "explain",
+        value: create(StreamingQueryCommand_ExplainCommandSchema, {
+          extended: (command.extended as boolean) ?? false,
+        }),
+      };
+    case "awaitTermination": {
+      const timeoutMs = command.timeoutMs as number | undefined;
+      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
+        throw new UnsupportedOperationError(
+          `streamingQueryCommand awaitTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
+        );
+      }
+      return {
+        case: "awaitTermination",
+        value: create(StreamingQueryCommand_AwaitTerminationCommandSchema, {
+          ...(timeoutMs !== undefined && { timeoutMs: BigInt(timeoutMs) }),
+        }),
+      };
+    }
+    default:
+      throw new UnsupportedOperationError(`Unsupported streamingQueryCommand op: ${op}`);
+  }
+}
+
+function buildStreamingQueryCommand(command: Record<string, unknown>): Command {
+  const queryId = command.queryId as { id: string; runId: string };
+  const op = command.op as string;
+  return create(CommandSchema, {
+    commandType: {
+      case: "streamingQueryCommand",
+      value: create(StreamingQueryCommandSchema, {
+        queryId: create(StreamingQueryInstanceIdSchema, {
+          id: queryId.id,
+          runId: queryId.runId,
+        }),
+        command: buildStreamingQueryOpProto(op, command),
+      }),
+    },
+  });
 }
 
 // AnalyzePlan request/response building

@@ -5,6 +5,7 @@ import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
+import { DataStreamWriter } from "./streaming/data-stream-writer.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
@@ -645,6 +646,18 @@ export class DataFrame {
    */
   writeTo(tableName: string): DataFrameWriterV2 {
     return new DataFrameWriterV2(this, tableName);
+  }
+
+  /**
+   * Returns a {@link DataStreamWriter} for launching a streaming query
+   * against the data in this (streaming) DataFrame.
+   *
+   * Only valid on streaming DataFrames (those whose source plan is built
+   * via `spark.readStream`). The server will reject the write if the input
+   * plan isn't streaming.
+   */
+  get writeStream(): DataStreamWriter {
+    return new DataStreamWriter(this);
   }
 
   // Caching & Persistence
