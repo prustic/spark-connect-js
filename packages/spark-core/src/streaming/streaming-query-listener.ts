@@ -1,6 +1,9 @@
 import type { SparkSession } from "../spark-session.js";
 import type { StreamingQueryProgress } from "./types.js";
 
+// spark-core stays platform-neutral; declare only what we use.
+declare const console: { warn(...args: unknown[]): void };
+
 /**
  * Fired when a streaming query has just been launched. Parsed from the
  * server's `queryStartedEventJson` on `WriteStreamOperationStartResult`.
@@ -68,6 +71,12 @@ export class StreamingQueryListenerBus {
   private _driver: Promise<void> | null = null;
   /** Resolves once the server has acked `addListenerBusListener`. */
   private _registered: Promise<void> | null = null;
+  /**
+   * Promise chain that serializes every `_dispatch` call so events delivered
+   * from the driver and from `dispatchStarted` (called by the writer) reach
+   * each listener in strict FIFO order, matching PySpark's single-thread bus.
+   */
+  private _dispatchChain: Promise<void> = Promise.resolve();
 
   constructor(session: SparkSession) {
     this._session = session;
@@ -95,15 +104,16 @@ export class StreamingQueryListenerBus {
     if (idx < 0) return;
     this._listeners.splice(idx, 1);
     if (this._listeners.length === 0 && this._driver !== null) {
+      // Null the slots *before* awaiting so a concurrent `add` opens a fresh
+      // subscription instead of binding to the about-to-drain driver.
       const driver = this._driver;
-      // Tell the server to close the stream; that's how the driver completes.
+      this._driver = null;
+      this._registered = null;
       await this._session._executeCommandResponses({
         type: "streamingQueryListenerBusCommand",
         op: "removeListenerBusListener",
       });
       await driver;
-      this._driver = null;
-      this._registered = null;
     }
   }
 
@@ -169,14 +179,14 @@ export class StreamingQueryListenerBus {
 
   private async _dispatchEvent(eventType: string, eventJson: string): Promise<void> {
     if (eventType === "progress") {
-      const event = safeParse(eventJson);
+      const event = parseOrWarn(eventJson, eventType);
       if (event !== undefined) {
         await this._dispatch((l) => l.onQueryProgress?.(event as StreamingQueryProgress));
       }
       return;
     }
     if (eventType === "idle") {
-      const event = safeParse(eventJson) as Partial<QueryIdleEvent> | undefined;
+      const event = parseOrWarn(eventJson, eventType) as Partial<QueryIdleEvent> | undefined;
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryIdle?.({
@@ -189,7 +199,7 @@ export class StreamingQueryListenerBus {
       return;
     }
     if (eventType === "terminated") {
-      const event = safeParse(eventJson) as Partial<QueryTerminatedEvent> | undefined;
+      const event = parseOrWarn(eventJson, eventType) as Partial<QueryTerminatedEvent> | undefined;
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryTerminated?.({
@@ -207,25 +217,40 @@ export class StreamingQueryListenerBus {
     // unspecified / unknown — ignore
   }
 
-  private async _dispatch(
+  /**
+   * Append a fan-out task to {@link _dispatchChain} so all dispatches across
+   * the bus (driver-side and {@link dispatchStarted}) stay strictly FIFO.
+   */
+  private _dispatch(
     apply: (listener: StreamingQueryListener) => void | Promise<void>,
   ): Promise<void> {
-    // Snapshot to tolerate add/remove during dispatch.
-    const snapshot = this._listeners.slice();
-    for (let i = 0; i < snapshot.length; i++) {
-      try {
-        await apply(snapshot[i]);
-      } catch (err) {
-        console.warn(`StreamingQueryListener[${String(i)}] callback threw`, err);
+    const next = this._dispatchChain.then(async () => {
+      // Snapshot to tolerate add/remove during dispatch.
+      const snapshot = this._listeners.slice();
+      for (let i = 0; i < snapshot.length; i++) {
+        try {
+          await apply(snapshot[i]);
+        } catch (err) {
+          console.warn(`StreamingQueryListener[${String(i)}] callback threw`, err);
+        }
       }
-    }
+    });
+    // Swallow the (impossible) chain failure so one task's throw can't poison
+    // subsequent dispatches. The per-listener try/catch above is the real
+    // exception isolation.
+    this._dispatchChain = next.catch(() => undefined);
+    return next;
   }
 }
 
-function safeParse(json: string): unknown {
+function parseOrWarn(json: string, eventType: string): unknown {
   try {
     return JSON.parse(json);
-  } catch {
+  } catch (err) {
+    console.warn(
+      `StreamingQueryListenerBus: dropping malformed ${eventType} event JSON: ${json}`,
+      err,
+    );
     return undefined;
   }
 }

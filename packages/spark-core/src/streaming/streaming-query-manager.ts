@@ -28,12 +28,8 @@ interface StreamingQueryManagerCommandResultPayload {
 
 /**
  * Manages the streaming queries on a {@link SparkSession}. Obtained via
- * `spark.streams`.
- *
- * Mirrors `pyspark.sql.streaming.StreamingQueryManager` and the canonical
- * Scala `StreamingQueryManager`. Listener registration (`addListener` /
- * `removeListener` / `listListeners`) ships in the listener follow-up; this
- * commit covers the request/response surface only.
+ * `spark.streams`. Mirrors `pyspark.sql.streaming.StreamingQueryManager` and
+ * the canonical Scala `StreamingQueryManager`.
  *
  * @see [Spark source: StreamingQueryManager.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/streaming/StreamingQueryManager.scala)
  */
@@ -130,11 +126,13 @@ export class StreamingQueryManager {
     await bus.remove(listener);
   }
 
-  /** Server-side listener IDs (one per `addListener`-registered listener). */
-  async listListeners(): Promise<string[]> {
-    const { listenerIds = [] } = await this._exec("listListeners");
-    return listenerIds;
-  }
+  // `listListeners()` is intentionally not exposed: the proto's
+  // `StreamingQueryManagerCommand.listListeners` returns IDs of Java
+  // listeners registered via `StreamingQueryManagerCommand.addListener`
+  // (which carries `listener_payload: bytes`), not the TS listeners we
+  // subscribe via `StreamingQueryListenerBusCommand.addListenerBusListener`.
+  // A TS client never registers Java listeners, so the result is always
+  // empty — surfacing it would be misleading. PySpark Connect omits it too.
 
   private async _exec(
     op: string,
