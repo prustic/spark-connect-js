@@ -1,0 +1,24 @@
+---
+title: Integrations
+description: Runtimes that spark-connect-js supports today.
+---
+
+import { CardGrid } from '@astrojs/starlight/components';
+import IntegrationCard from '../../../components/IntegrationCard.astro';
+
+Each integration adapts [`@spark-connect-js/core`](https://www.npmjs.com/package/@spark-connect-js/core) to a specific JavaScript runtime.
+
+## Runtimes
+
+<CardGrid>
+  <IntegrationCard
+    icon="node"
+    title="Node.js"
+    description="The @spark-connect-js/node package. gRPC via @grpc/grpc-js, Arrow decoding via apache-arrow."
+    href="/spark-connect-js/integrations/runtimes/node/"
+  />
+</CardGrid>
+
+## Want something that is not here?
+
+Open an issue on [GitHub](https://github.com/prustic/spark-connect-js/issues). If the runtime or framework has a stable gRPC and Arrow story, an adapter is usually small. Additional runtime and framework integrations are on the [roadmap](/spark-connect-js/roadmap/) for 0.9.0; managed platform connectors (Databricks, AWS EMR, possibly more) land in 0.8.0.

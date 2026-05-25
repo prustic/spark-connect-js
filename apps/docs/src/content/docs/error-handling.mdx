@@ -1,0 +1,85 @@
+---
+title: Error handling
+description: What SparkConnectError tells you today, and the Spark Connect failure modes to recognise.
+---
+
+## SparkConnectError
+
+When the Spark Connect server rejects a plan or the transport fails, the client throws a `SparkConnectError`:
+
+```ts
+class SparkConnectError extends Error {
+  readonly code: number;                            // gRPC status code
+  readonly errorClass?: string;                     // e.g. "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+  readonly sqlState?: string;                       // e.g. "42703"
+  readonly messageParameters?: Record<string, string>; // template variables from the server
+  readonly errorTypeHierarchy?: readonly string[];  // JVM exception class chain, root-most first
+  readonly serverStackTrace?: readonly string[];    // populated when spark.sql.connect.serverStacktrace.enabled
+  readonly cause?: unknown;                         // the raw @grpc/grpc-js error
+}
+```
+
+`code` and `message` are always set. `errorClass` and `sqlState` are decoded from the server's `grpc-status-details-bin` trailer for any plan that fails analysis or execution. `errorTypeHierarchy` and `serverStackTrace` come from a follow-up `FetchErrorDetails` RPC the transport issues automatically when the inline trailer is incomplete. `serverStackTrace` is empty unless the server runs with `spark.sql.connect.serverStacktrace.enabled=true`, which most production deployments leave off.
+
+Match on `errorClass` first, fall back to `code` for transport-layer failures (`UNAVAILABLE`, `DEADLINE_EXCEEDED`, etc.) where the server never produced an error class.
+
+## Failure modes
+
+`SparkConnectError.code` is a gRPC status:
+
+| `code`             | What it means                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `INVALID_ARGUMENT` | The analyzer or parser rejected the plan (unknown column, unknown table, bad SQL, type mismatch). The error `message` points at the offending node. |
+| `INTERNAL`         | The server session is gone, usually because the driver restarted or the operation was garbage-collected before a reattach. Build a new session and retry. |
+| `CANCELLED`        | The query was cancelled via `interruptAll`, `interruptTag`, or an RPC deadline. Not a bug.                                                             |
+| `UNAVAILABLE`      | Transport-level failure: driver crashed, load balancer draining, network partition. Idempotent reads are safe to retry.                                |
+| `UNAUTHENTICATED`  | The bearer token is missing, rejected, or expired. Refresh it and rebuild the session.                                                                 |
+
+## `SparkClientError`
+
+Everything the client rejects before any RPC throws a `SparkClientError` subclass:
+
+- `InvalidConfigError`: the session builder is missing required config.
+- `InvalidInputError`: a DataFrame method got a malformed argument.
+- `UnsupportedOperationError`: the current transport doesn't support a capability.
+
+These signal bugs in your code, not runtime conditions. Let them surface rather than catching.
+
+```ts
+SparkSession.builder().getOrCreate();
+// InvalidConfigError: SparkSession requires a remote URL.
+
+df.bucketBy(0, "id");
+// InvalidInputError: bucketBy requires a positive number of buckets.
+```
+
+## Handling errors at the boundary
+
+Let errors bubble to the edge (HTTP handler, job runner, CLI) and classify them once, there. Pulling the classifier out as a named function keeps the call site clean and makes the policy easy to extend or test.
+
+```ts
+import { SparkClientError, SparkConnectError, GrpcStatusCode } from "@spark-connect-js/node";
+
+function classify(err: unknown) {
+  // SparkClientError signals a bug in our code; let it surface.
+  if (err instanceof SparkClientError) throw err;
+
+  if (err instanceof SparkConnectError) {
+    switch (err.code) {
+      case GrpcStatusCode.UNAVAILABLE:
+        return { status: 503, body: "Spark driver unreachable" };
+      case GrpcStatusCode.UNAUTHENTICATED:
+        return { status: 401, body: "Authentication failed; refresh the token" };
+    }
+  }
+
+  throw err;
+}
+
+return runQuery().catch(classify);
+```
+
+## Reference
+
+- Spark's error-condition catalogue: [`error-conditions.json`](https://github.com/apache/spark/blob/master/common/utils/src/main/resources/error/error-conditions.json). Those identifiers are exactly what `errorClass` carries.
+- gRPC status codes: [grpc.io/docs/guides/status-codes](https://grpc.io/docs/guides/status-codes/).

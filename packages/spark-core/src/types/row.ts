@@ -1,9 +1,9 @@
 /**
- * Row
- *
  * A Row is the JS-native representation of one record returned by a DataFrame
- * action.  It maps column names to JS values. *
- * @see Spark source: sql/api/src/main/scala/org/apache/spark/sql/Row.scala *
+ * action. It maps column names to JavaScript values.
+ *
+ * @see [Spark source: Row.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/Row.scala)
+ *
  * When Arrow IPC batches are decoded, each row is materialised as a plain
  * object.  This is intentionally kept as a simple Record type because we don't
  * wrap it in a class because:

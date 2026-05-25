@@ -3,9 +3,10 @@ packages:
   - "tooling/*"
   - "examples/*"
   - "tests/*"
+  - "apps/*"
 
 catalog:
-  "@types/node": ^25.5.2
+  "@types/node": ^25.8.0
   typescript: ^5.9.3
   prettier: ^3.8.1
   eslint: ^10.1.0

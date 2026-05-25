@@ -1,0 +1,94 @@
+---
+title: Contributing
+description: How to build, test, and contribute to spark-connect-js.
+---
+
+For policy and process, see [CONTRIBUTING.md](https://github.com/prustic/spark-connect-js/blob/main/CONTRIBUTING.md).
+
+## Repository layout
+
+A pnpm + Turborepo monorepo:
+
+```
+packages/
+  spark-core/        zero-dependency API surface: DataFrame, Column, plan builder
+  spark-node/        gRPC transport, Arrow decoder, Node entry point
+  spark-connect/     generated protobuf types (do not edit by hand)
+apps/
+  docs/              this site (Astro + Starlight + TypeDoc)
+examples/
+  node-*/            runnable example apps, one per workload style
+```
+
+Scripts are defined in `package.json` at the repo root and in each workspace. Turbo orchestrates them across the monorepo; `pnpm --filter <package> <script>` invokes a script in a specific workspace.
+
+## Setup
+
+Requires Node 22 or later and pnpm 10 or later.
+
+```bash
+git clone https://github.com/prustic/spark-connect-js.git
+cd spark-connect-js
+pnpm install
+```
+
+## Testing and linting
+
+Unit tests live alongside source as `*.test.ts` files and run against an in-memory fake transport, so they're fast and need no external services.
+
+Integration tests live in `tests/integration/` (`@spark-connect-js/integration-tests`). The `test:integration` script brings up a Spark Connect server in Docker, runs against it, and tears it down:
+
+```bash
+pnpm --filter @spark-connect-js/integration-tests test:integration
+```
+
+The default endpoint is `sc://localhost:15002`; override with the `SPARK_REMOTE` env var if you're pointing at something else.
+
+For interactive smoke testing, the apps in `examples/` each ship a `docker-compose.yml` for the same setup. Run the example, hit the live server, tear it down.
+
+Linting and formatting use ESLint and Prettier with shared config in `tooling/eslint/` and `tooling/prettier/`. Both run in CI on every PR alongside the build and test steps.
+
+## Adding a built-in function
+
+Built-in functions wrap `callFunction`, which packages the arguments into an `UnresolvedFunction` expression and lets Catalyst handle the rest.
+
+```ts
+// packages/spark-core/src/functions/index.ts
+export function coalesce(...cols: (Column | string)[]): Column {
+  return callFunction("coalesce", cols);
+}
+```
+
+Add a test that checks the generated plan structure, and if the function has non-trivial semantics, add an integration test that round-trips through a real server.
+
+The [`functions/index.ts`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-core/src/functions/index.ts) file groups functions by category (aggregate, string, date, math, conditional, collection). Add new entries in the matching section to keep the generated API reference readable.
+
+## Adding a DataFrame method
+
+1. Add the logical plan case in [`plan/logical-plan.ts`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-core/src/plan/logical-plan.ts).
+2. Add the builder method on [`DataFrame`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-core/src/data-frame.ts) that appends the new node to `this.plan`.
+3. Add the proto encoding in [`plan/plan-builder.ts`](https://github.com/prustic/spark-connect-js/blob/main/packages/spark-core/src/plan/plan-builder.ts).
+4. Add tests: a unit test for the builder, an encoding test for the proto round-trip, and an integration test against a real server.
+
+The proto schema for Spark Connect lives in the [Apache Spark source tree](https://github.com/apache/spark/tree/master/sql/connect/common/src/main/protobuf/spark/connect). When adding support for a new message type, align the TypeScript representation with the proto names (not the Scala DataFrame names) so encoding stays obvious.
+
+## Filing a bug
+
+Ideally, include:
+
+1. `@spark-connect-js/node` version from `package.json`.
+2. Node version (`node --version`).
+3. Spark server version (`spark.sql("SELECT version()").show()` or your vendor's equivalent).
+4. Minimal reproduction, a single SQL string or a short script.
+5. Full error: `errorClass`, `code`, `sqlState`, `message`.
+6. Output of `df.explain("extended")` if the error came from a plan.
+
+The [Troubleshooting](/spark-connect-js/troubleshooting/) page also offers some help in case of _common_ issues. 
+
+## Reporting security issues
+
+Do not open a public issue for a security vulnerability. See [SECURITY.md](https://github.com/prustic/spark-connect-js/blob/main/SECURITY.md) in the repo for the disclosure policy.
+
+## License
+
+By contributing, you agree that your contributions are licensed under [Apache-2.0](https://github.com/prustic/spark-connect-js/blob/main/LICENSE).

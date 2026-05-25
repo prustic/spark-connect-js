@@ -1,25 +1,30 @@
-/**
- * Column
- *
- * Represents a column expression in Spark's expression tree.
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/Column.scala
- * @see Catalyst expressions: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/
- *
- * In the JVM, Column wraps a Catalyst Expression.  Every operation on a Column
- * (>, <, ===, +, alias) produces a NEW expression tree node, never mutating
- * the original.  The full tree is serialised as a Spark Connect `Expression`
- * protobuf when the plan is sent to the server.
- *
- * Critical design constraint:
- *   These expressions are NEVER evaluated in JavaScript.  They are
- *   descriptions of computation that the JVM will execute.  We are building
- *   an AST, not running a query engine.
- */
-
 import type { Expression } from "./plan/logical-plan.js";
 import type { WindowSpec } from "./window.js";
 
+/**
+ * A reference to a column expression, typically obtained from {@link col} or
+ * from methods on a {@link DataFrame} such as `df.col("name")`.
+ *
+ * Every method on `Column` returns a **new** `Column` that wraps a new
+ * expression tree node; the original is never mutated. The combined tree is
+ * serialised to a Spark Connect `Expression` protobuf when the plan is sent
+ * to the server.
+ *
+ * @example Build a filter predicate
+ * ```ts
+ * import { col, lit } from "@spark-connect-js/core";
+ *
+ * const predicate = col("age").gte(lit(18)).and(col("country").eq(lit("NL")));
+ * const adults = df.filter(predicate);
+ * ```
+ *
+ * @example Build a sort key
+ * ```ts
+ * const sorted = df.orderBy(col("score").desc_nulls_last());
+ * ```
+ *
+ * @see [Spark source: Column.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/Column.scala)
+ */
 export class Column {
   /** @internal The raw expression tree node */
   readonly _expr: Expression;
@@ -359,24 +364,39 @@ export class Column {
 // These mirror PySpark's `from pyspark.sql.functions import col, lit`
 
 /**
- * Reference an unresolved column by name.
+ * Reference a column by name.
  *
- * "Unresolved" means the server will resolve it against the schema at
- * analysis time.  If the column doesn't exist, the JVM throws
- * AnalysisException; we can't catch that at compile time.
+ * The name is left unresolved client-side and bound against the DataFrame
+ * schema on the server at analysis time. If the column does not exist, the
+ * server raises `AnalysisException` when the plan is executed.
+ *
+ * @example
+ * ```ts
+ * import { col, lit } from "@spark-connect-js/core";
+ *
+ * df.filter(col("country").eq(lit("NL")));
+ * ```
+ *
+ * @param name - Column name; may be a simple identifier or a dotted path
+ *   (for example `"address.city"`) to reference a nested struct field.
  */
 export function col(name: string): Column {
   return new Column({ type: "unresolvedAttribute", name });
 }
 
 /**
- * Create a literal value expression.
+ * Wrap a JavaScript value as a literal column expression.
  *
- * ⚠️  Type mapping caveat:
- *   JS `number` is always IEEE-754 float64.  If you pass an integer literal
- *   that Spark expects as LongType, precision can be silently lost for values
- *   > Number.MAX_SAFE_INTEGER (2^53 - 1).  For large integers, use BigInt
- *   literals and ensure the plan builder maps them to Spark's LongType.
+ * @example
+ * ```ts
+ * df.withColumn("flag", lit(true));
+ * df.filter(col("age").gte(lit(18)));
+ * ```
+ *
+ * @remarks
+ * **Integer precision.** JavaScript `number` is IEEE-754 float64. Integer
+ * values above `Number.MAX_SAFE_INTEGER` (2^53 - 1) lose precision. Pass
+ * `bigint` literals when you need `LongType` semantics on the server.
  */
 export function lit(value: string | number | boolean | bigint | null): Column {
   return new Column({ type: "literal", value });

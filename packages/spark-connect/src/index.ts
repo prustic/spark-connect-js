@@ -30,8 +30,15 @@ export {
   ConfigResponseSchema,
   type InterruptRequest,
   InterruptRequestSchema,
+  InterruptRequest_InterruptType,
   type InterruptResponse,
   InterruptResponseSchema,
+  type ReattachOptions,
+  ReattachOptionsSchema,
+  type ExecutePlanRequest_RequestOption,
+  ExecutePlanRequest_RequestOptionSchema,
+  type ReattachExecuteRequest,
+  ReattachExecuteRequestSchema,
   type ReleaseSessionRequest,
   ReleaseSessionRequestSchema,
   type ReleaseSessionResponse,
@@ -55,11 +62,32 @@ export {
   AnalyzePlanRequest_SameSemanticsSchema,
   type AnalyzePlanRequest_SemanticHash,
   AnalyzePlanRequest_SemanticHashSchema,
+  type AnalyzePlanRequest_SparkVersion,
+  AnalyzePlanRequest_SparkVersionSchema,
   type AnalyzePlanResponse_Persist,
   type AnalyzePlanResponse_Unpersist,
   type AnalyzePlanResponse_GetStorageLevel,
   type AnalyzePlanResponse_SameSemantics,
   type AnalyzePlanResponse_SemanticHash,
+  type AnalyzePlanResponse_SparkVersion,
+  type ConfigRequest_Operation,
+  ConfigRequest_OperationSchema,
+  type ConfigRequest_Set,
+  ConfigRequest_SetSchema,
+  type ConfigRequest_Get,
+  ConfigRequest_GetSchema,
+  type ConfigRequest_GetWithDefault,
+  ConfigRequest_GetWithDefaultSchema,
+  type ConfigRequest_GetOption,
+  ConfigRequest_GetOptionSchema,
+  type ConfigRequest_GetAll,
+  ConfigRequest_GetAllSchema,
+  type ConfigRequest_Unset,
+  ConfigRequest_UnsetSchema,
+  type ConfigRequest_IsModifiable,
+  ConfigRequest_IsModifiableSchema,
+  type KeyValue,
+  KeyValueSchema,
 } from "./gen/spark/connect/base_pb.js";
 
 // Relation (logical plan) messages
@@ -169,6 +197,10 @@ export {
   Expression_SortOrderSchema,
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
+  type CommonInlineUserDefinedFunction,
+  CommonInlineUserDefinedFunctionSchema,
+  type JavaUDF,
+  JavaUDFSchema,
 } from "./gen/spark/connect/expressions_pb.js";
 
 // Window expression messages
@@ -183,7 +215,12 @@ export {
 } from "./gen/spark/connect/expressions_pb.js";
 
 // Type messages
-export { type DataType, DataTypeSchema } from "./gen/spark/connect/types_pb.js";
+export {
+  type DataType,
+  DataTypeSchema,
+  type DataType_Unparsed,
+  DataType_UnparsedSchema,
+} from "./gen/spark/connect/types_pb.js";
 
 // Catalog messages
 export {
@@ -201,16 +238,46 @@ export {
   ListFunctionsSchema,
   type ListColumns,
   ListColumnsSchema,
+  type ListCatalogs,
+  ListCatalogsSchema,
   type GetDatabase,
   GetDatabaseSchema,
   type GetTable,
   GetTableSchema,
+  type GetFunction,
+  GetFunctionSchema,
   type TableExists,
   TableExistsSchema,
   type DatabaseExists,
   DatabaseExistsSchema,
   type FunctionExists,
   FunctionExistsSchema,
+  type IsCached,
+  IsCachedSchema,
+  type DropTempView,
+  DropTempViewSchema,
+  type DropGlobalTempView,
+  DropGlobalTempViewSchema,
+  type CurrentCatalog,
+  CurrentCatalogSchema,
+  type SetCurrentCatalog,
+  SetCurrentCatalogSchema,
+  type CacheTable,
+  CacheTableSchema,
+  type UncacheTable,
+  UncacheTableSchema,
+  type ClearCache,
+  ClearCacheSchema,
+  type RefreshTable,
+  RefreshTableSchema,
+  type RefreshByPath,
+  RefreshByPathSchema,
+  type RecoverPartitions,
+  RecoverPartitionsSchema,
+  type CreateTable,
+  CreateTableSchema,
+  type CreateExternalTable,
+  CreateExternalTableSchema,
 } from "./gen/spark/connect/catalog_pb.js";
 
 // Expression.ExpressionString
@@ -243,6 +310,30 @@ export {
   WriteOperationV2_Mode,
   type CreateDataFrameViewCommand,
   CreateDataFrameViewCommandSchema,
+  type WriteStreamOperationStart,
+  WriteStreamOperationStartSchema,
+  type WriteStreamOperationStartResult,
+  WriteStreamOperationStartResultSchema,
+  type StreamingQueryInstanceId,
+  StreamingQueryInstanceIdSchema,
+  type StreamingQueryCommand,
+  StreamingQueryCommandSchema,
+  type StreamingQueryCommand_ExplainCommand,
+  StreamingQueryCommand_ExplainCommandSchema,
+  type StreamingQueryCommand_AwaitTerminationCommand,
+  StreamingQueryCommand_AwaitTerminationCommandSchema,
+  type StreamingQueryCommandResult,
+  StreamingQueryCommandResultSchema,
+  type StreamingQueryCommandResult_StatusResult,
+  StreamingQueryCommandResult_StatusResultSchema,
+  type StreamingQueryCommandResult_RecentProgressResult,
+  StreamingQueryCommandResult_RecentProgressResultSchema,
+  type StreamingQueryCommandResult_ExplainResult,
+  StreamingQueryCommandResult_ExplainResultSchema,
+  type StreamingQueryCommandResult_ExceptionResult,
+  StreamingQueryCommandResult_ExceptionResultSchema,
+  type StreamingQueryCommandResult_AwaitTerminationResult,
+  StreamingQueryCommandResult_AwaitTerminationResultSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)
@@ -250,3 +341,17 @@ export {
   type StorageLevel as ProtoStorageLevel,
   StorageLevelSchema,
 } from "./gen/spark/connect/common_pb.js";
+
+// google.rpc error envelope (carried in grpc-status-details-bin trailer)
+export { type Status, StatusSchema } from "./gen/google/rpc/status_pb.js";
+export { type ErrorInfo, ErrorInfoSchema } from "./gen/google/rpc/error_details_pb.js";
+
+// Spark error detail message (decoded from FetchErrorDetailsResponse)
+export {
+  type FetchErrorDetailsResponse_Error,
+  FetchErrorDetailsResponse_ErrorSchema,
+  type FetchErrorDetailsResponse_SparkThrowable,
+  FetchErrorDetailsResponse_SparkThrowableSchema,
+  type FetchErrorDetailsResponse_StackTraceElement,
+  FetchErrorDetailsResponse_StackTraceElementSchema,
+} from "./gen/spark/connect/base_pb.js";

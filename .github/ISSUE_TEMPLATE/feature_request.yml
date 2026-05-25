@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest a missing API, capability, or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What you're trying to do and why the current API doesn't cover it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed API
+      description: How you'd want to call it. Pseudocode is fine.
+      render: typescript
+
+  - type: input
+    id: spark-equivalent
+    attributes:
+      label: Spark equivalent
+      description: How PySpark, Scala Spark, or another Spark Connect client handles this, if relevant.
+      placeholder: "PySpark: df.observe(...)"

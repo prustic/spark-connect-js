@@ -1,0 +1,40 @@
+# spark-connect-js
+
+> A TypeScript client for Apache Spark that speaks the Spark Connect protocol. Runs in Node.js without a JVM in the same process.
+
+spark-connect-js is an independent open-source project. It is not affiliated with or endorsed by the Apache Software Foundation. Application code installs `@spark-connect-js/node`; `@spark-connect-js/core` is the platform-agnostic plan builder with zero runtime dependencies.
+
+## Getting started
+
+- [Quickstart](https://prustic.github.io/spark-connect-js/quickstart/): install, connect to a Spark Connect server, run a first query
+- [Overview](https://prustic.github.io/spark-connect-js/): packages, install, first query
+- [Configuration](https://prustic.github.io/spark-connect-js/configuration/): session builder, connection string, runtime config
+- [Comparison to PySpark](https://prustic.github.io/spark-connect-js/pyspark-comparison/): differences between PySpark and spark-connect-js, and where they come from
+
+## API surface
+
+- [SQL and DataFrame guide](https://prustic.github.io/spark-connect-js/sql-and-dataframe-guide/): DataFrame, Column, joins, aggregations, SQL
+- [Functions](https://prustic.github.io/spark-connect-js/functions/): the built-in function catalog, grouped by category
+- [Window functions](https://prustic.github.io/spark-connect-js/window-functions/): `Window` spec, ranking, aggregates, frames
+- [I/O](https://prustic.github.io/spark-connect-js/io/): `DataFrameReader`, `DataFrameWriter`, `DataFrameWriterV2`
+- [Catalog](https://prustic.github.io/spark-connect-js/catalog/): databases, tables, views, functions, caching
+- [Error handling](https://prustic.github.io/spark-connect-js/error-handling/): `SparkConnectError`, `SparkClientError`, gRPC status codes
+- [API reference](https://prustic.github.io/spark-connect-js/api/): auto-generated from TSDoc
+
+## Project
+
+- [Compatibility](https://prustic.github.io/spark-connect-js/compatibility/): supported Spark and Node.js versions, runtime dependencies, API stability
+- [Architecture](https://prustic.github.io/spark-connect-js/architecture/): core/connect/node split, plan building, gRPC transport, Arrow decoding
+- [Integrations](https://prustic.github.io/spark-connect-js/integrations/): supported runtimes
+- [Security](https://prustic.github.io/spark-connect-js/security/): current state of transport security, vulnerability disclosure
+- [Troubleshooting](https://prustic.github.io/spark-connect-js/troubleshooting/): common failures and what they mean
+- [Roadmap](https://prustic.github.io/spark-connect-js/roadmap/): shipped releases and what lands next
+- [Changelog](https://prustic.github.io/spark-connect-js/changelog/): per-release notes
+- [Examples](https://prustic.github.io/spark-connect-js/examples/): runnable apps in the repo
+- [Contributing](https://prustic.github.io/spark-connect-js/contributing/): repo layout, setup, testing, how to add to the API
+
+## Source
+
+- Repository: https://github.com/prustic/spark-connect-js
+- npm, runtime package: https://www.npmjs.com/package/@spark-connect-js/node
+- npm, platform-agnostic core: https://www.npmjs.com/package/@spark-connect-js/core

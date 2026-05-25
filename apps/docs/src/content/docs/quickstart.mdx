@@ -1,0 +1,144 @@
+---
+title: Quickstart
+description: Start a Spark Connect server, install the client, and run your first query.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+
+## Before you start
+
+You need:
+
+- Node.js 22 or later.
+- Docker, or a JDK 17+ install for native Spark.
+
+If you already have access to a Spark Connect endpoint, skip to [Install the client](#install-the-client).
+
+## Start a local Spark Connect server
+
+Pick whichever option fits your environment. All produce a server reachable at `localhost:15002`.
+
+<Tabs>
+  <TabItem label="Docker">
+    ```bash
+    docker run --rm -p 15002:15002 \
+      apache/spark:3.5.3 \
+      /opt/spark/sbin/start-connect-server.sh \
+      --packages org.apache.spark:spark-connect_2.12:3.5.3
+    ```
+  </TabItem>
+  <TabItem label="macOS">
+    ```bash
+    brew install apache-spark
+    /opt/homebrew/opt/apache-spark/libexec/sbin/start-connect-server.sh \
+      --packages org.apache.spark:spark-connect_2.12:3.5.3
+    ```
+  </TabItem>
+  <TabItem label="Linux">
+    ```bash
+    curl -LO https://dlcdn.apache.org/spark/spark-3.5.3/spark-3.5.3-bin-hadoop3.tgz
+    tar xzf spark-3.5.3-bin-hadoop3.tgz
+    ./spark-3.5.3-bin-hadoop3/sbin/start-connect-server.sh \
+      --packages org.apache.spark:spark-connect_2.12:3.5.3
+    ```
+  </TabItem>
+  <TabItem label="Windows">
+    Use Docker (above), or run the Linux instructions inside WSL2.
+  </TabItem>
+</Tabs>
+
+Stop the server with Ctrl+C (Docker) or the matching `stop-connect-server.sh` (native installs). Spark 3.4 or newer works the same way; the version pinned above is just a stable target.
+
+## Install the client
+
+<Tabs syncKey="pkg">
+  <TabItem label="npm">
+    ```bash
+    npm install @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="bun">
+    ```bash
+    bun add @spark-connect-js/node
+    ```
+  </TabItem>
+</Tabs>
+
+`@spark-connect-js/node` depends on `@spark-connect-js/core` and re-exports its public API. `SparkSession`, `DataFrame`, `Column`, the built-in functions, and the catalog are all available from a single import.
+
+## Your first query
+
+```ts
+import { connect } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+
+try {
+  const rows = await spark
+    .sql("SELECT 1 AS n, 'hello' AS greeting")
+    .collect();
+  console.log(rows);
+  // [ { n: 1, greeting: 'hello' } ]
+} finally {
+  await spark.stop();
+}
+```
+
+- `connect(url)` is shorthand for `SparkSession.builder().remote(url).getOrCreate()`. The returned object is a handle; session state lives on the server.
+- `sql(...)` returns a lazy `DataFrame`. Nothing crosses the network until an action runs: `collect`, `count`, `show`, `first`, `head`, `take`, `toLocalIterator`, or a `DataFrameWriter` save method.
+- `stop()` closes the gRPC channel and releases the server-side session. Use `try`/`finally` for anything longer-lived than a script.
+
+## A larger example
+
+The snippet below builds an in-memory table, finds the top earners, and computes per-department aggregates. The same program lives in [`examples/node-quickstart`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-quickstart).
+
+```ts
+import { connect, col, lit, avg, count } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+
+try {
+  const employees = spark.sql(`
+    SELECT * FROM VALUES
+      ('Alice', 'Engineering', 90000),
+      ('Bob',   'Engineering', 85000),
+      ('Carol', 'Marketing',   70000),
+      ('Dave',  'Marketing',   72000),
+      ('Eve',   'Engineering', 95000)
+    AS employees(name, department, salary)
+  `);
+
+  const topEarners = employees
+    .filter(col("salary").gt(lit(75_000)))
+    .sort(col("salary").desc());
+  console.table(await topEarners.collect());
+
+  const byDepartment = employees
+    .groupBy("department")
+    .agg(
+      count("*").alias("headcount"),
+      avg("salary").alias("avg_salary"),
+    );
+  console.table(await byDepartment.collect());
+} finally {
+  await spark.stop();
+}
+```
+
+Three more scripts covering streaming, writes, and Arrow-batch iteration live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples).
+
+## Connecting to a remote cluster
+
+`connect("sc://host:443/;use_ssl=true;token=abc")` opens a TLS connection with a bearer token. Spark Connect itself listens in plaintext, so production deployments put a reverse proxy in front to terminate TLS; the client connects through it. The [Configuration](/spark-connect-js/configuration/) page covers every URL parameter, and the [`node-tls-behind-proxy`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy) example shows the proxy setup.
+

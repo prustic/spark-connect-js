@@ -1,0 +1,51 @@
+---
+title: Node.js
+description: The @spark-connect-js/node runtime adapter.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@spark-connect-js/node` is the reference runtime adapter. It provides the gRPC transport (via `@grpc/grpc-js`), the Arrow IPC decoder (via `apache-arrow`), and re-exports the full public API from `@spark-connect-js/core`. For application code this is the only package you install.
+
+## Installing
+
+<Tabs syncKey="pkg">
+  <TabItem label="npm">
+    ```bash
+    npm install @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @spark-connect-js/node
+    ```
+  </TabItem>
+  <TabItem label="bun">
+    ```bash
+    bun add @spark-connect-js/node
+    ```
+  </TabItem>
+</Tabs>
+
+## Usage
+
+```ts
+import { connect } from "@spark-connect-js/node";
+
+const spark = connect("sc://localhost:15002");
+const rows = await spark.sql("SELECT 1 AS n").collect();
+console.log(rows);
+await spark.stop();
+```
+
+See the [Quickstart](/spark-connect-js/quickstart/) for a full walkthrough and the [API reference](/spark-connect-js/api/) for every exported symbol.
+
+## Requirements
+
+- Node.js 22 or later.
+- A reachable Spark Connect server (Spark 3.4 or newer).

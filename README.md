@@ -8,7 +8,7 @@
     ·
     <a href="https://github.com/prustic/spark-connect-js/blob/main/CONTRIBUTING.md">Contributing</a>
     ·
-    <a href="https://github.com/prustic/spark-connect-js/blob/main/docs/api.md">API</a>
+    <a href="https://prustic.github.io/spark-connect-js/">Docs</a>
   </p>
 
   <p align="center">
@@ -20,7 +20,7 @@
 </p>
 
 > [!NOTE]
-> This project is in early development. APIs may change between releases.
+> This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## About
 
@@ -60,12 +60,14 @@ Requires a running Spark Connect server (Spark 4.0+). The Node.js adapter requir
 | `@spark-connect-js/core`    | DataFrame API and plan builder (platform-agnostic) |
 | `@spark-connect-js/connect` | Generated protobuf types                           |
 
-## Development
+## Documentation
 
-```bash
-git clone https://github.com/prustic/spark-connect-js.git && cd spark-connect-js
-pnpm install && pnpm blt
-```
+Full docs at [prustic.github.io/spark-connect-js](https://prustic.github.io/spark-connect-js/).
+
+- [Quickstart](https://prustic.github.io/spark-connect-js/quickstart/)
+- [SQL and DataFrame guide](https://prustic.github.io/spark-connect-js/sql-and-dataframe-guide/)
+- [Comparison to PySpark](https://prustic.github.io/spark-connect-js/pyspark-comparison/)
+- [Roadmap](https://prustic.github.io/spark-connect-js/roadmap/)
 
 ## Contribution
 

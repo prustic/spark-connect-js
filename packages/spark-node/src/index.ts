@@ -1,29 +1,34 @@
 /**
- * @spark-connect-js/node - Node.js runtime adapter for Spark Connect.
+ * @packageDocumentation
  *
- * Bridges @spark-connect-js/core's platform-agnostic DataFrame API with Node.js:
- *   - gRPC transport via @grpc/grpc-js (HTTP/2, protobuf on the wire)
- *   - Arrow IPC decoding via apache-arrow
- *   - Optional child_process management for local Spark servers
- *
- * @see connector/connect/common/src/main/protobuf/spark/connect/base.proto
- * @see https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format
+ * `@spark-connect-js/node` is the Node.js runtime adapter. It provides the
+ * gRPC transport (via `@grpc/grpc-js`), the Arrow IPC decoder (via
+ * `apache-arrow`), and an optional helper for launching a local Spark Connect
+ * server during development. It re-exports the public API from
+ * `@spark-connect-js/core` so a single import works for end users.
  *
  * @example
- *   import { SparkSession, col, lit } from "@spark-connect-js/node";
+ * ```ts
+ * import { SparkSession, col, lit } from "@spark-connect-js/node";
  *
- *   const spark = SparkSession.builder()
- *     .remote("sc://localhost:15002")
- *     .getOrCreate();
+ * const spark = SparkSession.builder()
+ *   .remote("sc://localhost:15002")
+ *   .getOrCreate();
  *
- *   const rows = await spark.table("people")
- *     .filter(col("age").gt(lit(30)))
- *     .collect();
+ * const rows = await spark.table("people")
+ *   .filter(col("age").gt(lit(30)))
+ *   .collect();
+ * ```
  */
 
 // Public API
 
 export { GrpcTransport } from "./transport/grpc-transport.js";
+export type { GrpcTransportOptions } from "./transport/grpc-transport.js";
+export { parseConnectionString } from "./transport/connection-string.js";
+export type { ParsedConnectionString } from "./transport/connection-string.js";
+export { DEFAULT_RETRY_POLICY } from "./transport/retry.js";
+export type { RetryPolicy } from "./transport/retry.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
 /** @internal Used by GrpcTransport; not part of the public API */
@@ -48,6 +53,10 @@ export {
   GrpcStatusCode,
   DataFrameWriter,
   DataFrameWriterV2,
+  DataStreamReader,
+  DataStreamWriter,
+  StreamingQuery,
+  Trigger,
   StructType,
   StructField,
   Catalog,
@@ -339,45 +348,59 @@ export type {
   CatalogOperation,
   WindowFrame,
   FrameBoundary,
+  StreamingOutputMode,
+  StreamingQueryStatus,
+  StreamingQueryProgress,
+  StreamingQueryException,
 } from "@spark-connect-js/core";
 
 // Convenience: fully-wired session factory
 
 import { SparkSession } from "@spark-connect-js/core";
 import { GrpcTransport } from "./transport/grpc-transport.js";
+import { parseConnectionString } from "./transport/connection-string.js";
 import { ArrowDecoder } from "./arrow/arrow-decoder.js";
-
-/**
- * Parse a Spark Connect URL (sc://host:port) into host:port.
- * Falls through to the raw string if no sc:// prefix.
- */
-function parseEndpoint(remote: string): string {
-  if (remote.startsWith("sc://")) {
-    return remote.slice("sc://".length);
-  }
-  return remote;
-}
 
 /**
  * Create a fully-wired SparkSession for Node.js.
  *
- * This is the primary entry point for @spark-connect-js/node. It creates a
- * SparkSession with GrpcTransport and ArrowDecoder pre-configured.
+ * Parses the full `sc://` connection string grammar, including reserved params
+ * (`token`, `use_ssl`, `user_id`, `user_agent`, `session_id`,
+ * `grpc_max_message_size`) and free-form params that pass through as gRPC
+ * metadata.
  *
  * @example
  *   import { connect, col, lit } from "@spark-connect-js/node";
  *
  *   const spark = connect("sc://localhost:15002");
- *   const df = spark.sql("SELECT * FROM my_table");
- *   const rows = await df.filter(col("age").gt(lit(30))).collect();
- *   await df.show();
+ *   const rows = await spark.sql("SELECT * FROM my_table").collect();
+ *
+ * @example
+ *   // TLS + bearer token
+ *   const spark = connect("sc://example.com:443/;token=abc;use_ssl=true");
  */
 export function connect(remote: string): SparkSession {
-  const endpoint = parseEndpoint(remote);
-  const transport = new GrpcTransport(endpoint);
-  return SparkSession.builder()
+  const parsed = parseConnectionString(remote);
+
+  const transport = new GrpcTransport({
+    host: parsed.host,
+    port: parsed.port,
+    useSsl: parsed.useSsl,
+    token: parsed.token,
+    userId: parsed.userId,
+    userAgent: parsed.userAgent,
+    metadata: parsed.headers,
+    grpcMaxMessageSize: parsed.grpcMaxMessageSize,
+  });
+
+  const builder = SparkSession.builder()
     .remote(remote)
     .transport(transport)
-    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks))
-    .getOrCreate();
+    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks));
+
+  if (parsed.sessionId !== undefined) {
+    builder.sessionId(parsed.sessionId);
+  }
+
+  return builder.getOrCreate();
 }

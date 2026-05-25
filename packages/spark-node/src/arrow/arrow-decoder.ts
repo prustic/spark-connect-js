@@ -1,8 +1,8 @@
 /**
  * Decodes Apache Arrow IPC stream data into JS-native Row objects.
  *
- * @see sql/core/src/main/scala/org/apache/spark/sql/execution/arrow/ArrowConverters.scala
- * @see https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format
+ * @see [Spark source: ArrowConverters.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/arrow/ArrowConverters.scala)
+ * @see [Arrow IPC streaming format](https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format)
  *
  * Each response from Spark Connect is a sequence of Arrow IPC messages:
  *   [Schema Message] → [RecordBatch 1] → [RecordBatch 2] → ... → [EOS]
@@ -79,7 +79,7 @@ function coerceValue(val: unknown): unknown {
     typeof val === "object" &&
     val !== null &&
     "toJSON" in val &&
-    typeof (val as { toJSON: unknown }).toJSON === "function"
+    typeof val.toJSON === "function"
   ) {
     return (val as { toJSON(): unknown }).toJSON();
   }
