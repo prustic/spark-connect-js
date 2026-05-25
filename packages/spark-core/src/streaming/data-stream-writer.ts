@@ -149,9 +149,8 @@ export class DataStreamWriter {
     }
     const queryName = result.name.length === 0 ? undefined : result.name;
     const queryId = result.queryId;
-    // Proto has no QUERY_STARTED_EVENT on the listener bus; the server hands
-    // the started-event JSON back here. Fire to bus listeners (if any) so
-    // user-level `onQueryStarted` matches PySpark/Scala behavior.
+    // The proto's listener-bus events don't include the started event, so
+    // dispatch it here from the start-result JSON.
     const bus = this._df._session._peekListenerBus();
     if (bus !== undefined && bus.size() > 0 && result.queryStartedEventJson !== undefined) {
       const parsed = parseStartedEvent(result.queryStartedEventJson);

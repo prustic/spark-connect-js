@@ -103,14 +103,12 @@ export class StreamingQueryManager {
   }
 
   /**
-   * Subscribe a listener to the streaming-query event bus. Lazy-opens a
-   * server-side subscription on the first call; subsequent listeners share
-   * the same subscription. Resolves once the server acknowledges
-   * registration.
+   * Register `listener` on the streaming-query event bus. The first call
+   * opens a server-side subscription; subsequent listeners share it.
+   * Resolves once the server acknowledges registration.
    *
-   * @remarks Callbacks are dispatched serially per session. On a
-   *   non-recoverable subscription drop the bus silently clears all
-   *   listeners; the user must `addListener` again to restart.
+   * @remarks On a non-recoverable subscription drop the bus clears every
+   *   listener; the caller must `addListener` again to restart.
    */
   async addListener(listener: StreamingQueryListener): Promise<void> {
     if (listener === null || typeof listener !== "object") {
@@ -132,12 +130,10 @@ export class StreamingQueryManager {
   }
 
   // `listListeners()` is intentionally not exposed. The proto's
-  // `StreamingQueryManagerCommand.listListeners` returns IDs of Java
-  // listeners registered via `StreamingQueryManagerCommand.addListener`
-  // (which carries `listener_payload: bytes`), not the TS listeners we
-  // subscribe via `StreamingQueryListenerBusCommand.addListenerBusListener`.
-  // A TS client never registers Java listeners, so the result is always
-  // empty. PySpark Connect omits it for the same reason.
+  // `listListeners` only returns Java listeners (registered via
+  // `addListener` with a `listener_payload: bytes`), not the bus listeners
+  // we use here, so the result is always empty for a TS client. PySpark
+  // Connect omits it for the same reason.
 
   private async _exec(
     op: string,

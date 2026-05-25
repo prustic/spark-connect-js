@@ -28,14 +28,13 @@ export interface QueryTerminatedEvent {
 }
 
 /**
- * Callback interface for receiving streaming-query lifecycle events. Pass an
- * object literal with the callbacks you care about, or `extends`
- * {@link StreamingQueryListenerBase} for a class-based style.
+ * Callback interface for streaming-query lifecycle events. Implement any
+ * subset of the callbacks; the bus skips the ones you don't define.
  *
  * @remarks
- * Callbacks are dispatched **serially** per session, so slow callbacks delay
- * subsequent event delivery. For parallel work, queue inside the callback.
- * Callbacks may be `async`; the bus `await`s each return.
+ * Callbacks dispatch serially per session, so a slow callback delays the
+ * next event. `async` callbacks are awaited; queue inside the callback if
+ * you need parallel work.
  *
  * @see [Spark source: StreamingQueryListener.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/streaming/StreamingQueryListener.scala)
  */
@@ -47,9 +46,8 @@ export interface StreamingQueryListener {
 }
 
 /**
- * Empty base class implementing {@link StreamingQueryListener}. Provided for
- * users who prefer the PySpark/Scala `class MyListener extends ...` style;
- * users who prefer object literals can implement the interface directly.
+ * Empty base class implementing {@link StreamingQueryListener} for users who
+ * prefer the `class MyListener extends ...` style over object literals.
  */
 export class StreamingQueryListenerBase implements StreamingQueryListener {}
 
@@ -80,9 +78,8 @@ export class StreamingQueryListenerBus {
   }
 
   /**
-   * Add a listener. Lazy-opens the subscription and waits for the server's
-   * registration ack. Catches a sync-throw registration failure (e.g. a
-   * transport missing `executeCommandStream`) and resets state so a follow-up
+   * Lazy-opens the subscription on the first call and waits for the server's
+   * registration ack. On registration failure, resets state so a follow-up
    * `add()` re-opens cleanly.
    */
   async add(listener: StreamingQueryListener): Promise<void> {
@@ -102,16 +99,14 @@ export class StreamingQueryListenerBus {
   }
 
   /**
-   * Remove a listener. When the last listener is removed, sends
-   * `removeListenerBusListener` so the server closes the subscription; the
-   * driver task completes on its own.
+   * Remove a listener. Sends `removeListenerBusListener` once the last
+   * listener leaves so the server closes the subscription.
    *
-   * Does not `await` the driver: callbacks may invoke `removeListener(self)`,
-   * which would deadlock on a single event loop (driver -> dispatch ->
-   * callback -> remove -> driver). Server-close drives teardown instead.
-   * Side effect: if `addListener` is called again before the server processes
-   * the remove, in-flight events from the old subscription briefly dispatch
-   * to the new listener. Same race exists in PySpark Connect's bus thread.
+   * Does not `await` the driver: a callback invoking `removeListener(self)`
+   * would deadlock on a single event loop. Server-close drives teardown
+   * instead. If `addListener` runs again before the server processes the
+   * remove, in-flight events from the old subscription briefly dispatch to
+   * the new listener. Same race in PySpark Connect's bus thread.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);
@@ -134,9 +129,9 @@ export class StreamingQueryListenerBus {
   }
 
   /**
-   * Dispatch a `QueryStartedEvent` from outside the driver (called from
-   * `DataStreamWriter._start` when listeners are registered and the server's
-   * start result carries `queryStartedEventJson`).
+   * Dispatch a `QueryStartedEvent` from outside the driver. Called by
+   * `DataStreamWriter._start`, where the started event arrives on the start
+   * result rather than the bus.
    */
   async dispatchStarted(event: QueryStartedEvent): Promise<void> {
     await this._dispatch((l) => l.onQueryStarted?.(event));
@@ -175,13 +170,12 @@ export class StreamingQueryListenerBus {
           await this._dispatchEvent(e.eventType, e.eventJson);
         }
       }
-      // Server closed the stream cleanly (typically after our removeListenerBusListener).
+      // Clean server close (usually after our removeListenerBusListener).
       if (reg.resolve !== null) reg.resolve();
     } catch (err) {
-      // Non-recoverable drop: surface to the pending registration awaiter if
-      // any; otherwise clear so a future addListener() re-opens. Live-drop
-      // path nulls _driver/_registered here; sync-throw path is handled in
-      // add()'s catch (assignment ordering, see add()).
+      // Non-recoverable drop. Surface to any pending registration awaiter;
+      // otherwise clear so a future addListener() re-opens. The sync-throw
+      // path is handled in add()'s catch (see add() for the ordering).
       if (reg.reject !== null) reg.reject(err);
       else {
         this._driver = null;
@@ -245,15 +239,13 @@ export class StreamingQueryListenerBus {
         try {
           await apply(listener);
         } catch {
-          // Per-listener exception isolation: a throwing callback must not
-          // break delivery to the other listeners. Callbacks are user code;
-          // it's the caller's responsibility to instrument them.
+          // Isolate a throwing callback so the remaining listeners still get
+          // the event. User callbacks are user code to instrument.
         }
       }
     });
-    // Swallow the (impossible) chain failure so one task's throw can't poison
-    // subsequent dispatches. The per-listener try/catch above is the real
-    // exception isolation.
+    // Keep one task's throw from poisoning the chain. Real isolation lives
+    // in the per-listener try/catch above.
     this._dispatchChain = next.catch(() => undefined);
     return next;
   }

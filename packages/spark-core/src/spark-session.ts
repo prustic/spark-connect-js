@@ -65,11 +65,11 @@ export interface Transport {
   ): Promise<Record<string, unknown>[]>;
 
   /**
-   * Execute a command and yield decoded non-Arrow result frames incrementally
-   * as the server pushes them. Used by long-running subscriptions like the
-   * streaming-query listener bus, where collecting into an array would defeat
-   * the point. Each yielded entry has the same shape as
-   * {@link executeCommandResponses} entries (a `type`-discriminated record).
+   * Execute a command and yield decoded non-Arrow result frames as the server
+   * pushes them. Used by long-running subscriptions (e.g. the listener bus)
+   * where {@link executeCommandResponses}' collect-and-return would block on
+   * the stream forever. Each yielded entry is a `type`-discriminated record,
+   * same shape as {@link executeCommandResponses} entries.
    */
   executeCommandStream?(
     sessionId: string,

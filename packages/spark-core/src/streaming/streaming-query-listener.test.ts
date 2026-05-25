@@ -105,11 +105,10 @@ describe("StreamingQueryListenerBus error surfacing", () => {
   });
 
   it("a second addListener after a sync-throw failure re-invokes the transport (not the stale _driver)", async () => {
-    // Without the add()-side cleanup, `this._driver = this._run()` overwrites
-    // _run's catch-side null with the fulfilled Promise. The second add() sees
-    // _driver !== null and short-circuits, re-throwing the stale _registered
-    // rejection without ever calling the transport again. We detect that by
-    // counting executeCommandStream invocations.
+    // Without the add()-side cleanup, `this._driver = this._run()` would
+    // overwrite _run's catch-side null with the fulfilled Promise. The second
+    // add() would see _driver !== null and re-throw the stale rejection
+    // without calling the transport. Counting invocations pins that down.
     let invocations = 0;
     const errs = ["first", "second"];
     const transport: Transport = {
