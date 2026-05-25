@@ -108,7 +108,10 @@ export class StreamingQueryListenerBus {
    *
    * Does not `await` the driver: callbacks may invoke `removeListener(self)`
    * which would deadlock on a single event loop (driver → dispatch → callback
-   * → remove → driver). Server-close drives teardown instead.
+   * → remove → driver). Server-close drives teardown instead. Side effect:
+   * if `addListener` is called again before the server processes the remove,
+   * in-flight events from the old subscription briefly dispatch to the new
+   * listener. Same race exists in PySpark Connect's bus thread.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);

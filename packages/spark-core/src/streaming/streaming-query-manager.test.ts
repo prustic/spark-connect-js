@@ -161,4 +161,22 @@ describe("StreamingQueryManager", () => {
     const mgr = makeManager(t);
     await assert.rejects(() => mgr.active(), SparkClientError);
   });
+
+  it("addListener rejects null / non-object input", async () => {
+    const t = capturingTransport();
+    const mgr = makeManager(t);
+    // Cast through unknown to bypass the TS interface and exercise the runtime guard.
+    await assert.rejects(
+      () => mgr.addListener(null as unknown as Parameters<typeof mgr.addListener>[0]),
+      InvalidInputError,
+    );
+    await assert.rejects(
+      () => mgr.addListener(undefined as unknown as Parameters<typeof mgr.addListener>[0]),
+      InvalidInputError,
+    );
+    await assert.rejects(
+      () => mgr.addListener("nope" as unknown as Parameters<typeof mgr.addListener>[0]),
+      InvalidInputError,
+    );
+  });
 });

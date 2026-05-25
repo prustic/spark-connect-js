@@ -113,6 +113,11 @@ export class StreamingQueryManager {
    *   listeners; the user must `addListener` again to restart.
    */
   async addListener(listener: StreamingQueryListener): Promise<void> {
+    if (listener === null || typeof listener !== "object") {
+      throw new InvalidInputError(
+        "StreamingQueryManager.addListener: listener must be an object implementing StreamingQueryListener.",
+      );
+    }
     await this._session._getOrCreateListenerBus().add(listener);
   }
 
