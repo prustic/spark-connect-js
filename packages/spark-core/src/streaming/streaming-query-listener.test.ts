@@ -103,6 +103,39 @@ describe("StreamingQueryListenerBus error surfacing", () => {
       /does not support executeCommandStream/,
     );
   });
+
+  it("a second addListener after a sync-throw failure re-invokes the transport (not the stale _driver)", async () => {
+    // Without the add()-side cleanup, `this._driver = this._run()` overwrites
+    // _run's catch-side null with the fulfilled Promise. The second add() sees
+    // _driver !== null and short-circuits, re-throwing the stale _registered
+    // rejection without ever calling the transport again. We detect that by
+    // counting executeCommandStream invocations.
+    let invocations = 0;
+    const errs = ["first", "second"];
+    const transport: Transport = {
+      async *executePlan(): AsyncIterable<Uint8Array> {
+        // no-op
+      },
+      // Sync-throw on every invocation, with a different message each time.
+      executeCommandStream() {
+        const i = invocations++;
+        throw new Error(errs[Math.min(i, errs.length - 1)]);
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+    await assert.rejects(
+      () => spark.streams.addListener({ onQueryProgress: () => undefined }),
+      /first/,
+    );
+    await assert.rejects(
+      () => spark.streams.addListener({ onQueryProgress: () => undefined }),
+      /second/,
+    );
+    assert.equal(invocations, 2, "transport should have been invoked twice");
+  });
 });
 
 describe("StreamingQueryListenerBase", () => {
@@ -243,6 +276,33 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     await removeP;
     const found = t.managerCommands.find((c) => c["op"] === "removeListenerBusListener");
     assert.ok(found, "expected removeListenerBusListener command to be sent");
+  });
+
+  it("self-removal from inside a callback does not deadlock", async () => {
+    // Regression for the single-event-loop case where bus.remove() awaiting
+    // the driver, which is awaiting the user callback, which is awaiting
+    // bus.remove(), forms a cycle. The fix: remove() doesn't await the
+    // driver; server-close drives teardown.
+    const t = scriptedTransport();
+    const spark = newSession(t);
+    let progressCalled = false;
+    const theListener: StreamingQueryListener = {
+      onQueryProgress: async () => {
+        progressCalled = true;
+        await spark.streams.removeListener(theListener);
+      },
+    };
+    t.pushFrame({ listenerBusListenerAdded: true });
+    await spark.streams.addListener(theListener);
+    t.pushFrame({ events: [{ eventType: "progress", eventJson: '{"batchId":0}' }] });
+    t.closeStream();
+    // If the deadlock is present this never resolves; node --test times out.
+    await new Promise((r) => setTimeout(r, 30));
+    assert.ok(progressCalled, "callback must have run");
+    assert.ok(
+      t.managerCommands.some((c) => c["op"] === "removeListenerBusListener"),
+      "remove must have sent the bus-listener teardown command",
+    );
   });
 
   it("clears listeners on non-recoverable stream error (PySpark drop policy)", async () => {

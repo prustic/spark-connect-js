@@ -85,19 +85,42 @@ export class StreamingQueryListenerBus {
   /**
    * Add a listener. Lazy-opens the subscription on the first call and waits
    * for the server's registration ack before resolving.
+   *
+   * On registration failure (most often a transport that doesn't implement
+   * `executeCommandStream`), the `_run()` body runs synchronously to its
+   * catch *before* the `this._driver = this._run()` assignment lands, which
+   * would leave `_driver` pointing to a fulfilled Promise and wedge future
+   * `add()` calls on a stale rejected `_registered`. We catch the rejection
+   * here and clear both slots so the next `add()` cleanly re-opens.
    */
   async add(listener: StreamingQueryListener): Promise<void> {
     this._listeners.push(listener);
     if (this._driver === null) {
       this._driver = this._run();
     }
-    if (this._registered !== null) await this._registered;
+    if (this._registered !== null) {
+      try {
+        await this._registered;
+      } catch (err) {
+        this._driver = null;
+        this._registered = null;
+        throw err;
+      }
+    }
   }
 
   /**
    * Remove a listener. When the last listener is removed, sends
-   * `removeListenerBusListener` to close the subscription; the driver task
-   * completes and is cleared so the next {@link add} re-opens.
+   * `removeListenerBusListener` so the server closes the subscription; the
+   * driver task completes on its own.
+   *
+   * Deliberately does **not** `await` the driver here. PySpark's bus runs on
+   * its own thread; this implementation runs the driver inside the same
+   * event loop, so if a listener calls `removeListener(self)` from inside its
+   * own callback the chain is: driver → _dispatch → callback → removeListener
+   * → (would) → driver. Self-removal would deadlock. Server-close-driven
+   * teardown is best-effort: a brief overlapping tail is a far better
+   * footgun than a deadlock on a perfectly reasonable user pattern.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);
@@ -106,14 +129,12 @@ export class StreamingQueryListenerBus {
     if (this._listeners.length === 0 && this._driver !== null) {
       // Null the slots *before* awaiting so a concurrent `add` opens a fresh
       // subscription instead of binding to the about-to-drain driver.
-      const driver = this._driver;
       this._driver = null;
       this._registered = null;
       await this._session._executeCommandResponses({
         type: "streamingQueryListenerBusCommand",
         op: "removeListenerBusListener",
       });
-      await driver;
     }
   }
 
@@ -170,16 +191,17 @@ export class StreamingQueryListenerBus {
       // Non-recoverable drop: matches PySpark — clear listeners, surface the
       // failure to the registration awaiter (if any), warn for live ones.
       if (reg.reject !== null) reg.reject(err);
-      else console.warn("StreamingQueryListenerBus: stream terminated, clearing listeners.", err);
+      else {
+        console.warn("StreamingQueryListenerBus: stream terminated, clearing listeners.", err);
+        // Live-drop path (registration was already acked): clear the driver
+        // here so the next `add()` re-opens. We don't touch `_driver` on the
+        // sync-throw path because the assignment in `add()` (`this._driver
+        // = this._run()`) would land *after* this catch ran in the same sync
+        // tick and overwrite the null. `add()`'s own catch handles that case.
+        this._driver = null;
+        this._registered = null;
+      }
       this._listeners.length = 0;
-      this._driver = null;
-      // Intentionally NOT nulling `_registered` here. If `_executeCommandStream`
-      // throws synchronously (e.g. transport doesn't implement it), this catch
-      // runs in the same sync tick that `add()` invoked `_run()` — nulling
-      // would race the `await this._registered` in `add()` to `null`, silently
-      // dropping the error. Leaving it pointing to the rejected Promise lets
-      // the awaiter see it; the next `add()` overwrites `_registered` when it
-      // spawns a fresh `_run()`.
     }
   }
 
