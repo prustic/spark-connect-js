@@ -4,6 +4,9 @@ import { StreamingQuery } from "./streaming-query.js";
 import type { Trigger } from "./trigger.js";
 import type { StreamingOutputMode } from "./types.js";
 
+// spark-core stays platform-neutral; declare only what we use.
+declare const console: { warn(...args: unknown[]): void };
+
 /**
  * Fluent writer for a streaming `DataFrame`, obtained via
  * `df.writeStream`. Configure the output format, options, output mode, and
@@ -177,7 +180,10 @@ function parseStartedEvent(
 ): { id?: string; runId?: string; name?: string; timestamp?: string } | undefined {
   try {
     return JSON.parse(json) as { id?: string; runId?: string; name?: string; timestamp?: string };
-  } catch {
+  } catch (err) {
+    // Mirror the bus's `parseOrWarn` policy for consistency: surface malformed
+    // event JSON via console.warn rather than silently dropping.
+    console.warn(`DataStreamWriter.start: dropping malformed queryStartedEventJson: ${json}`, err);
     return undefined;
   }
 }

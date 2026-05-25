@@ -173,7 +173,13 @@ export class StreamingQueryListenerBus {
       else console.warn("StreamingQueryListenerBus: stream terminated, clearing listeners.", err);
       this._listeners.length = 0;
       this._driver = null;
-      this._registered = null;
+      // Intentionally NOT nulling `_registered` here. If `_executeCommandStream`
+      // throws synchronously (e.g. transport doesn't implement it), this catch
+      // runs in the same sync tick that `add()` invoked `_run()` — nulling
+      // would race the `await this._registered` in `add()` to `null`, silently
+      // dropping the error. Leaving it pointing to the rejected Promise lets
+      // the awaiter see it; the next `add()` overwrites `_registered` when it
+      // spawns a fresh `_run()`.
     }
   }
 

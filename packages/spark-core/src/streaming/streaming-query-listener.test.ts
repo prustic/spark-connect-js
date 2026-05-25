@@ -87,6 +87,24 @@ function newSession(transport: Transport): SparkSession {
   return SparkSession.builder().remote("sc://localhost:15002").transport(transport).getOrCreate();
 }
 
+describe("StreamingQueryListenerBus error surfacing", () => {
+  it("rejects addListener if the transport lacks executeCommandStream (sync throw in _run)", async () => {
+    const minimal: Transport = {
+      async *executePlan(): AsyncIterable<Uint8Array> {
+        // no-op; executeCommandStream is intentionally omitted.
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(minimal)
+      .getOrCreate();
+    await assert.rejects(
+      () => spark.streams.addListener({ onQueryProgress: () => undefined }),
+      /does not support executeCommandStream/,
+    );
+  });
+});
+
 describe("StreamingQueryListenerBase", () => {
   it("implements StreamingQueryListener as an empty class", () => {
     class MyListener extends StreamingQueryListenerBase {
