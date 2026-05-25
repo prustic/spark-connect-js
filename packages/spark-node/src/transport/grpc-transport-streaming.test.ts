@@ -61,7 +61,7 @@ describe("buildCommandProto: writeStreamOperationStart", () => {
     [{ kind: "once" }, "once", true],
     [{ kind: "continuous", interval: "1 second" }, "continuousCheckpointInterval", "1 second"],
   ] as const) {
-    it(`maps trigger ${spec.kind} → ${expectedCase}`, () => {
+    it(`maps trigger ${spec.kind} to ${expectedCase}`, () => {
       const cmd = buildCommandProto({
         type: "writeStreamOperationStart",
         plan: RATE_PLAN,

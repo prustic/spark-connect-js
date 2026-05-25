@@ -35,7 +35,7 @@ interface StreamingQueryCommandResultPayload {
  * by {@link DataStreamWriter.start} and {@link DataStreamWriter.toTable}.
  *
  * Properties (`id`, `runId`, `name`) are cached from the start response.
- * Methods (`status`, `lastProgress`, `stop`, …) each issue a
+ * Methods (`status`, `lastProgress`, `stop`, and so on) each issue a
  * `StreamingQueryCommand` RPC.
  *
  * `isActive` is asynchronous on this client even though PySpark and Scala
@@ -147,7 +147,7 @@ export class StreamingQuery {
    * @remarks
    * The timeout is in **milliseconds**, matching the Scala client and the
    * Spark Connect `timeout_ms` wire field. PySpark's `awaitTermination`
-   * takes **seconds** — porting `awaitTermination(10)` from PySpark gives
+   * takes **seconds**, so porting `awaitTermination(10)` from PySpark gives
    * 10ms here, not 10s. Pass `10_000` for the PySpark `10` equivalent.
    *
    * @throws SparkConnectError if the query terminated with an exception.
@@ -187,9 +187,9 @@ export class StreamingQuery {
 }
 
 /**
- * Parse a server-sent progress JSON string, surfacing a malformed payload as
- * a {@link SparkClientError} rather than a raw `SyntaxError` — keeps the
- * class's failure modes within the typed error hierarchy.
+ * Parse a server-sent progress JSON string. Surfaces a malformed payload as
+ * a {@link SparkClientError} so failures stay within the typed error
+ * hierarchy instead of a raw `SyntaxError`.
  */
 function parseProgress(json: string, op: string): StreamingQueryProgress {
   try {

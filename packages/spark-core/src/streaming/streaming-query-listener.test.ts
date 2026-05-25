@@ -268,10 +268,7 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     const listener: StreamingQueryListener = { onQueryProgress: () => undefined };
     t.pushFrame({ listenerBusListenerAdded: true });
     await spark.streams.addListener(listener);
-    // Schedule the close to fire after remove sends the manager command.
     const removeP = spark.streams.removeListener(listener);
-    // The bus calls executeCommandResponses(removeListenerBusListener) and then
-    // awaits the driver — which needs the server-side stream to end.
     t.closeStream();
     await removeP;
     const found = t.managerCommands.find((c) => c["op"] === "removeListenerBusListener");

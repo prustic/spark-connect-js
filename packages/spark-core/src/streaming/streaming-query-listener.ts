@@ -33,7 +33,7 @@ export interface QueryTerminatedEvent {
  * {@link StreamingQueryListenerBase} for a class-based style.
  *
  * @remarks
- * Callbacks are dispatched **serially** per session — slow callbacks delay
+ * Callbacks are dispatched **serially** per session, so slow callbacks delay
  * subsequent event delivery. For parallel work, queue inside the callback.
  * Callbacks may be `async`; the bus `await`s each return.
  *
@@ -106,12 +106,12 @@ export class StreamingQueryListenerBus {
    * `removeListenerBusListener` so the server closes the subscription; the
    * driver task completes on its own.
    *
-   * Does not `await` the driver: callbacks may invoke `removeListener(self)`
-   * which would deadlock on a single event loop (driver → dispatch → callback
-   * → remove → driver). Server-close drives teardown instead. Side effect:
-   * if `addListener` is called again before the server processes the remove,
-   * in-flight events from the old subscription briefly dispatch to the new
-   * listener. Same race exists in PySpark Connect's bus thread.
+   * Does not `await` the driver: callbacks may invoke `removeListener(self)`,
+   * which would deadlock on a single event loop (driver -> dispatch ->
+   * callback -> remove -> driver). Server-close drives teardown instead.
+   * Side effect: if `addListener` is called again before the server processes
+   * the remove, in-flight events from the old subscription briefly dispatch
+   * to the new listener. Same race exists in PySpark Connect's bus thread.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);
@@ -181,7 +181,7 @@ export class StreamingQueryListenerBus {
       // Non-recoverable drop: surface to the pending registration awaiter if
       // any; otherwise clear so a future addListener() re-opens. Live-drop
       // path nulls _driver/_registered here; sync-throw path is handled in
-      // add()'s catch (assignment ordering — see add()).
+      // add()'s catch (assignment ordering, see add()).
       if (reg.reject !== null) reg.reject(err);
       else {
         this._driver = null;
@@ -228,7 +228,7 @@ export class StreamingQueryListenerBus {
       }
       return;
     }
-    // unspecified / unknown — ignore
+    // unspecified / unknown: ignore
   }
 
   /**
@@ -259,10 +259,6 @@ export class StreamingQueryListenerBus {
   }
 }
 
-/**
- * Parse server-sent event JSON. Server bugs producing malformed payloads are
- * skipped silently — the bus contract is best-effort delivery.
- */
 function safeParse(json: string): unknown {
   try {
     return JSON.parse(json);

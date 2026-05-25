@@ -209,7 +209,7 @@ export class SparkSession {
     return new DataStreamReader(this);
   }
 
-  /** Manage the streaming queries running on this session (`active`, `get`, …). */
+  /** Manage the streaming queries running on this session. */
   get streams(): StreamingQueryManager {
     return new StreamingQueryManager(this);
   }

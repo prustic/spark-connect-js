@@ -78,7 +78,7 @@ export class StreamingQueryManager {
    * @remarks
    * The timeout is in **milliseconds**, matching the Scala client and the
    * Spark Connect `timeout_ms` wire field. PySpark's
-   * `awaitAnyTermination(timeout)` takes **seconds** — pass `10_000` for the
+   * `awaitAnyTermination(timeout)` takes **seconds**; pass `10_000` for the
    * PySpark `10` equivalent.
    *
    * @throws SparkConnectError if a query terminated with an exception.
@@ -131,13 +131,13 @@ export class StreamingQueryManager {
     await bus.remove(listener);
   }
 
-  // `listListeners()` is intentionally not exposed: the proto's
+  // `listListeners()` is intentionally not exposed. The proto's
   // `StreamingQueryManagerCommand.listListeners` returns IDs of Java
   // listeners registered via `StreamingQueryManagerCommand.addListener`
   // (which carries `listener_payload: bytes`), not the TS listeners we
   // subscribe via `StreamingQueryListenerBusCommand.addListenerBusListener`.
   // A TS client never registers Java listeners, so the result is always
-  // empty — surfacing it would be misleading. PySpark Connect omits it too.
+  // empty. PySpark Connect omits it for the same reason.
 
   private async _exec(
     op: string,

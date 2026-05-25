@@ -172,10 +172,6 @@ export class DataStreamWriter {
   }
 }
 
-/**
- * Parse `queryStartedEventJson` from the start result. Malformed payloads are
- * skipped silently — best-effort dispatch matching the bus's parse policy.
- */
 function parseStartedEvent(
   json: string,
 ): { id?: string; runId?: string; name?: string; timestamp?: string } | undefined {

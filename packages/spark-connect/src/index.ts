@@ -334,7 +334,7 @@ export {
   StreamingQueryCommandResult_ExceptionResultSchema,
   type StreamingQueryCommandResult_AwaitTerminationResult,
   StreamingQueryCommandResult_AwaitTerminationResultSchema,
-  // Streaming — Manager (Phase B)
+  // StreamingQueryManager
   type StreamingQueryManagerCommand,
   StreamingQueryManagerCommandSchema,
   type StreamingQueryManagerCommand_AwaitAnyTerminationCommand,
@@ -349,7 +349,7 @@ export {
   StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema,
   type StreamingQueryManagerCommandResult_ListStreamingQueryListenerResult,
   StreamingQueryManagerCommandResult_ListStreamingQueryListenerResultSchema,
-  // Streaming — Listener bus (Phase B)
+  // StreamingQueryListener bus
   type StreamingQueryListenerBusCommand,
   StreamingQueryListenerBusCommandSchema,
   type StreamingQueryListenerEvent,

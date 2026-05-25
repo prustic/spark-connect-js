@@ -333,10 +333,9 @@ export class GrpcTransport implements Transport {
         });
       }
     } finally {
-      // If the consumer breaks the loop without the server closing first,
-      // the driver keeps running until the server eventually does. The
-      // listener-bus driver always issues `removeListenerBusListener`, which
-      // makes the server close — so this path completes promptly.
+      // If the consumer breaks the loop before the server closes, the driver
+      // keeps running until it does. The listener-bus driver always issues
+      // `removeListenerBusListener`, which makes the server close.
       await driver.catch(() => undefined);
     }
   }

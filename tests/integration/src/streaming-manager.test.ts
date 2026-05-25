@@ -108,8 +108,8 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
         terminated.push(e);
       },
     };
-    // Also register a second listener whose onQueryProgress throws — assert
-    // the first listener still receives every event (exception isolation).
+    // Register a second listener whose onQueryProgress throws and assert the
+    // first listener still receives every event (exception isolation).
     const goodCount = { n: 0 };
     const isolatedListener: StreamingQueryListener = {
       onQueryProgress: () => {
