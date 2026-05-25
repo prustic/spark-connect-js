@@ -1,9 +1,6 @@
 import type { SparkSession } from "../spark-session.js";
 import type { StreamingQueryProgress } from "./types.js";
 
-// spark-core stays platform-neutral; declare only what we use.
-declare const console: { warn(...args: unknown[]): void };
-
 /**
  * Fired when a streaming query has just been launched. Parsed from the
  * server's `queryStartedEventJson` on `WriteStreamOperationStartResult`.
@@ -83,15 +80,10 @@ export class StreamingQueryListenerBus {
   }
 
   /**
-   * Add a listener. Lazy-opens the subscription on the first call and waits
-   * for the server's registration ack before resolving.
-   *
-   * On registration failure (most often a transport that doesn't implement
-   * `executeCommandStream`), the `_run()` body runs synchronously to its
-   * catch *before* the `this._driver = this._run()` assignment lands, which
-   * would leave `_driver` pointing to a fulfilled Promise and wedge future
-   * `add()` calls on a stale rejected `_registered`. We catch the rejection
-   * here and clear both slots so the next `add()` cleanly re-opens.
+   * Add a listener. Lazy-opens the subscription and waits for the server's
+   * registration ack. Catches a sync-throw registration failure (e.g. a
+   * transport missing `executeCommandStream`) and resets state so a follow-up
+   * `add()` re-opens cleanly.
    */
   async add(listener: StreamingQueryListener): Promise<void> {
     this._listeners.push(listener);
@@ -114,21 +106,16 @@ export class StreamingQueryListenerBus {
    * `removeListenerBusListener` so the server closes the subscription; the
    * driver task completes on its own.
    *
-   * Deliberately does **not** `await` the driver here. PySpark's bus runs on
-   * its own thread; this implementation runs the driver inside the same
-   * event loop, so if a listener calls `removeListener(self)` from inside its
-   * own callback the chain is: driver → _dispatch → callback → removeListener
-   * → (would) → driver. Self-removal would deadlock. Server-close-driven
-   * teardown is best-effort: a brief overlapping tail is a far better
-   * footgun than a deadlock on a perfectly reasonable user pattern.
+   * Does not `await` the driver: callbacks may invoke `removeListener(self)`
+   * which would deadlock on a single event loop (driver → dispatch → callback
+   * → remove → driver). Server-close drives teardown instead.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);
     if (idx < 0) return;
     this._listeners.splice(idx, 1);
     if (this._listeners.length === 0 && this._driver !== null) {
-      // Null the slots *before* awaiting so a concurrent `add` opens a fresh
-      // subscription instead of binding to the about-to-drain driver.
+      // Null slots before the await so a concurrent add() re-opens cleanly.
       this._driver = null;
       this._registered = null;
       await this._session._executeCommandResponses({
@@ -188,16 +175,12 @@ export class StreamingQueryListenerBus {
       // Server closed the stream cleanly (typically after our removeListenerBusListener).
       if (reg.resolve !== null) reg.resolve();
     } catch (err) {
-      // Non-recoverable drop: matches PySpark — clear listeners, surface the
-      // failure to the registration awaiter (if any), warn for live ones.
+      // Non-recoverable drop: surface to the pending registration awaiter if
+      // any; otherwise clear so a future addListener() re-opens. Live-drop
+      // path nulls _driver/_registered here; sync-throw path is handled in
+      // add()'s catch (assignment ordering — see add()).
       if (reg.reject !== null) reg.reject(err);
       else {
-        console.warn("StreamingQueryListenerBus: stream terminated, clearing listeners.", err);
-        // Live-drop path (registration was already acked): clear the driver
-        // here so the next `add()` re-opens. We don't touch `_driver` on the
-        // sync-throw path because the assignment in `add()` (`this._driver
-        // = this._run()`) would land *after* this catch ran in the same sync
-        // tick and overwrite the null. `add()`'s own catch handles that case.
         this._driver = null;
         this._registered = null;
       }
@@ -207,14 +190,14 @@ export class StreamingQueryListenerBus {
 
   private async _dispatchEvent(eventType: string, eventJson: string): Promise<void> {
     if (eventType === "progress") {
-      const event = parseOrWarn(eventJson, eventType);
+      const event = safeParse(eventJson);
       if (event !== undefined) {
         await this._dispatch((l) => l.onQueryProgress?.(event as StreamingQueryProgress));
       }
       return;
     }
     if (eventType === "idle") {
-      const event = parseOrWarn(eventJson, eventType) as Partial<QueryIdleEvent> | undefined;
+      const event = safeParse(eventJson) as Partial<QueryIdleEvent> | undefined;
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryIdle?.({
@@ -227,7 +210,7 @@ export class StreamingQueryListenerBus {
       return;
     }
     if (eventType === "terminated") {
-      const event = parseOrWarn(eventJson, eventType) as Partial<QueryTerminatedEvent> | undefined;
+      const event = safeParse(eventJson) as Partial<QueryTerminatedEvent> | undefined;
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryTerminated?.({
@@ -255,11 +238,13 @@ export class StreamingQueryListenerBus {
     const next = this._dispatchChain.then(async () => {
       // Snapshot to tolerate add/remove during dispatch.
       const snapshot = this._listeners.slice();
-      for (let i = 0; i < snapshot.length; i++) {
+      for (const listener of snapshot) {
         try {
-          await apply(snapshot[i]);
-        } catch (err) {
-          console.warn(`StreamingQueryListener[${String(i)}] callback threw`, err);
+          await apply(listener);
+        } catch {
+          // Per-listener exception isolation: a throwing callback must not
+          // break delivery to the other listeners. Callbacks are user code;
+          // it's the caller's responsibility to instrument them.
         }
       }
     });
@@ -271,14 +256,14 @@ export class StreamingQueryListenerBus {
   }
 }
 
-function parseOrWarn(json: string, eventType: string): unknown {
+/**
+ * Parse server-sent event JSON. Server bugs producing malformed payloads are
+ * skipped silently — the bus contract is best-effort delivery.
+ */
+function safeParse(json: string): unknown {
   try {
     return JSON.parse(json);
-  } catch (err) {
-    console.warn(
-      `StreamingQueryListenerBus: dropping malformed ${eventType} event JSON: ${json}`,
-      err,
-    );
+  } catch {
     return undefined;
   }
 }

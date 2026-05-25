@@ -109,8 +109,8 @@ export class StreamingQueryManager {
    * registration.
    *
    * @remarks Callbacks are dispatched serially per session. On a
-   *   non-recoverable subscription drop the bus clears all listeners and
-   *   warns to `console.warn`; the user must `addListener` again to restart.
+   *   non-recoverable subscription drop the bus silently clears all
+   *   listeners; the user must `addListener` again to restart.
    */
   async addListener(listener: StreamingQueryListener): Promise<void> {
     await this._session._getOrCreateListenerBus().add(listener);
