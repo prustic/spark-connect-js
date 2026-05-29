@@ -286,6 +286,7 @@ export class GrpcTransport implements Transport {
     // result frames surface via the `onResponse` hook, so we bridge them into
     // an async-iterable through a Promise-gated queue.
     const queue: Record<string, unknown>[] = [];
+
     // Boxed so closures share the slot; bare `let` would let TS narrow each
     // closure to a non-callable variant.
     const state: { wake: (() => void) | null; done: boolean; err: Error | null } = {
@@ -293,14 +294,17 @@ export class GrpcTransport implements Transport {
       done: false,
       err: null,
     };
+
     const capture = (response: ExecutePlanResponse): void => {
       const decoded = decodeCommandResponse(response);
       if (decoded === undefined) return;
       queue.push(decoded);
+
       const w = state.wake;
       state.wake = null;
       if (w !== null) w();
     };
+
     const driver = (async () => {
       try {
         for await (const _ of this._streamWithReattach(sessionId, operationId, request, capture)) {
@@ -312,6 +316,7 @@ export class GrpcTransport implements Transport {
         state.err = e instanceof Error ? e : new Error(String(e));
       } finally {
         state.done = true;
+
         const w = state.wake;
         state.wake = null;
         if (w !== null) w();
@@ -324,10 +329,12 @@ export class GrpcTransport implements Transport {
           yield queue.shift()!;
           continue;
         }
+
         if (state.done) {
           if (state.err !== null) throw state.err;
           return;
         }
+
         await new Promise<void>((r) => {
           state.wake = r;
         });
@@ -1449,6 +1456,7 @@ function buildStreamingQueryManagerOpProto(
           `streamingQueryManagerCommand awaitAnyTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
         );
       }
+
       return {
         case: "awaitAnyTermination",
         value: create(StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema, {

@@ -87,6 +87,7 @@ export class StreamingQueryListenerBus {
     if (this._driver === null) {
       this._driver = this._run();
     }
+
     if (this._registered !== null) {
       try {
         await this._registered;
@@ -99,19 +100,17 @@ export class StreamingQueryListenerBus {
   }
 
   /**
-   * Remove a listener. Sends `removeListenerBusListener` once the last
-   * listener leaves so the server closes the subscription.
+   * Remove a listener. When the last leaves, sends `removeListenerBusListener`
+   * so the server closes the subscription.
    *
-   * Does not `await` the driver: a callback invoking `removeListener(self)`
-   * would deadlock on a single event loop. Server-close drives teardown
-   * instead. If `addListener` runs again before the server processes the
-   * remove, in-flight events from the old subscription briefly dispatch to
-   * the new listener. Same race in PySpark Connect's bus thread.
+   * Does not `await` the driver: a callback calling `removeListener(self)`
+   * would otherwise deadlock the event loop.
    */
   async remove(listener: StreamingQueryListener): Promise<void> {
     const idx = this._listeners.indexOf(listener);
     if (idx < 0) return;
     this._listeners.splice(idx, 1);
+
     if (this._listeners.length === 0 && this._driver !== null) {
       // Null slots before the await so a concurrent add() re-opens cleanly.
       this._driver = null;
@@ -144,6 +143,7 @@ export class StreamingQueryListenerBus {
       resolve: null,
       reject: null,
     };
+
     this._registered = new Promise((resolve, reject) => {
       reg.resolve = resolve;
       reg.reject = reject;
@@ -154,22 +154,27 @@ export class StreamingQueryListenerBus {
         type: "streamingQueryListenerBusCommand",
         op: "addListenerBusListener",
       });
+
       for await (const frame of frames) {
         if (frame["type"] !== "streamingQueryListenerEventsResult") continue;
+
         const payload = frame as {
           events?: { eventType: string; eventJson: string }[];
           listenerBusListenerAdded?: boolean;
         };
+
         if (payload.listenerBusListenerAdded === true && reg.resolve !== null) {
           const r = reg.resolve;
           reg.resolve = null;
           reg.reject = null;
           r();
         }
+
         for (const e of payload.events ?? []) {
           await this._dispatchEvent(e.eventType, e.eventJson);
         }
       }
+
       // Clean server close (usually after our removeListenerBusListener).
       if (reg.resolve !== null) reg.resolve();
     } catch (err) {
@@ -181,20 +186,22 @@ export class StreamingQueryListenerBus {
         this._driver = null;
         this._registered = null;
       }
+
       this._listeners.length = 0;
     }
   }
 
   private async _dispatchEvent(eventType: string, eventJson: string): Promise<void> {
     if (eventType === "progress") {
-      const event = safeParse(eventJson);
+      const event = safeParse<StreamingQueryProgress>(eventJson);
       if (event !== undefined) {
-        await this._dispatch((l) => l.onQueryProgress?.(event as StreamingQueryProgress));
+        await this._dispatch((l) => l.onQueryProgress?.(event));
       }
       return;
     }
+
     if (eventType === "idle") {
-      const event = safeParse(eventJson) as Partial<QueryIdleEvent> | undefined;
+      const event = safeParse<Partial<QueryIdleEvent>>(eventJson);
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryIdle?.({
@@ -206,8 +213,9 @@ export class StreamingQueryListenerBus {
       }
       return;
     }
+
     if (eventType === "terminated") {
-      const event = safeParse(eventJson) as Partial<QueryTerminatedEvent> | undefined;
+      const event = safeParse<Partial<QueryTerminatedEvent>>(eventJson);
       if (event !== undefined) {
         await this._dispatch((l) =>
           l.onQueryTerminated?.({
@@ -222,6 +230,7 @@ export class StreamingQueryListenerBus {
       }
       return;
     }
+
     // unspecified / unknown: ignore
   }
 
@@ -244,16 +253,18 @@ export class StreamingQueryListenerBus {
         }
       }
     });
+
     // Keep one task's throw from poisoning the chain. Real isolation lives
     // in the per-listener try/catch above.
     this._dispatchChain = next.catch(() => undefined);
+
     return next;
   }
 }
 
-function safeParse(json: string): unknown {
+function safeParse<T>(json: string): T | undefined {
   try {
-    return JSON.parse(json);
+    return JSON.parse(json) as T;
   } catch {
     return undefined;
   }

@@ -108,6 +108,7 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
         terminated.push(e);
       },
     };
+
     // Register a second listener whose onQueryProgress throws and assert the
     // first listener still receives every event (exception isolation).
     const goodCount = { n: 0 };
@@ -125,6 +126,7 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
     await spark().streams.addListener(listener);
     await spark().streams.addListener(isolatedListener);
     await spark().streams.addListener(throwingListener);
+
     let query: StreamingQuery | undefined;
     try {
       query = await startRateMemoryQuery(`mgr_listener_${Math.random().toString(36).slice(2, 10)}`);
@@ -136,6 +138,7 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
     } finally {
       if (query !== undefined) await query.stop();
     }
+
     const sawTerminated = await waitUntil(async () => terminated.length >= 1, 5_000);
     assert.ok(sawTerminated, "expected onQueryTerminated to fire after stop()");
 

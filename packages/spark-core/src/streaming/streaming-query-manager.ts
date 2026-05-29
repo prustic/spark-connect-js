@@ -58,8 +58,10 @@ export class StreamingQueryManager {
     if (id.length === 0) {
       throw new InvalidInputError("StreamingQueryManager.get: id must be non-empty.");
     }
+
     const { query } = await this._exec("getQuery", { id });
     if (query === undefined) return null;
+
     return new StreamingQuery(
       this._session,
       query.id,
@@ -88,12 +90,15 @@ export class StreamingQueryManager {
       await this._exec("awaitAnyTermination");
       return undefined;
     }
+
     if (!Number.isInteger(timeoutMs) || timeoutMs < 0) {
       throw new InvalidInputError(
         `StreamingQueryManager.awaitAnyTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
       );
     }
+
     const { terminated = false } = await this._exec("awaitAnyTermination", { timeoutMs });
+
     return terminated;
   }
 
@@ -116,6 +121,7 @@ export class StreamingQueryManager {
         "StreamingQueryManager.addListener: listener must be an object implementing StreamingQueryListener.",
       );
     }
+
     await this._session._getOrCreateListenerBus().add(listener);
   }
 
@@ -144,12 +150,14 @@ export class StreamingQueryManager {
       op,
       ...extra,
     });
+
     const match = responses.find((r) => r["type"] === "streamingQueryManagerCommandResult");
     if (match === undefined) {
       throw new SparkClientError(
         `Spark Connect server returned no streamingQueryManagerCommandResult for op "${op}".`,
       );
     }
+
     return match as unknown as StreamingQueryManagerCommandResultPayload;
   }
 }

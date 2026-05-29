@@ -123,6 +123,7 @@ export class DataStreamWriter {
         "DataStreamWriter requires either format(...) or a sink destination via start(path) / toTable(name).",
       );
     }
+
     const responses = await this._df._session._executeCommandResponses({
       type: "writeStreamOperationStart",
       plan: this._df._plan,
@@ -134,6 +135,7 @@ export class DataStreamWriter {
       ...(this._queryName !== undefined && { queryName: this._queryName }),
       ...(sink !== undefined && { sink }),
     });
+
     const result = responses.find((r) => r["type"] === "writeStreamOperationStartResult") as
       | {
           type: "writeStreamOperationStartResult";
@@ -147,8 +149,10 @@ export class DataStreamWriter {
         "Spark Connect server did not return a writeStreamOperationStartResult with a queryId.",
       );
     }
+
     const queryName = result.name.length === 0 ? undefined : result.name;
     const queryId = result.queryId;
+
     // The proto's listener-bus events don't include the started event, so
     // dispatch it here from the start-result JSON.
     const bus = this._df._session._peekListenerBus();
@@ -167,6 +171,7 @@ export class DataStreamWriter {
         });
       }
     }
+
     return new StreamingQuery(this._df._session, queryId.id, queryId.runId, queryName);
   }
 }

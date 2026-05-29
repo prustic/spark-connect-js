@@ -303,6 +303,7 @@ export class SparkSession {
           "Use a full Transport implementation (e.g. GrpcTransport) that supports streaming commands.",
       );
     }
+
     return this.transport.executeCommandResponses(this.sessionId, command, this._executeOptions());
   }
 
@@ -317,6 +318,7 @@ export class SparkSession {
           "Use a full Transport implementation (e.g. GrpcTransport) that supports streaming subscriptions.",
       );
     }
+
     return this.transport.executeCommandStream(this.sessionId, command, this._executeOptions());
   }
 

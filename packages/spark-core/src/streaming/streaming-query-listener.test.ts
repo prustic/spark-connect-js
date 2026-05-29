@@ -32,14 +32,16 @@ function scriptedTransport(): ScriptedTransport {
     | { kind: "frame"; value: Record<string, unknown> }
     | { kind: "error"; err: unknown }
     | { kind: "close" };
+
   const queue: Pending[] = [];
   const state: { wake: (() => void) | null } = { wake: null };
+  const managerCommands: Record<string, unknown>[] = [];
+
   const wake = (): void => {
     const w = state.wake;
     state.wake = null;
     if (w !== null) w();
   };
-  const managerCommands: Record<string, unknown>[] = [];
 
   return {
     managerCommands,
@@ -74,9 +76,11 @@ function scriptedTransport(): ScriptedTransport {
           });
           continue;
         }
+
         const next = queue.shift()!;
         if (next.kind === "close") return;
         if (next.kind === "error") throw next.err;
+
         yield next.value;
       }
     },
