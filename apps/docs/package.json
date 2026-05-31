@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.39.2",
-    "astro": "^6.3.3",
+    "astro": "^6.4.2",
     "mermaid": "^11.14.0",
     "sharp": "^0.34.5",
-    "starlight-typedoc": "^0.22.0",
+    "starlight-typedoc": "^0.23.0",
     "typedoc": "^0.28.19",
     "typedoc-plugin-markdown": "^4.11.0"
   },
