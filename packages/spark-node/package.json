@@ -47,7 +47,7 @@
     "@spark-connect-js/core": "workspace:*",
     "@spark-connect-js/connect": "workspace:*",
     "@bufbuild/protobuf": "^2.12.0",
-    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
     "apache-arrow": "^21.1.0"
   },
