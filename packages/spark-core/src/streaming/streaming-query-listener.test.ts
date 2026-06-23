@@ -254,13 +254,48 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
         },
         {
           eventType: "terminated",
-          eventJson: JSON.stringify({ id: "id-a", runId: "run-b", exception: "boom" }),
+          eventJson: JSON.stringify({
+            id: "id-a",
+            runId: "run-b",
+            exception: "boom",
+            errorClassOnException: "java.lang.RuntimeException",
+          }),
         },
       ],
     });
     await new Promise((r) => setTimeout(r, 5));
     assert.deepEqual(idle, [{ id: "id-a", runId: "run-b", timestamp: "2026-01-01" }]);
-    assert.deepEqual(terminated, [{ id: "id-a", runId: "run-b", exception: "boom" }]);
+    assert.deepEqual(terminated, [
+      {
+        id: "id-a",
+        runId: "run-b",
+        exception: "boom",
+        errorClassOnException: "java.lang.RuntimeException",
+      },
+    ]);
+    t.closeStream();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it("silently drops malformed event JSON", async () => {
+    const t = scriptedTransport();
+    const spark = newSession(t);
+    const progress: StreamingQueryProgress[] = [];
+    t.pushFrame({ listenerBusListenerAdded: true });
+    await spark.streams.addListener({
+      onQueryProgress: (e) => {
+        progress.push(e);
+      },
+    });
+    t.pushFrame({
+      events: [
+        { eventType: "progress", eventJson: "{not-valid-json" },
+        { eventType: "progress", eventJson: '{"batchId":1}' },
+      ],
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(progress.length, 1, "only the well-formed event should reach the listener");
+    assert.equal((progress[0] as { batchId?: number }).batchId, 1);
     t.closeStream();
     await new Promise((r) => setTimeout(r, 0));
   });

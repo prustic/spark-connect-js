@@ -105,6 +105,21 @@ describe("StreamingQueryManager", () => {
     assert.equal(await mgr.get("missing"), null);
   });
 
+  it("get(id) normalizes an empty server-side name to undefined", async () => {
+    const t = capturingTransport();
+    t.setResponses([
+      {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "query",
+        query: { id: "id-a", runId: "run-a", name: "" },
+      },
+    ]);
+    const mgr = makeManager(t);
+    const q = await mgr.get("id-a");
+    assert.ok(q);
+    assert.equal(q.name, undefined);
+  });
+
   it("get() rejects an empty id", async () => {
     const t = capturingTransport();
     const mgr = makeManager(t);
@@ -178,5 +193,12 @@ describe("StreamingQueryManager", () => {
       () => mgr.addListener("nope" as unknown as Parameters<typeof mgr.addListener>[0]),
       InvalidInputError,
     );
+  });
+
+  it("removeListener is a no-op when no listener was ever registered", async () => {
+    const t = capturingTransport();
+    const mgr = makeManager(t);
+    await mgr.removeListener({ onQueryProgress: () => undefined });
+    assert.equal(t.commands.length, 0);
   });
 });
