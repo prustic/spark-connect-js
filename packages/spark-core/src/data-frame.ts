@@ -420,12 +420,10 @@ export class DataFrame {
    * @example df.selectExpr("age * 2 as doubled_age", "name")
    */
   selectExpr(...exprs: string[]): DataFrame {
-    const sqlExprs = exprs.map(
-      (e): Expression => ({
-        type: "expressionString",
-        expression: e,
-      }),
-    );
+    const sqlExprs = exprs.map((e): Expression => ({
+      type: "expressionString",
+      expression: e,
+    }));
     return DataFrame._fromPlan(this._session, {
       type: "project",
       child: this._plan,
