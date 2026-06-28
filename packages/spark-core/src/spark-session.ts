@@ -6,6 +6,8 @@ import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { DataStreamReader } from "./streaming/data-stream-reader.js";
+import { StreamingQueryManager } from "./streaming/streaming-query-manager.js";
+import { StreamingQueryListenerBus } from "./streaming/streaming-query-listener.js";
 
 // crypto.randomUUID() is available globally in Node 19+, Deno, and all modern
 // browsers, but TypeScript's ES2023 lib doesn't include it since it's a Web
@@ -61,6 +63,17 @@ export interface Transport {
     command: Record<string, unknown>,
     options?: ExecuteOptions,
   ): Promise<Record<string, unknown>[]>;
+
+  /**
+   * Execute a command and yield decoded result frames as the server pushes
+   * them. For long-running subscriptions (e.g. the listener bus) where
+   * {@link executeCommandResponses}' collect-and-return would never resolve.
+   */
+  executeCommandStream?(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): AsyncIterable<Record<string, unknown>>;
 
   /** Send an AnalyzePlan request (schema, explain, etc.) and return the response. */
   analyzePlan?(
@@ -148,6 +161,8 @@ export class SparkSession {
   private readonly _tagSet: Set<string> = new Set();
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
+  /** @internal */
+  private _streamingListenerBus: StreamingQueryListenerBus | undefined;
 
   /** @internal Called by SparkSessionBuilder to construct the session. */
   static _create(config: SparkSessionConfig): SparkSession {
@@ -190,6 +205,22 @@ export class SparkSession {
    */
   get readStream(): DataStreamReader {
     return new DataStreamReader(this);
+  }
+
+  /** Manage the streaming queries running on this session. */
+  get streams(): StreamingQueryManager {
+    return new StreamingQueryManager(this);
+  }
+
+  /** @internal */
+  _getOrCreateListenerBus(): StreamingQueryListenerBus {
+    this._streamingListenerBus ??= new StreamingQueryListenerBus(this);
+    return this._streamingListenerBus;
+  }
+
+  /** @internal Returns the bus if one was lazy-created, otherwise undefined. */
+  _peekListenerBus(): StreamingQueryListenerBus | undefined {
+    return this._streamingListenerBus;
   }
 
   /** Execute a SQL query. */
@@ -270,7 +301,23 @@ export class SparkSession {
           "Use a full Transport implementation (e.g. GrpcTransport) that supports streaming commands.",
       );
     }
+
     return this.transport.executeCommandResponses(this.sessionId, command, this._executeOptions());
+  }
+
+  /**
+   * @internal Used by the listener-bus driver to consume the server's
+   * long-running event stream incrementally.
+   */
+  _executeCommandStream(command: Record<string, unknown>): AsyncIterable<Record<string, unknown>> {
+    if (!this.transport.executeCommandStream) {
+      throw new UnsupportedOperationError(
+        `Transport ${this.transport.constructor.name} does not support executeCommandStream. ` +
+          "Use a full Transport implementation (e.g. GrpcTransport) that supports streaming subscriptions.",
+      );
+    }
+
+    return this.transport.executeCommandStream(this.sessionId, command, this._executeOptions());
   }
 
   /** @internal Snapshot of per-call options at the time of dispatch. */
