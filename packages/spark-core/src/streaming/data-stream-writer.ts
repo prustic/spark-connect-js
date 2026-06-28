@@ -123,6 +123,7 @@ export class DataStreamWriter {
         "DataStreamWriter requires either format(...) or a sink destination via start(path) / toTable(name).",
       );
     }
+
     const responses = await this._df._session._executeCommandResponses({
       type: "writeStreamOperationStart",
       plan: this._df._plan,
@@ -134,6 +135,7 @@ export class DataStreamWriter {
       ...(this._queryName !== undefined && { queryName: this._queryName }),
       ...(sink !== undefined && { sink }),
     });
+
     const result = responses.find((r) => r["type"] === "writeStreamOperationStartResult") as
       | {
           type: "writeStreamOperationStartResult";
@@ -147,11 +149,39 @@ export class DataStreamWriter {
         "Spark Connect server did not return a writeStreamOperationStartResult with a queryId.",
       );
     }
-    return new StreamingQuery(
-      this._df._session,
-      result.queryId.id,
-      result.queryId.runId,
-      result.name.length === 0 ? undefined : result.name,
-    );
+
+    const queryName = result.name.length === 0 ? undefined : result.name;
+    const queryId = result.queryId;
+
+    // The proto's listener-bus events don't include the started event, so
+    // dispatch it here from the start-result JSON.
+    const bus = this._df._session._peekListenerBus();
+    if (bus !== undefined && bus.size() > 0 && result.queryStartedEventJson !== undefined) {
+      const parsed = parseStartedEvent(result.queryStartedEventJson);
+      if (parsed !== undefined) {
+        await bus.dispatchStarted({
+          id: parsed.id ?? queryId.id,
+          runId: parsed.runId ?? queryId.runId,
+          ...(parsed.name !== undefined
+            ? { name: parsed.name }
+            : queryName !== undefined
+              ? { name: queryName }
+              : {}),
+          timestamp: parsed.timestamp ?? "",
+        });
+      }
+    }
+
+    return new StreamingQuery(this._df._session, queryId.id, queryId.runId, queryName);
+  }
+}
+
+function parseStartedEvent(
+  json: string,
+): { id?: string; runId?: string; name?: string; timestamp?: string } | undefined {
+  try {
+    return JSON.parse(json) as { id?: string; runId?: string; name?: string; timestamp?: string };
+  } catch {
+    return undefined;
   }
 }
