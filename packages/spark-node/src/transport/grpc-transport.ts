@@ -272,68 +272,58 @@ export class GrpcTransport implements Transport {
     options?: ExecuteOptions,
   ): AsyncIterable<Record<string, unknown>> {
     const operationId = newOperationId();
-    const commandProto = buildCommandProto(command);
     const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
       case: "command",
-      value: commandProto,
+      value: buildCommandProto(command),
     });
 
-    // `_streamWithReattach` yields Arrow bytes; non-Arrow result frames
-    // arrive via the `onResponse` hook. Bridge them into the async-iterable
-    // with a Promise-gated queue.
-    const queue: Record<string, unknown>[] = [];
+    // Bridge `_streamWithReattach`'s `onResponse` callback (push) into this
+    // generator's pull semantics via a buffer and a wake `signal`.
+    const buffer: Record<string, unknown>[] = [];
+    let resolveSignal: () => void = () => {};
+    let signal: Promise<void> = new Promise((r) => {
+      resolveSignal = r;
+    });
+    let done = false;
 
-    // Boxed so the `wake` reassignments stay visible to the closures (bare
-    // `let` would narrow each capture to `null`).
-    const state: { wake: (() => void) | null; done: boolean; err: Error | null } = {
-      wake: null,
-      done: false,
-      err: null,
-    };
-
-    const capture = (response: ExecutePlanResponse): void => {
-      const decoded = decodeCommandResponse(response);
-      if (decoded === undefined) return;
-      queue.push(decoded);
-
-      const w = state.wake;
-      state.wake = null;
-      if (w !== null) w();
+    const wake = (): void => {
+      const fire = resolveSignal;
+      signal = new Promise((r) => {
+        resolveSignal = r;
+      });
+      fire();
     };
 
     const driver = (async () => {
       try {
-        for await (const _ of this._streamWithReattach(sessionId, operationId, request, capture)) {
+        for await (const _ of this._streamWithReattach(
+          sessionId,
+          operationId,
+          request,
+          (response) => {
+            const decoded = decodeCommandResponse(response);
+            if (decoded !== undefined) {
+              buffer.push(decoded);
+              wake();
+            }
+          },
+        )) {
           // discard Arrow bytes (subscriptions never emit them)
         }
-      } catch (e) {
-        // `iterateWithReattach` already wraps gRPC errors as `SparkConnectError`;
-        // anything else gets wrapped here so the rethrow is always an `Error`.
-        state.err = e instanceof Error ? e : new Error(String(e));
       } finally {
-        state.done = true;
-
-        const w = state.wake;
-        state.wake = null;
-        if (w !== null) w();
+        done = true;
+        wake();
       }
     })();
 
     try {
       while (true) {
-        if (queue.length > 0) {
-          yield queue.shift()!;
-          continue;
-        }
-
-        if (state.done) {
-          if (state.err !== null) throw state.err;
+        while (buffer.length > 0) yield buffer.shift()!;
+        if (done) {
+          await driver; // re-throws if the underlying stream failed
           return;
         }
-
-        await new Promise<void>((r) => {
-          state.wake = r;
-        });
+        await signal;
       }
     } finally {
       // Server-close drives the driver to completion. The listener bus always
