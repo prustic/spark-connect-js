@@ -70,9 +70,7 @@ export interface WindowFrame {
 }
 
 export type FrameBoundary =
-  | { type: "currentRow" }
-  | { type: "unbounded" }
-  | { type: "value"; value: Expression };
+  { type: "currentRow" } | { type: "unbounded" } | { type: "value"; value: Expression };
 
 /**
  * The logical plan tree, mirroring Spark Catalyst's internal representation.
@@ -268,13 +266,7 @@ export interface JoinPlan {
   right: LogicalPlan;
   condition?: Expression;
   joinType:
-    | "inner"
-    | "full_outer"
-    | "left_outer"
-    | "right_outer"
-    | "left_semi"
-    | "left_anti"
-    | "cross";
+    "inner" | "full_outer" | "left_outer" | "right_outer" | "left_semi" | "left_anti" | "cross";
 }
 
 /**
