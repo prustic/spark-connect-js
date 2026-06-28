@@ -193,8 +193,8 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     });
     t.pushFrame({
       events: [
-        { eventType: "progress", eventJson: '{"batchId":0}' },
-        { eventType: "progress", eventJson: '{"batchId":1}' },
+        { eventType: "progress", eventJson: '{"progress":{"batchId":0}}' },
+        { eventType: "progress", eventJson: '{"progress":{"batchId":1}}' },
       ],
     });
     // Yield the loop so the driver processes the frame.
@@ -222,8 +222,8 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     });
     t.pushFrame({
       events: [
-        { eventType: "progress", eventJson: '{"batchId":0}' },
-        { eventType: "progress", eventJson: '{"batchId":1}' },
+        { eventType: "progress", eventJson: '{"progress":{"batchId":0}}' },
+        { eventType: "progress", eventJson: '{"progress":{"batchId":1}}' },
       ],
     });
     await new Promise((r) => setTimeout(r, 5));
@@ -290,12 +290,41 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     t.pushFrame({
       events: [
         { eventType: "progress", eventJson: "{not-valid-json" },
-        { eventType: "progress", eventJson: '{"batchId":1}' },
+        { eventType: "progress", eventJson: '{"progress":{"batchId":1}}' },
       ],
     });
     await new Promise((r) => setTimeout(r, 5));
     assert.equal(progress.length, 1, "only the well-formed event should reach the listener");
     assert.equal((progress[0] as { batchId?: number }).batchId, 1);
+    t.closeStream();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it("unwraps the server's `progress` wrapper so callbacks see a flat StreamingQueryProgress", async () => {
+    // Server sends `{"progress": {"batchId": 42, "inputRowsPerSecond": 5}}`;
+    // the wrapper must be peeled off (matches PySpark Connect's bus).
+    const t = scriptedTransport();
+    const spark = newSession(t);
+    const seen: StreamingQueryProgress[] = [];
+    t.pushFrame({ listenerBusListenerAdded: true });
+    await spark.streams.addListener({
+      onQueryProgress: (e) => {
+        seen.push(e);
+      },
+    });
+    t.pushFrame({
+      events: [
+        {
+          eventType: "progress",
+          eventJson: JSON.stringify({ progress: { batchId: 42, inputRowsPerSecond: 5 } }),
+        },
+      ],
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(seen.length, 1);
+    assert.equal((seen[0] as { batchId?: number }).batchId, 42);
+    assert.equal((seen[0] as { inputRowsPerSecond?: number }).inputRowsPerSecond, 5);
+    assert.equal((seen[0] as Record<string, unknown>)["progress"], undefined);
     t.closeStream();
     await new Promise((r) => setTimeout(r, 0));
   });
@@ -329,7 +358,7 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     };
     t.pushFrame({ listenerBusListenerAdded: true });
     await spark.streams.addListener(theListener);
-    t.pushFrame({ events: [{ eventType: "progress", eventJson: '{"batchId":0}' }] });
+    t.pushFrame({ events: [{ eventType: "progress", eventJson: '{"progress":{"batchId":0}}' }] });
     t.closeStream();
     // If the deadlock is present this never resolves; node --test times out.
     await new Promise((r) => setTimeout(r, 30));
