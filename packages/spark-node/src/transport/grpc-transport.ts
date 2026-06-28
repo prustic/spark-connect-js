@@ -278,13 +278,13 @@ export class GrpcTransport implements Transport {
       value: commandProto,
     });
 
-    // The underlying `_streamWithReattach` yields Arrow bytes only. Non-Arrow
-    // result frames surface via the `onResponse` hook, so we bridge them into
-    // an async-iterable through a Promise-gated queue.
+    // `_streamWithReattach` yields Arrow bytes; non-Arrow result frames
+    // arrive via the `onResponse` hook. Bridge them into the async-iterable
+    // with a Promise-gated queue.
     const queue: Record<string, unknown>[] = [];
 
-    // Boxed so closures share the slot; bare `let` would let TS narrow each
-    // closure to a non-callable variant.
+    // Boxed so the `wake` reassignments stay visible to the closures (bare
+    // `let` would narrow each capture to `null`).
     const state: { wake: (() => void) | null; done: boolean; err: Error | null } = {
       wake: null,
       done: false,
@@ -307,8 +307,8 @@ export class GrpcTransport implements Transport {
           // discard Arrow bytes (subscriptions never emit them)
         }
       } catch (e) {
-        // wrapError in iterateWithReattach already lifts gRPC errors to
-        // SparkConnectError; anything else gets wrapped here for the rethrow.
+        // `iterateWithReattach` already wraps gRPC errors as `SparkConnectError`;
+        // anything else gets wrapped here so the rethrow is always an `Error`.
         state.err = e instanceof Error ? e : new Error(String(e));
       } finally {
         state.done = true;
@@ -336,9 +336,8 @@ export class GrpcTransport implements Transport {
         });
       }
     } finally {
-      // If the consumer breaks the loop before the server closes, the driver
-      // keeps running until it does. The listener-bus driver always issues
-      // `removeListenerBusListener`, which makes the server close.
+      // Server-close drives the driver to completion. The listener bus always
+      // issues `removeListenerBusListener` first, so this resolves promptly.
       await driver.catch(() => undefined);
     }
   }
@@ -964,7 +963,7 @@ function decodeStreamingQueryManagerCommandResult(
         })),
       };
     case "query":
-      // Server returns the resolved query (or the case is absent on miss).
+      // Server returns the resolved query, or no `id` at all on a miss.
       return {
         type: "streamingQueryManagerCommandResult",
         resultType: "query",
@@ -1396,7 +1395,8 @@ function buildStreamingQueryOpProto(
       };
     case "awaitTermination": {
       const timeoutMs = command.timeoutMs as number | undefined;
-      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      // Revalidate here so direct callers of the exported `buildCommandProto`
+      // get a typed error instead of a `BigInt()` throw on a bad float.
       if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
         throw new UnsupportedOperationError(
           `streamingQueryCommand awaitTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
@@ -1446,7 +1446,8 @@ function buildStreamingQueryManagerOpProto(
       return { case: "listListeners", value: true };
     case "awaitAnyTermination": {
       const timeoutMs = command.timeoutMs as number | undefined;
-      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      // Revalidate here so direct callers of the exported `buildCommandProto`
+      // get a typed error instead of a `BigInt()` throw on a bad float.
       if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
         throw new UnsupportedOperationError(
           `streamingQueryManagerCommand awaitAnyTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,

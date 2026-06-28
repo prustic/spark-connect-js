@@ -131,8 +131,9 @@ export class StreamingQueryListenerBus {
   }
 
   private async _run(): Promise<void> {
-    // Boxed so the Promise-callback assignments are visible to the outer
-    // async scope without TS narrowing to never.
+    // Box the resolve/reject slots so the closures inside `new Promise`
+    // share the references with the outer scope. Bare `let` would let TS
+    // narrow each closure capture to `never`.
     const reg: { resolve: (() => void) | null; reject: ((e: unknown) => void) | null } = {
       resolve: null,
       reject: null,
@@ -242,8 +243,8 @@ export class StreamingQueryListenerBus {
         try {
           await apply(listener);
         } catch {
-          // Isolate a throwing callback so the remaining listeners still get
-          // the event. User callbacks are user code to instrument.
+          // Isolate a throwing callback so the rest of the listeners still
+          // receive the event. Instrumentation is the caller's job.
         }
       }
     });
