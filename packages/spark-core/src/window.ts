@@ -1,15 +1,3 @@
-/**
- * Window
- *
- * Window specification for window functions (row_number, rank, lag, etc.).
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/expressions/Window.scala
- * @see Spark source: sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/windowExpressions.scala
- *
- * A WindowSpec describes HOW to partition, order, and frame the data for
- * a window function.  It is immutable; every method returns a new WindowSpec.
- */
-
 import type { Expression, SortOrder, WindowFrame, FrameBoundary } from "./plan/logical-plan.js";
 import { col } from "./column.js";
 import type { Column } from "./column.js";
@@ -36,6 +24,24 @@ function toSortOrder(c: ColOrName): SortOrder {
   };
 }
 
+/**
+ * Describes how to partition, order, and frame a window for window functions
+ * such as `row_number`, `rank`, and `lag`.
+ *
+ * Obtain a `WindowSpec` from the {@link Window} factory. Instances are
+ * immutable; every builder method returns a new `WindowSpec`.
+ *
+ * @example Ranking within a partition
+ * ```ts
+ * import { Window, col } from "@spark-connect-js/core";
+ * import { row_number } from "@spark-connect-js/core/functions";
+ *
+ * const spec = Window.partitionBy("country").orderBy(col("score").desc());
+ * const ranked = df.withColumn("rank", row_number().over(spec));
+ * ```
+ *
+ * @see [Spark source: Window.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/expressions/Window.scala)
+ */
 export class WindowSpec {
   /** @internal */
   readonly _partitionSpec: Expression[];
@@ -92,8 +98,21 @@ function toBoundary(value: number): FrameBoundary {
 }
 
 /**
- * Static factory for creating WindowSpec instances.
- * Mirrors PySpark's `Window.partitionBy(...)`.
+ * Entry point for building a {@link WindowSpec}.
+ *
+ * Mirrors PySpark's `Window` object. Expose `partitionBy`, `orderBy`,
+ * `rowsBetween`, and `rangeBetween` as factories, plus the boundary
+ * constants `unboundedPreceding`, `unboundedFollowing`, and `currentRow`.
+ *
+ * @example
+ * ```ts
+ * import { Window, col } from "@spark-connect-js/core";
+ *
+ * const spec = Window
+ *   .partitionBy("country")
+ *   .orderBy(col("ts"))
+ *   .rowsBetween(Window.unboundedPreceding, Window.currentRow);
+ * ```
  */
 export const Window = {
   unboundedPreceding: -2147483648, // Integer.MIN_VALUE (Spark convention)

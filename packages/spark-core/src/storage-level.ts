@@ -4,7 +4,7 @@
  * Mirrors the Java/Scala/Python StorageLevel class with the same
  * predefined constants.
  *
- * @see org.apache.spark.storage.StorageLevel
+ * @see [Spark source: StorageLevel.scala](https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/storage/StorageLevel.scala)
  */
 export interface StorageLevel {
   useDisk: boolean;

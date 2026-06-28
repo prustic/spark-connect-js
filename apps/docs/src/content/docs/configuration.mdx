@@ -1,0 +1,130 @@
+---
+title: Configuration
+description: Connection strings, builder options, and data-source options.
+---
+
+## The connection URL
+
+The client accepts the full `sc://` connection-string grammar:
+
+```
+sc://host:port[/[;key=value][;key=value]...]
+```
+
+Reserved keys with first-class handling:
+
+| Key | Meaning |
+| --- | --- |
+| `use_ssl` | `true` swaps the channel to `grpc.credentials.createSsl()`. The presence of `token` implies `use_ssl=true`. |
+| `token` | Bearer token. Attached as `authorization: Bearer <token>` on every RPC. Token-over-insecure (`use_ssl=false` with `token`) is rejected. |
+| `user_id` | Sent as `userContext.userId` on every RPC. |
+| `user_agent` | Prefix to the canonical user-agent string `<your prefix> spark-connect-js/<ver> (node <ver>; <platform>)`. |
+| `session_id` | Reuse an existing server-side session by UUID. Validated at parse time. |
+| `grpc_max_message_size` | Override the gRPC max-message-size in bytes for both inbound and outbound. |
+
+Any unreserved `;key=value` pair is attached as gRPC metadata on every outgoing RPC.
+
+### Examples
+
+```ts
+connect("sc://localhost:15002");
+connect("sc://spark.internal:443/;use_ssl=true");
+connect("sc://spark.internal:443/;token=abc;use_ssl=true");
+connect("sc://spark.internal:443/;use_ssl=true;tenant=acme;x-deploy=blue");
+connect("sc://localhost:15002/;session_id=550e8400-e29b-41d4-a716-446655440000");
+```
+
+To skip the URL string, use the builder directly:
+
+```ts
+import { SparkSession } from "@spark-connect-js/node";
+
+const spark = SparkSession.builder()
+  .remote("sc://spark.internal:15002")
+  .getOrCreate();
+```
+
+## Builder methods
+
+```ts
+SparkSession.builder()
+  .remote("sc://localhost:15002")   // required, connection URL
+  .sessionId("550e8400-e29b-41d4-a716-446655440000") // optional, reuse a server-side session
+  .transport(customTransport)       // optional, plug in a custom transport
+  .arrowDecoder(customDecoder)      // optional, plug in a custom Arrow decoder
+  .getOrCreate();                   // return the session
+```
+
+`getOrCreate()` constructs the session without opening the channel. The channel opens lazily on the first RPC.
+
+For low-level transport tuning (custom `ChannelCredentials`, retry policy override, max-message-size override) construct a `GrpcTransport` directly and inject it via `.transport(...)`. The `GrpcTransportOptions` shape is documented in the [API reference](/spark-connect-js/api/).
+
+## Data-source options
+
+Reader and writer options pass through to Spark unchanged. The full list is in the [Spark SQL data sources documentation](https://spark.apache.org/docs/latest/sql-data-sources.html).
+
+### CSV
+
+| Option            | Default      | Description                                |
+| ----------------- | ------------ | ------------------------------------------ |
+| `header`          | `false`      | Treat the first line as a header.          |
+| `sep`             | `,`          | Field separator.                           |
+| `quote`           | `"`          | Quote character.                           |
+| `escape`          | `\\`         | Escape character inside quotes.            |
+| `inferSchema`     | `false`      | Infer types; requires a second pass.       |
+| `nullValue`       | `""`         | String that represents null.               |
+| `dateFormat`      |              | Date parse pattern.                        |
+| `timestampFormat` |              | Timestamp parse pattern.                   |
+| `mode`            | `PERMISSIVE` | `PERMISSIVE`, `DROPMALFORMED`, `FAILFAST`. |
+| `multiLine`       | `false`      | Allow newlines inside quoted fields.       |
+
+### JSON
+
+| Option               | Default      | Description                                         |
+| -------------------- | ------------ | --------------------------------------------------- |
+| `multiLine`          | `false`      | One JSON object may span multiple lines per file.   |
+| `allowComments`      | `false`      | Permit `//` comments.                               |
+| `allowSingleQuotes`  | `true`       | Permit `'...'` strings.                             |
+| `mode`               | `PERMISSIVE` | `PERMISSIVE`, `DROPMALFORMED`, `FAILFAST`.          |
+| `primitivesAsString` | `false`      | Keep every primitive value as a string.             |
+
+### Parquet and ORC
+
+| Option        | Default  | Description                                            |
+| ------------- | -------- | ------------------------------------------------------ |
+| `compression` | `snappy` | `none`, `snappy`, `gzip`, `lz4`, `zstd`.               |
+| `mergeSchema` | `false`  | Merge schemas across files. Expensive for wide tables. |
+
+### All formats
+
+| Option                              | Description                                      |
+| ----------------------------------- | ------------------------------------------------ |
+| `pathGlobFilter`                    | Restrict file discovery with a glob pattern.     |
+| `recursiveFileLookup`               | Include files in nested directories.             |
+| `modifiedBefore` / `modifiedAfter`  | Filter by file modification time.                |
+
+### Write modes
+
+| Mode                      | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `append`                  | Add to existing data.                    |
+| `overwrite`               | Replace existing data.                   |
+| `ignore`                  | No-op if the target exists.              |
+| `error` / `errorifexists` | Fail if the target exists (the default). |
+
+## Runtime configuration
+
+`session.conf` mirrors PySpark's `spark.conf`, routed through Spark Connect's `Config` RPC. Every method is async because each call is a server roundtrip.
+
+```ts
+await spark.conf.set("spark.sql.shuffle.partitions", "50");
+const v = await spark.conf.get("spark.sql.shuffle.partitions"); // "50"
+const all = await spark.conf.getAll();                          // Record<string, string>
+const allShuffle = await spark.conf.getAll("spark.sql.shuffle.");
+const ok = await spark.conf.isModifiable("spark.sql.shuffle.partitions"); // true
+await spark.conf.unset("spark.sql.shuffle.partitions");
+```
+
+`get` returns `string | undefined`; the server returns `undefined` for unset keys.
+
+Server-side defaults still live in `spark-defaults.conf` or `--conf` flags on `start-connect-server.sh`. `session.conf` is for per-session overrides made from client code.

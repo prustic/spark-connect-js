@@ -1,0 +1,6 @@
+Contact: https://github.com/prustic/spark-connect-js/security/advisories/new
+Contact: https://github.com/prustic/spark-connect-js/issues
+Expires: 2027-04-21T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://prustic.github.io/spark-connect-js/.well-known/security.txt
+Policy: https://github.com/prustic/spark-connect-js/security/policy

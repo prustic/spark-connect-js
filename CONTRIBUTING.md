@@ -1,51 +1,45 @@
 # Contributing to spark-connect-js
 
-For development setup, see the [README](README.md).
+Thanks for considering a contribution. spark-connect-js is a TypeScript client for Apache Spark Connect; PRs that improve fidelity with Spark, fix bugs, fill in API gaps, or sharpen the docs are all welcome.
 
-## Ways to Contribute
+For development setup (clone, install, build, run tests, add a function, add a DataFrame method), see the [Contributing](https://prustic.github.io/spark-connect-js/contributing/) page on the docs site. Below is the policy and process side: what to expect when you open an issue or send a PR.
 
-- **Report bugs**: open an issue with reproduction steps
-- **Suggest features**: open an issue describing the use case
-- **Submit a PR**: bug fixes, new functions, documentation improvements
-- **Improve docs**: typos, unclear explanations, missing examples
+## Ways to contribute
 
-## Opening Issues
+- Report bugs by opening an issue with a reproduction.
+- Suggest features by opening an issue with the use case and (where relevant) how PySpark handles the same thing.
+- Send a PR for bug fixes, missing methods, doc improvements, or runnable examples.
 
-- Search existing issues first to avoid duplicates.
-- For bugs, include: what you expected, what happened, Node.js version, Spark version, and a minimal reproduction.
-- For feature requests, describe the use case and how PySpark handles it (if applicable).
+For anything bigger than a small fix, an issue first to align on the approach saves cycles for both sides.
 
-## Pull Requests
+## Opening issues
 
-1. Fork the repo and create a branch from `main`.
-2. Make your changes with tests.
-3. Run `pnpm blt` to verify build, lint, and tests all pass.
-4. Add a changeset: `pnpm changeset` (describe what changed and select the affected packages).
-5. Open a PR against `main`.
+Search existing issues to avoid duplicates. For bugs, include what you expected, what actually happened, your Node.js version, the Spark server version, and a minimal reproduction (a single SQL string or a 10-line script is ideal). For feature requests, describe the use case and what the PySpark equivalent looks like.
 
-Keep PRs focused. One concern per PR. If a PR touches multiple unrelated things, split it up.
+Security vulnerabilities don't go in public issues. See [SECURITY.md](SECURITY.md) for the disclosure process.
 
-## Commit Messages
+## Pull requests
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
+1. Fork and branch from `main`.
+2. Make your changes with tests. Bug fixes need a regression test; new methods need plan-shape unit tests at minimum, and an integration test against a real Spark Connect server when behavior is non-trivial.
+3. Run the full build, lint, and test pipeline before pushing; that's what CI runs.
+4. Open the PR against `main` with a description that explains what changed and why.
 
-```
-feat: add DataFrame.unpivot() method
+Keep PRs focused. One concern per PR; split unrelated changes.
+
+## Commit messages
+
+[Conventional Commits](https://www.conventionalcommits.org/):
+
+```text
+feat: add DataFrame.unpivot()
 fix: handle null columns in groupBy aggregation
-chore: update @grpc/grpc-js to 1.13
+chore: bump @grpc/grpc-js to 1.13
 docs: add streaming example
 ```
 
-Scope is optional: `feat(core): ...`, `fix(node): ...`
-
-## Code Guidelines
-
-- TypeScript strict mode
-- ESLint + Prettier enforced in CI
-- Zero runtime dependencies in `@spark-connect-js/core`
-- Tests live alongside source as `*.test.ts` files
-- Run `pnpm format:fix` before committing
+Scope is optional but helps readers (`feat(core):`, `fix(node):`).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under [Apache-2.0](LICENSE).
+By contributing, you agree that your contributions are licensed under [Apache-2.0](LICENSE).

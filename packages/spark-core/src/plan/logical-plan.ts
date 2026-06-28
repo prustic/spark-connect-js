@@ -1,42 +1,21 @@
+// Logical plan tree types. Each variant of LogicalPlan maps to a Spark Connect
+// Relation message; each variant of Expression maps to an Expression message.
+// DataFrame methods build the tree locally; @spark-connect-js/node's PlanBuilder
+// serializes it to protobuf when an action runs.
+
+import type { StorageLevel } from "../storage-level.js";
+
 /**
- * LogicalPlan
+ * One node in a logical plan's expression tree.
  *
- * These types represent the **logical plan tree** that mirrors Spark Catalyst's
- * internal plan representation.  Every DataFrame transformation appends a new
- * node to the tree; the full tree is serialised to protobuf for Spark Connect.
+ * Used by {@link FilterPlan.condition}, {@link ProjectPlan.expressions}, and
+ * inside aggregations and window specifications. Expressions stay unresolved
+ * on the client: column references are plain strings, function calls reference
+ * names rather than implementations. The server's analyzer binds them against
+ * the catalog and schema before execution.
  *
- * @see Spark source (LogicalPlan): sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
- * @see Spark source (basic nodes): sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/basicLogicalOperators.scala
- * @see Spark Connect proto (Relation): connector/connect/common/src/main/protobuf/spark/connect/relations.proto
- * @see Spark Connect proto (Expression): connector/connect/common/src/main/protobuf/spark/connect/expressions.proto
- *
- * How this maps to Spark internals
- *
- * Spark's Catalyst engine processes plans in phases:
- *
- *   1. Unresolved Logical Plan  ← THIS IS WHAT WE BUILD
- *      Column references are just strings ("age", "dept.name").
- *
- *   2. Resolved Logical Plan (analysis)
- *      The Analyzer resolves column references against the catalog/schema.
- *
- *   3. Optimised Logical Plan (optimization)
- *      Catalyst rules fire: constant folding, predicate pushdown, etc.
- *
- *   4. Physical Plan (planning)
- *      The planner picks execution strategies: SortMergeJoin vs BroadcastHash, etc.
- *
- *   5. Executed Plan (execution)
- *      Code generation (WholeStageCodegen) compiles the plan into JVM bytecode.
- *
- * We only control phase 1.  Everything from phase 2 onward is handled by the
- * JVM-side Spark Connect server.  But getting phase 1 RIGHT is essential;
- * a malformed unresolved plan causes cryptic AnalysisExceptions.
+ * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  */
-
-// Expression types
-// These model nodes in the expression tree inside filter, select, and agg.
-
 export type Expression =
   | { type: "unresolvedAttribute"; name: string }
   | { type: "literal"; value: string | number | boolean | bigint | null }
@@ -91,13 +70,25 @@ export interface WindowFrame {
 }
 
 export type FrameBoundary =
-  | { type: "currentRow" }
-  | { type: "unbounded" }
-  | { type: "value"; value: Expression };
+  { type: "currentRow" } | { type: "unbounded" } | { type: "value"; value: Expression };
 
-// Plan node types
-// Each type maps to a Spark Connect `Relation` protobuf variant.
-
+/**
+ * The logical plan tree, mirroring Spark Catalyst's internal representation.
+ * Every DataFrame transformation appends a new node to the tree; the full tree
+ * serializes to protobuf for Spark Connect when an action runs.
+ *
+ * The plan that spark-connect-js builds is the *unresolved* form: column
+ * references are strings, nothing is bound to a catalog yet. The Spark Connect
+ * server runs the remaining Catalyst phases (analysis, optimization, physical
+ * planning, codegen) before executing.
+ *
+ * A malformed unresolved plan produces cryptic `AnalysisException`s on the
+ * server, so the shape here matters. Each variant maps one-to-one to a Spark
+ * Connect `Relation` protobuf message.
+ *
+ * @see [Spark source: LogicalPlan.scala](https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala)
+ * @see [Spark Connect proto: relations.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/relations.proto)
+ */
 export type LogicalPlan =
   | ReadPlan
   | ReadTablePlan
@@ -138,7 +129,8 @@ export type LogicalPlan =
 
 /**
  * Read from a data source.
- * → Spark Connect: Relation.Read { ReadType.DataSource }
+ *
+ * - Spark Connect: Relation.Read { ReadType.DataSource }
  */
 export interface ReadPlan {
   type: "read";
@@ -146,21 +138,25 @@ export interface ReadPlan {
   path: string;
   options: Record<string, string>;
   schema?: string;
+  isStreaming?: boolean;
 }
 
 /**
  * Read from a named table.
- * → Spark Connect: Relation.Read { ReadType.NamedTable }
+ *
+ * - Spark Connect: Relation.Read { ReadType.NamedTable }
  */
 export interface ReadTablePlan {
   type: "readTable";
   tableName: string;
   options: Record<string, string>;
+  isStreaming?: boolean;
 }
 
 /**
  * Create a DataFrame from local data (Arrow IPC bytes).
- * → Spark Connect: Relation.LocalRelation { data, schema }
+ *
+ * - Spark Connect: Relation.LocalRelation { data, schema }
  */
 export interface LocalRelationPlan {
   type: "localRelation";
@@ -170,7 +166,8 @@ export interface LocalRelationPlan {
 
 /**
  * Execute raw SQL.
- * → Spark Connect: Relation.Sql { query }
+ *
+ * - Spark Connect: Relation.Sql { query }
  */
 export interface SqlPlan {
   type: "sql";
@@ -179,8 +176,9 @@ export interface SqlPlan {
 
 /**
  * Filter rows by a predicate.
- * → Spark Connect: Relation.Filter { child, condition }
- * → Catalyst: Filter(condition: Expression, child: LogicalPlan)
+ *
+ * - Spark Connect: Relation.Filter { child, condition }
+ * - Catalyst: Filter(condition: Expression, child: LogicalPlan)
  */
 export interface FilterPlan {
   type: "filter";
@@ -190,8 +188,9 @@ export interface FilterPlan {
 
 /**
  * Select / project columns.
- * → Spark Connect: Relation.Project { child, expressions }
- * → Catalyst: Project(projectList: Seq[Expression], child: LogicalPlan)
+ *
+ * - Spark Connect: Relation.Project { child, expressions }
+ * - Catalyst: Project(projectList: Seq[Expression], child: LogicalPlan)
  */
 export interface ProjectPlan {
   type: "project";
@@ -201,8 +200,9 @@ export interface ProjectPlan {
 
 /**
  * Group-by + aggregation.
- * → Spark Connect: Relation.Aggregate { child, grouping_expressions, aggregate_expressions }
- * → Catalyst: Aggregate(groupingExprs, aggregateExprs, child)
+ *
+ * - Spark Connect: Relation.Aggregate { child, grouping_expressions, aggregate_expressions }
+ * - Catalyst: Aggregate(groupingExprs, aggregateExprs, child)
  */
 export interface AggregatePlan {
   type: "aggregate";
@@ -218,8 +218,9 @@ export interface AggregatePlan {
 
 /**
  * Limit the number of returned rows.
- * → Spark Connect: Relation.Limit { child, limit }
- * → Catalyst: GlobalLimit(limitExpr, LocalLimit(limitExpr, child))
+ *
+ * - Spark Connect: Relation.Limit { child, limit }
+ * - Catalyst: GlobalLimit(limitExpr, LocalLimit(limitExpr, child))
  */
 export interface LimitPlan {
   type: "limit";
@@ -229,8 +230,9 @@ export interface LimitPlan {
 
 /**
  * Sort rows by one or more expressions.
- * → Spark Connect: Relation.Sort { child, order }
- * → Catalyst: Sort(order: Seq[SortOrder], global: Boolean, child)
+ *
+ * - Spark Connect: Relation.Sort { child, order }
+ * - Catalyst: Sort(order: Seq[SortOrder], global: Boolean, child)
  */
 export interface SortPlan {
   type: "sort";
@@ -239,16 +241,24 @@ export interface SortPlan {
   isGlobal: boolean;
 }
 
+/**
+ * One column in a sort or window specification: an expression plus a direction
+ * and a null-ordering policy.
+ */
 export interface SortOrder {
+  /** The expression being sorted on. */
   expression: Expression;
+  /** Sort direction. */
   direction: "ascending" | "descending";
+  /** Where nulls go relative to non-null values. */
   nullOrdering: "nulls_first" | "nulls_last";
 }
 
 /**
  * Join two DataFrames.
- * → Spark Connect: Relation.Join { left, right, join_condition, join_type }
- * → Catalyst: Join(left, right, joinType, condition, hint)
+ *
+ * - Spark Connect: Relation.Join { left, right, join_condition, join_type }
+ * - Catalyst: Join(left, right, joinType, condition, hint)
  */
 export interface JoinPlan {
   type: "join";
@@ -256,19 +266,14 @@ export interface JoinPlan {
   right: LogicalPlan;
   condition?: Expression;
   joinType:
-    | "inner"
-    | "full_outer"
-    | "left_outer"
-    | "right_outer"
-    | "left_semi"
-    | "left_anti"
-    | "cross";
+    "inner" | "full_outer" | "left_outer" | "right_outer" | "left_semi" | "left_anti" | "cross";
 }
 
 /**
  * Drop columns by name.
- * → Spark Connect: Relation.Drop { child, columns }
- * → Catalyst: Project with filtered columns
+ *
+ * - Spark Connect: Relation.Drop { child, columns }
+ * - Catalyst: Project with filtered columns
  */
 export interface DropPlan {
   type: "drop";
@@ -278,8 +283,9 @@ export interface DropPlan {
 
 /**
  * Add or replace columns.
- * → Spark Connect: Relation.WithColumns { child, aliases }
- * → Catalyst: Project with new named expressions
+ *
+ * - Spark Connect: Relation.WithColumns { child, aliases }
+ * - Catalyst: Project with new named expressions
  */
 export interface WithColumnsPlan {
   type: "withColumns";
@@ -289,7 +295,8 @@ export interface WithColumnsPlan {
 
 /**
  * Remove duplicate rows.
- * → Spark Connect: Relation.Deduplicate { child, column_names, all_columns_as_keys }
+ *
+ * - Spark Connect: Relation.Deduplicate { child, column_names, all_columns_as_keys }
  */
 export interface DeduplicatePlan {
   type: "deduplicate";
@@ -300,7 +307,8 @@ export interface DeduplicatePlan {
 
 /**
  * Skip the first N rows.
- * → Spark Connect: Relation.Offset { child, offset }
+ *
+ * - Spark Connect: Relation.Offset { child, offset }
  */
 export interface OffsetPlan {
   type: "offset";
@@ -309,20 +317,53 @@ export interface OffsetPlan {
 }
 
 /**
- * Catalog API operations.
- * → Spark Connect: Relation.Catalog { cat_type oneof }
+ * One operation against the Spark catalog (databases, tables, functions,
+ * temp views, caching, metadata refresh).
  *
- * Catalog operations are sent as a Relation with a `catalog` variant,
- * and the server returns the result as a DataFrame (Arrow batches).
+ * Catalog operations travel inside a {@link CatalogPlan} as a Spark Connect
+ * `Relation.Catalog`; the server returns the result as a DataFrame, decoded
+ * from Arrow batches like any other query.
+ *
+ * - Spark Connect: Relation.Catalog { cat_type oneof }
  */
 export type CatalogOperation =
   | { op: "listDatabases"; pattern?: string }
   | { op: "listTables"; dbName?: string; pattern?: string }
   | { op: "listColumns"; tableName: string; dbName?: string }
+  | { op: "listFunctions"; dbName?: string; pattern?: string }
+  | { op: "listCatalogs"; pattern?: string }
+  | { op: "getDatabase"; dbName: string }
+  | { op: "getTable"; tableName: string; dbName?: string }
+  | { op: "getFunction"; functionName: string; dbName?: string }
   | { op: "tableExists"; tableName: string; dbName?: string }
   | { op: "databaseExists"; dbName: string }
+  | { op: "functionExists"; functionName: string; dbName?: string }
+  | { op: "isCached"; tableName: string }
+  | { op: "dropTempView"; viewName: string }
+  | { op: "dropGlobalTempView"; viewName: string }
   | { op: "currentDatabase" }
-  | { op: "setCurrentDatabase"; dbName: string };
+  | { op: "setCurrentDatabase"; dbName: string }
+  | { op: "currentCatalog" }
+  | { op: "setCurrentCatalog"; catalogName: string }
+  | {
+      op: "cacheTable";
+      tableName: string;
+      storageLevel?: StorageLevel;
+    }
+  | { op: "uncacheTable"; tableName: string }
+  | { op: "clearCache" }
+  | { op: "refreshTable"; tableName: string }
+  | { op: "refreshByPath"; path: string }
+  | { op: "recoverPartitions"; tableName: string }
+  | {
+      op: "createTable";
+      tableName: string;
+      path?: string;
+      source?: string;
+      description?: string;
+      schema?: string;
+      options?: Record<string, string>;
+    };
 
 export interface CatalogPlan {
   type: "catalog";
@@ -331,7 +372,8 @@ export interface CatalogPlan {
 
 /**
  * Set operations: union, intersect, except.
- * → Spark Connect: Relation.SetOperation
+ *
+ * - Spark Connect: Relation.SetOperation
  */
 export interface SetOperationPlan {
   type: "setOperation";
@@ -345,7 +387,8 @@ export interface SetOperationPlan {
 
 /**
  * Random sample of rows.
- * → Spark Connect: Relation.Sample
+ *
+ * - Spark Connect: Relation.Sample
  */
 export interface SamplePlan {
   type: "sample";
@@ -358,7 +401,8 @@ export interface SamplePlan {
 
 /**
  * Fill null values.
- * → Spark Connect: Relation.FillNa (NAFill)
+ *
+ * - Spark Connect: Relation.FillNa (NAFill)
  */
 export interface NAFillPlan {
   type: "fillNa";
@@ -369,7 +413,8 @@ export interface NAFillPlan {
 
 /**
  * Drop rows with null values.
- * → Spark Connect: Relation.DropNa (NADrop)
+ *
+ * - Spark Connect: Relation.DropNa (NADrop)
  */
 export interface NADropPlan {
   type: "dropNa";
@@ -380,7 +425,8 @@ export interface NADropPlan {
 
 /**
  * Rename columns (return new DataFrame with renamed columns).
- * → Spark Connect: Relation.ToDF
+ *
+ * - Spark Connect: Relation.ToDF
  */
 export interface ToDFPlan {
   type: "toDF";
@@ -390,7 +436,8 @@ export interface ToDFPlan {
 
 /**
  * Compute summary statistics.
- * → Spark Connect: Relation.Describe (StatDescribe)
+ *
+ * - Spark Connect: Relation.Describe (StatDescribe)
  */
 export interface DescribePlan {
   type: "describe";
@@ -400,7 +447,8 @@ export interface DescribePlan {
 
 /**
  * Generate a sequence of integers.
- * → Spark Connect: Relation.Range
+ *
+ * - Spark Connect: Relation.Range
  */
 export interface RangePlan {
   type: "range";
@@ -412,7 +460,8 @@ export interface RangePlan {
 
 /**
  * Rename columns by name mapping.
- * → Spark Connect: Relation.WithColumnsRenamed
+ *
+ * - Spark Connect: Relation.WithColumnsRenamed
  */
 export interface WithColumnsRenamedPlan {
   type: "withColumnsRenamed";
@@ -422,7 +471,8 @@ export interface WithColumnsRenamedPlan {
 
 /**
  * Assign a name (alias) to a DataFrame / subquery.
- * → Spark Connect: Relation.SubqueryAlias
+ *
+ * - Spark Connect: Relation.SubqueryAlias
  */
 export interface SubqueryAliasPlan {
   type: "subqueryAlias";
@@ -432,7 +482,8 @@ export interface SubqueryAliasPlan {
 
 /**
  * Attach a hint to a relation.
- * → Spark Connect: Relation.Hint
+ *
+ * - Spark Connect: Relation.Hint
  */
 export interface HintPlan {
   type: "hint";
@@ -443,7 +494,8 @@ export interface HintPlan {
 
 /**
  * Fetch the last N rows.
- * → Spark Connect: Relation.Tail
+ *
+ * - Spark Connect: Relation.Tail
  */
 export interface TailPlan {
   type: "tail";
@@ -453,7 +505,8 @@ export interface TailPlan {
 
 /**
  * Repartition a DataFrame.
- * → Spark Connect: Relation.Repartition
+ *
+ * - Spark Connect: Relation.Repartition
  *
  * When shuffle=true, this is repartition(). When shuffle=false, this is coalesce().
  */
@@ -466,7 +519,8 @@ export interface RepartitionPlan {
 
 /**
  * Repartition by expression (range-based partitioning).
- * → Spark Connect: Relation.RepartitionByExpression
+ *
+ * - Spark Connect: Relation.RepartitionByExpression
  */
 export interface RepartitionByExpressionPlan {
   type: "repartitionByExpression";
@@ -477,8 +531,9 @@ export interface RepartitionByExpressionPlan {
 
 /**
  * Unpivot a DataFrame from wide format to long format.
- * → Spark Connect: Relation.Unpivot
- * → Catalyst: Unpivot(ids, values, variableColumnName, valueColumnName)
+ *
+ * - Spark Connect: Relation.Unpivot
+ * - Catalyst: Unpivot(ids, values, variableColumnName, valueColumnName)
  */
 export interface UnpivotPlan {
   type: "unpivot";
@@ -491,7 +546,8 @@ export interface UnpivotPlan {
 
 /**
  * Compute summary statistics.
- * → Spark Connect: Relation.Summary (StatSummary)
+ *
+ * - Spark Connect: Relation.Summary (StatSummary)
  */
 export interface SummaryPlan {
   type: "summary";
@@ -501,7 +557,8 @@ export interface SummaryPlan {
 
 /**
  * Replace values matching old with new.
- * → Spark Connect: Relation.Replace (NAReplace)
+ *
+ * - Spark Connect: Relation.Replace (NAReplace)
  */
 export interface NAReplacePlan {
   type: "naReplace";
@@ -515,7 +572,8 @@ export interface NAReplacePlan {
 
 /**
  * Compute Pearson correlation between two columns.
- * → Spark Connect: Relation.Corr (StatCorr)
+ *
+ * - Spark Connect: Relation.Corr (StatCorr)
  */
 export interface StatCorrPlan {
   type: "statCorr";
@@ -527,7 +585,8 @@ export interface StatCorrPlan {
 
 /**
  * Compute sample covariance between two columns.
- * → Spark Connect: Relation.Cov (StatCov)
+ *
+ * - Spark Connect: Relation.Cov (StatCov)
  */
 export interface StatCovPlan {
   type: "statCov";
@@ -538,7 +597,8 @@ export interface StatCovPlan {
 
 /**
  * Compute a pair-wise frequency table (contingency table).
- * → Spark Connect: Relation.Crosstab (StatCrosstab)
+ *
+ * - Spark Connect: Relation.Crosstab (StatCrosstab)
  */
 export interface StatCrosstabPlan {
   type: "statCrosstab";
@@ -549,7 +609,8 @@ export interface StatCrosstabPlan {
 
 /**
  * Find frequent items in columns.
- * → Spark Connect: Relation.FreqItems (StatFreqItems)
+ *
+ * - Spark Connect: Relation.FreqItems (StatFreqItems)
  */
 export interface StatFreqItemsPlan {
   type: "statFreqItems";
@@ -560,7 +621,8 @@ export interface StatFreqItemsPlan {
 
 /**
  * Compute approximate quantiles of numerical columns.
- * → Spark Connect: Relation.ApproxQuantile (StatApproxQuantile)
+ *
+ * - Spark Connect: Relation.ApproxQuantile (StatApproxQuantile)
  */
 export interface StatApproxQuantilePlan {
   type: "statApproxQuantile";

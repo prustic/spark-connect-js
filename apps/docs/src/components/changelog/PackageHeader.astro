@@ -1,0 +1,25 @@
+---
+interface Props {
+  name: string;
+  version: string;
+  npmUrl: string;
+  githubUrl: string;
+}
+
+const { name, version, npmUrl, githubUrl } = Astro.props;
+
+const npmBadge = `https://img.shields.io/badge/npm-${version}-cb3837?logo=npm&logoColor=white`;
+const githubBadge = `https://img.shields.io/badge/github-${version}-181717?logo=github&logoColor=white`;
+---
+
+<div class="release-package-header">
+  <h4 class="release-package-title">{name}</h4>
+  <p class="release-badges">
+    <a class="release-badge" href={npmUrl}>
+      <img src={npmBadge} alt={`npm ${version}`} />
+    </a>
+    <a class="release-badge" href={githubUrl}>
+      <img src={githubBadge} alt={`github ${version}`} />
+    </a>
+  </p>
+</div>

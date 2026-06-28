@@ -1,0 +1,27 @@
+---
+interface Props {
+  version: string;
+  date: string;
+  summary: string;
+  latest?: boolean;
+}
+
+const { version, date, summary, latest = false } = Astro.props;
+const iso = date;
+const display = new Date(date).toLocaleDateString("en-GB", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<header class="release-header" id={`v${version}`}>
+  <div class="release-header__meta">
+    <span class="release-header__version">v{version}</span>
+    {latest && <span class="release-header__chip release-header__chip--latest">Latest</span>}
+    <time class="release-header__date" datetime={iso}>{display}</time>
+    <a class="release-header__permalink" href={`#v${version}`} aria-label={`Permalink to v${version}`}>#</a>
+  </div>
+  <p class="release-header__summary">{summary}</p>
+  <slot />
+</header>

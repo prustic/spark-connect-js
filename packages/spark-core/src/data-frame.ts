@@ -1,16 +1,3 @@
-/**
- * Lazy DataFrame - each transformation returns a new instance wrapping
- * a logical plan tree. No work happens until an action (collect, count, etc.)
- * triggers execution via Spark Connect.
- *
- * @see sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala
- * @see sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala
- *
- * Laziness is a correctness requirement, not a convenience. Catalyst needs
- * the full plan to push predicates, prune columns, reorder joins, and fold
- * constant expressions.
- */
-
 import type { SparkSession } from "./spark-session.js";
 import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
@@ -18,6 +5,7 @@ import { Column, col } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
+import { DataStreamWriter } from "./streaming/data-stream-writer.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
@@ -37,6 +25,30 @@ function inferLiteralValue(s: string): string | number | boolean | null {
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
 
+/**
+ * A distributed collection of rows with a named schema, obtained from a
+ * {@link SparkSession} (for example via `spark.read.parquet(path)` or
+ * `spark.sql(...)`).
+ *
+ * `DataFrame` is **lazy**. Transformation methods (`select`, `filter`, `join`,
+ * `withColumn`, etc.) return a new `DataFrame` that wraps an extended logical
+ * plan; no work is performed on the server until an **action** (`collect`,
+ * `count`, `show`, `write.save`, etc.) is called.
+ *
+ * @example Read, transform, collect
+ * ```ts
+ * const df = await spark.read.parquet("s3://bucket/events");
+ *
+ * const recent = df
+ *   .filter(col("ts").gte(lit("2026-01-01")))
+ *   .groupBy("country")
+ *   .count();
+ *
+ * const rows = await recent.collect();
+ * ```
+ *
+ * @see [Spark source: Dataset.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala)
+ */
 export class DataFrame {
   /** @internal */
   readonly _session: SparkSession;
@@ -408,12 +420,10 @@ export class DataFrame {
    * @example df.selectExpr("age * 2 as doubled_age", "name")
    */
   selectExpr(...exprs: string[]): DataFrame {
-    const sqlExprs = exprs.map(
-      (e): Expression => ({
-        type: "expressionString",
-        expression: e,
-      }),
-    );
+    const sqlExprs = exprs.map((e): Expression => ({
+      type: "expressionString",
+      expression: e,
+    }));
     return DataFrame._fromPlan(this._session, {
       type: "project",
       child: this._plan,
@@ -634,6 +644,18 @@ export class DataFrame {
    */
   writeTo(tableName: string): DataFrameWriterV2 {
     return new DataFrameWriterV2(this, tableName);
+  }
+
+  /**
+   * Returns a {@link DataStreamWriter} for launching a streaming query
+   * against the data in this (streaming) DataFrame.
+   *
+   * Only valid on streaming DataFrames (those whose source plan is built
+   * via `spark.readStream`). The server will reject the write if the input
+   * plan isn't streaming.
+   */
+  get writeStream(): DataStreamWriter {
+    return new DataStreamWriter(this);
   }
 
   // Caching & Persistence
@@ -974,10 +996,12 @@ export class DataFrame {
 
     const fmt = (val: unknown): string => {
       if (val === null || val === undefined) return "null";
-      const s =
-        typeof val === "object"
-          ? JSON.stringify(val)
-          : String(val as string | number | boolean | bigint);
+      if (typeof val === "object") {
+        const s = JSON.stringify(val);
+        return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      const s = String(val);
       return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
     };
 

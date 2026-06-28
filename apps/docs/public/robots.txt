@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://prustic.github.io/spark-connect-js/sitemap-index.xml

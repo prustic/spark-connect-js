@@ -67,6 +67,19 @@ describe("aggregate functions", () => {
     assertFn(max("x"), "max", 1);
   });
 
+  it("count('*') sends count(1), not count(UnresolvedAttribute('*'))", () => {
+    const c = count("*");
+    assert.equal(c._expr.type, "unresolvedFunction");
+    if (c._expr.type !== "unresolvedFunction") return;
+    assert.equal(c._expr.name, "count");
+    assert.equal(c._expr.arguments.length, 1);
+    const arg = c._expr.arguments[0];
+    assert.equal(arg.type, "literal");
+    if (arg.type === "literal") {
+      assert.equal(arg.value, 1);
+    }
+  });
+
   it("countDistinct/sum_distinct set isDistinct", () => {
     const cd = countDistinct("x");
     if (cd._expr.type === "unresolvedFunction") {

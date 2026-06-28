@@ -8,8 +8,8 @@
  * This module bridges the gap by creating typed protobuf messages that
  * can be serialized to binary for the gRPC wire format.
  *
- * @see Spark Connect proto (Relation): sql/connect/common/src/main/protobuf/spark/connect/relations.proto
- * @see Spark Connect proto (Expression): sql/connect/common/src/main/protobuf/spark/connect/expressions.proto
+ * @see [Spark Connect proto: relations.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/relations.proto)
+ * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  */
 
 import { create } from "@bufbuild/protobuf";
@@ -58,8 +58,29 @@ import {
   ListDatabasesSchema,
   ListTablesSchema,
   ListColumnsSchema,
+  ListFunctionsSchema,
+  ListCatalogsSchema,
+  GetDatabaseSchema,
+  GetTableSchema,
+  GetFunctionSchema,
   TableExistsSchema,
   DatabaseExistsSchema,
+  FunctionExistsSchema,
+  IsCachedSchema,
+  DropTempViewSchema,
+  DropGlobalTempViewSchema,
+  CurrentCatalogSchema,
+  SetCurrentCatalogSchema,
+  CacheTableSchema,
+  UncacheTableSchema,
+  ClearCacheSchema,
+  RefreshTableSchema,
+  RefreshByPathSchema,
+  RecoverPartitionsSchema,
+  StorageLevelSchema,
+  CreateTableSchema,
+  DataTypeSchema,
+  DataType_UnparsedSchema,
   SetOperationSchema,
   SetOperation_SetOpType,
   SampleSchema,
@@ -123,11 +144,12 @@ export function buildRelation(plan: LogicalPlan): Relation {
               case: "dataSource",
               value: create(Read_DataSourceSchema, {
                 format: plan.format,
-                paths: [plan.path],
+                paths: plan.isStreaming === true && plan.path === "" ? [] : [plan.path],
                 options: plan.options,
                 ...(plan.schema != null && { schema: plan.schema }),
               }),
             },
+            ...(plan.isStreaming === true && { isStreaming: true }),
           }),
         },
       });
@@ -144,6 +166,7 @@ export function buildRelation(plan: LogicalPlan): Relation {
                 options: plan.options,
               }),
             },
+            ...(plan.isStreaming === true && { isStreaming: true }),
           }),
         },
       });
@@ -340,6 +363,39 @@ export function buildRelation(plan: LogicalPlan): Relation {
             value: create(ListColumnsSchema, { tableName: op.tableName, dbName: op.dbName }),
           };
           break;
+        case "listFunctions":
+          catValue = {
+            case: "listFunctions",
+            value: create(ListFunctionsSchema, { dbName: op.dbName, pattern: op.pattern }),
+          };
+          break;
+        case "listCatalogs":
+          catValue = {
+            case: "listCatalogs",
+            value: create(ListCatalogsSchema, { pattern: op.pattern }),
+          };
+          break;
+        case "getDatabase":
+          catValue = {
+            case: "getDatabase",
+            value: create(GetDatabaseSchema, { dbName: op.dbName }),
+          };
+          break;
+        case "getTable":
+          catValue = {
+            case: "getTable",
+            value: create(GetTableSchema, { tableName: op.tableName, dbName: op.dbName }),
+          };
+          break;
+        case "getFunction":
+          catValue = {
+            case: "getFunction",
+            value: create(GetFunctionSchema, {
+              functionName: op.functionName,
+              dbName: op.dbName,
+            }),
+          };
+          break;
         case "tableExists":
           catValue = {
             case: "tableExists",
@@ -352,6 +408,128 @@ export function buildRelation(plan: LogicalPlan): Relation {
             value: create(DatabaseExistsSchema, { dbName: op.dbName }),
           };
           break;
+        case "functionExists":
+          catValue = {
+            case: "functionExists",
+            value: create(FunctionExistsSchema, {
+              functionName: op.functionName,
+              dbName: op.dbName,
+            }),
+          };
+          break;
+        case "isCached":
+          catValue = {
+            case: "isCached",
+            value: create(IsCachedSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "dropTempView":
+          catValue = {
+            case: "dropTempView",
+            value: create(DropTempViewSchema, { viewName: op.viewName }),
+          };
+          break;
+        case "dropGlobalTempView":
+          catValue = {
+            case: "dropGlobalTempView",
+            value: create(DropGlobalTempViewSchema, { viewName: op.viewName }),
+          };
+          break;
+        case "currentCatalog":
+          catValue = {
+            case: "currentCatalog",
+            value: create(CurrentCatalogSchema, {}),
+          };
+          break;
+        case "setCurrentCatalog":
+          catValue = {
+            case: "setCurrentCatalog",
+            value: create(SetCurrentCatalogSchema, {
+              catalogName: op.catalogName,
+            }),
+          };
+          break;
+        case "cacheTable":
+          catValue = {
+            case: "cacheTable",
+            value: create(CacheTableSchema, {
+              tableName: op.tableName,
+              ...(op.storageLevel
+                ? {
+                    storageLevel: create(StorageLevelSchema, {
+                      useDisk: op.storageLevel.useDisk,
+                      useMemory: op.storageLevel.useMemory,
+                      useOffHeap: op.storageLevel.useOffHeap,
+                      deserialized: op.storageLevel.deserialized,
+                      replication: op.storageLevel.replication,
+                    }),
+                  }
+                : {}),
+            }),
+          };
+          break;
+        case "uncacheTable":
+          catValue = {
+            case: "uncacheTable",
+            value: create(UncacheTableSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "clearCache":
+          catValue = {
+            case: "clearCache",
+            value: create(ClearCacheSchema, {}),
+          };
+          break;
+        case "refreshTable":
+          catValue = {
+            case: "refreshTable",
+            value: create(RefreshTableSchema, { tableName: op.tableName }),
+          };
+          break;
+        case "refreshByPath":
+          catValue = {
+            case: "refreshByPath",
+            value: create(RefreshByPathSchema, { path: op.path }),
+          };
+          break;
+        case "recoverPartitions":
+          catValue = {
+            case: "recoverPartitions",
+            value: create(RecoverPartitionsSchema, {
+              tableName: op.tableName,
+            }),
+          };
+          break;
+        case "createTable":
+          catValue = {
+            case: "createTable",
+            value: create(CreateTableSchema, {
+              tableName: op.tableName,
+              ...(op.path !== undefined ? { path: op.path } : {}),
+              ...(op.source !== undefined ? { source: op.source } : {}),
+              ...(op.description !== undefined ? { description: op.description } : {}),
+              ...(op.schema !== undefined
+                ? {
+                    schema: create(DataTypeSchema, {
+                      kind: {
+                        case: "unparsed",
+                        value: create(DataType_UnparsedSchema, {
+                          dataTypeString: op.schema,
+                        }),
+                      },
+                    }),
+                  }
+                : {}),
+              ...(op.options !== undefined ? { options: op.options } : {}),
+            }),
+          };
+          break;
+        default: {
+          const _exhaustive: never = op;
+          throw new UnsupportedOperationError(
+            `Unsupported catalog operation: ${(_exhaustive as { op: string }).op}`,
+          );
+        }
       }
       const catalog = create(CatalogSchema, { catType: catValue });
       return create(RelationSchema, {

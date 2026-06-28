@@ -1,25 +1,32 @@
-/**
- * DataFrameWriterV2
- *
- * Provides methods for writing a DataFrame using the DataSource V2 API.
- * Accessed via `df.writeTo(tableName)`. Unlike the V1 writer which is
- * path-oriented, V2 is catalog-aware and supports atomic table operations
- * (create, replace, createOrReplace) and partition-granularity writes
- * (append, overwrite, overwritePartitions).
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/DataFrameWriterV2.scala
- * @see Spark Connect: WriteOperationV2 in commands.proto
- *
- * Usage:
- *   await df.writeTo("catalog.db.table").using("iceberg").create();
- *   await df.writeTo("my_table").append();
- *   await df.writeTo("my_table").overwrite(col("date").eq(lit("2024-01-01")));
- */
-
 import type { DataFrame } from "./data-frame.js";
 import type { Column } from "./column.js";
 import type { Expression } from "./plan/logical-plan.js";
 
+/**
+ * Writes a {@link DataFrame} to a catalog table using the DataSource V2 API.
+ *
+ * Obtained via `df.writeTo(tableName)`. Unlike the path-oriented
+ * {@link DataFrameWriter}, V2 is catalog-aware and supports atomic table
+ * operations (`create`, `replace`, `createOrReplace`) and partition-level
+ * writes (`append`, `overwrite`, `overwritePartitions`).
+ *
+ * @example Create a new Iceberg table
+ * ```ts
+ * await df.writeTo("analytics.events").using("iceberg").create();
+ * ```
+ *
+ * @example Append to an existing table
+ * ```ts
+ * await df.writeTo("analytics.events").append();
+ * ```
+ *
+ * @example Overwrite a specific partition
+ * ```ts
+ * await df.writeTo("analytics.events").overwrite(col("day").eq(lit("2026-04-21")));
+ * ```
+ *
+ * @see [Spark source: DataFrameWriterV2.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/DataFrameWriterV2.scala)
+ */
 export class DataFrameWriterV2 {
   private readonly _df: DataFrame;
   private readonly _tableName: string;

@@ -1,55 +1,27 @@
 /**
- * @spark-connect-js/core  -  Pure TypeScript Logical DataFrame API
+ * @packageDocumentation
  *
- * This package is the **platform-agnostic** heart of the Spark JS client.
- * It contains ZERO runtime dependencies, no Node APIs, no browser APIs - only
- * pure TypeScript types and logic that model Spark's query planning layer.
+ * Auto-generated reference for the public exports of `@spark-connect-js/core`
+ * and `@spark-connect-js/node`. Each entry below is sourced from the TSDoc on
+ * the corresponding source symbol; this page is a directory, not a tutorial.
  *
- * What this package does
- *
- *   1. Provides a fluent DataFrame API (read → filter → groupBy → agg → collect)
- *      that mirrors PySpark / Scala Spark semantics.
- *
- *   2. Builds **logical plans** - tree-structured descriptions of the query the
- *      user wants to run.  These plans are serialised as Spark Connect protocol
- *      buffers and sent to the Spark Connect server by a runtime adapter
- *      (e.g. @spark-connect-js/node).
- *
- *   3. Defines the Column expression DSL used inside filter() and agg() so that
- *      predicate push-down and projection pruning can happen server-side on the
- *      JVM, not in JavaScript.
- *
- * Why Spark internals knowledge is required
- *
- *   • Every DataFrame method maps to a node in Spark's Catalyst logical plan
- *     tree (UnresolvedRelation → Filter → Aggregate → Project).  If the plan
- *     is constructed incorrectly the JVM will throw an AnalysisException and
- *     you will need to read Spark source to debug it.
- *
- *   • Spark Connect serialises plans with Protocol Buffers (spark.connect.*).
- *     The proto schema lives in the Spark repo under
- *     `connector/connect/common/src/main/protobuf/`.  Any change there will
- *     ripple into the types defined in this package.
- *
- *   • Column expressions must respect Spark's type system (ByteType through
- *     DecimalType, StructType, ArrayType, MapType).  JS `number` is an
- *     IEEE-754 double. Mapping it naïvely to Spark's IntegerType or LongType
- *     causes silent precision loss in aggregation results.
- *
- * Relationship to other packages
- *
- *   @spark-connect-js/core  ←  imported by every runtime adapter
- *       │
- *       ├── @spark-connect-js/node   (gRPC transport, Arrow decoding, Node Buffers)
- *       ├── @spark-connect-js/deno   (future: Deno-native transport)
- *       └── @spark-connect-js/web    (future: HTTP/2 + browser Arrow)
- *
+ * For task-oriented usage, start with the [Quickstart](/spark-connect-js/quickstart/)
+ * and the [SQL and DataFrame guide](/spark-connect-js/sql-and-dataframe-guide/).
+ * For the layered model behind the types listed here (logical plans, transport,
+ * Arrow decoding), see [Architecture](/spark-connect-js/architecture/).
  */
 
 // Core Types
 
-export { SparkSession } from "./spark-session.js";
+export { SparkSession, SparkSessionBuilder, DataFrameReader } from "./spark-session.js";
 export { DataFrame } from "./data-frame.js";
+export { DataStreamReader, DataStreamWriter, StreamingQuery, Trigger } from "./streaming/index.js";
+export type {
+  StreamingOutputMode,
+  StreamingQueryStatus,
+  StreamingQueryProgress,
+  StreamingQueryException,
+} from "./streaming/index.js";
 export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
@@ -59,6 +31,8 @@ export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";
 export { StructType, StructField } from "./types/struct.js";
 export { Catalog } from "./catalog.js";
+export { UDFRegistration } from "./udf-registration.js";
+export { RuntimeConfig } from "./runtime-config.js";
 export { WindowSpec, Window } from "./window.js";
 export type { StorageLevel } from "./storage-level.js";
 export {
@@ -75,14 +49,9 @@ export {
   DISK_ONLY_2,
   OFF_HEAP,
 } from "./storage-level.js";
-export type {
-  LogicalPlan,
-  Expression,
-  SortOrder,
-  CatalogOperation,
-  WindowFrame,
-  FrameBoundary,
-} from "./plan/logical-plan.js";
+// Re-export every plan and expression type so each variant of LogicalPlan
+// shows up individually in the API reference, not just the union.
+export type * from "./plan/logical-plan.js";
 export { PlanBuilder } from "./plan/plan-builder.js";
 
 // Functions
@@ -354,7 +323,12 @@ export {
 // in implementation modules.
 export type { Row } from "./types/row.js";
 export type { Schema, FieldDescriptor } from "./types/schema.js";
-export type { SparkSessionConfig, Transport, ArrowDecoderFn } from "./spark-session.js";
+export type {
+  SparkSessionConfig,
+  Transport,
+  ArrowDecoderFn,
+  ExecuteOptions,
+} from "./spark-session.js";
 export {
   SparkConnectError,
   SparkClientError,

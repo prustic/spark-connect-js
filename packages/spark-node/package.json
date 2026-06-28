@@ -1,6 +1,6 @@
 {
   "name": "@spark-connect-js/node",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Node.js runtime adapter: gRPC transport, Arrow decoding, Buffer handling, async streaming for Spark Connect",
   "license": "Apache-2.0",
   "repository": {
@@ -44,11 +44,11 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@spark-connect-js/core": "workspace:*",
+    "@bufbuild/protobuf": "^2.12.1",
+    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/proto-loader": "^0.8.1",
     "@spark-connect-js/connect": "workspace:*",
-    "@bufbuild/protobuf": "^2.11.0",
-    "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.0",
+    "@spark-connect-js/core": "workspace:*",
     "apache-arrow": "^21.1.0"
   },
   "devDependencies": {

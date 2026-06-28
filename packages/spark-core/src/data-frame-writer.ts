@@ -1,26 +1,32 @@
-/**
- * DataFrameWriter
- *
- * Provides methods for writing a DataFrame to external storage systems.
- * Mirrors Spark's `DataFrameWriter` (accessed via `df.write`).
- *
- * @see Spark source: sql/core/src/main/scala/org/apache/spark/sql/DataFrameWriter.scala
- * @see Spark Connect: WriteOperation in commands.proto
- *
- * Usage:
- *   await df.write.format("parquet").mode("overwrite").save("/path/to/output");
- *   await df.write.format("parquet").saveAsTable("my_table");
- *
- * The writer sends a WriteOperation Command through the Spark Connect
- * ExecutePlan RPC. Unlike queries (which return Arrow data), write
- * operations are fire-and-forget commands with no return data.
- */
-
 import type { DataFrame } from "./data-frame.js";
 import { InvalidInputError } from "./errors.js";
 
+/**
+ * Save mode for {@link DataFrameWriter.mode}.
+ *
+ * - `append` - add new data to existing output.
+ * - `overwrite` - replace existing output.
+ * - `error` *(default)* - fail if the target already exists.
+ * - `ignore` - silently skip the write if the target already exists.
+ */
 export type SaveMode = "append" | "overwrite" | "error" | "ignore";
 
+/**
+ * Writes the contents of a {@link DataFrame} to an external storage system
+ * or a catalog table.
+ *
+ * Obtained via {@link DataFrame.write}. Mirrors Spark's path-oriented
+ * `DataFrameWriter` (V1). For catalog-aware, atomic table writes, use
+ * {@link DataFrameWriterV2} via `df.writeTo(table)`.
+ *
+ * @example
+ * ```ts
+ * await df.write.format("parquet").mode("overwrite").save("/path/to/output");
+ * await df.write.mode("append").saveAsTable("analytics.events");
+ * ```
+ *
+ * @see [Spark source: DataFrameWriter.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/DataFrameWriter.scala)
+ */
 export class DataFrameWriter {
   private readonly _df: DataFrame;
   private _format: string = "parquet";

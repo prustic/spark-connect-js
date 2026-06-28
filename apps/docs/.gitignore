@@ -1,0 +1,18 @@
+# Astro
+.astro/
+dist/
+
+# Dependencies
+node_modules/
+
+# Turbo
+.turbo/
+
+# TypeDoc-generated API reference
+src/content/docs/api/
+
+# Auto-generated from packages/*/CHANGELOG.md
+src/content/docs/changelog.mdx
+
+# Logs
+*.log
