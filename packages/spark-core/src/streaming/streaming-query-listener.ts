@@ -1,10 +1,7 @@
 import type { SparkSession } from "../spark-session.js";
 import type { StreamingQueryProgress } from "./types.js";
 
-/**
- * Fired when a streaming query has just been launched. Parsed from the
- * server's `queryStartedEventJson` on `WriteStreamOperationStartResult`.
- */
+/** Fired when a streaming query is launched. */
 export interface QueryStartedEvent {
   id: string;
   runId: string;
@@ -52,11 +49,8 @@ export interface StreamingQueryListener {
 export class StreamingQueryListenerBase implements StreamingQueryListener {}
 
 /**
- * Session-scoped listener-bus driver. Owns the long-running
- * `StreamingQueryListenerBusCommand` subscription, the listener set, and the
- * fan-out dispatch. Created lazily on the first
- * {@link StreamingQueryManager.addListener}; torn down on the last
- * {@link StreamingQueryManager.removeListener}.
+ * Owns the session's listener-bus subscription, listener set, and dispatch.
+ * Lazy-created on the first `addListener`, torn down on the last `removeListener`.
  *
  * @internal
  */

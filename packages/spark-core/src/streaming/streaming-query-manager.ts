@@ -4,11 +4,11 @@ import { StreamingQuery } from "./streaming-query.js";
 import type { StreamingQueryListener } from "./streaming-query-listener.js";
 
 /**
- * Decoded `StreamingQueryManagerCommandResult` payload as the transport hands
- * it back to core. Only one of `activeQueries` / `query` / `terminated` /
- * `listenerIds` is set, matching the issued command.
+ * Decoded `StreamingQueryManagerCommandResult` from the transport. Only one
+ * of `activeQueries` / `query` / `terminated` / `listenerIds` is set, keyed
+ * to the issued command.
  *
- * @internal Boundary contract with the transport command-result decoder.
+ * @internal
  */
 interface StreamingQueryManagerCommandResultPayload {
   type: "streamingQueryManagerCommandResult";

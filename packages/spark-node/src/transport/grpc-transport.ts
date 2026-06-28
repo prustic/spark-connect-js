@@ -265,11 +265,7 @@ export class GrpcTransport implements Transport {
     return responses;
   }
 
-  /**
-   * Execute a command and yield decoded non-Arrow result frames incrementally.
-   * Used by the streaming-query listener bus, which consumes a long-running
-   * `ExecutePlan` subscription.
-   */
+  /** Execute a command and yield decoded result frames incrementally via ExecutePlan RPC. */
   async *executeCommandStream(
     sessionId: string,
     command: Record<string, unknown>,

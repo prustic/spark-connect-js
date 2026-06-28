@@ -142,7 +142,6 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
     const sawTerminated = await waitUntil(async () => terminated.length >= 1, 5_000);
     assert.ok(sawTerminated, "expected onQueryTerminated to fire after stop()");
 
-    // Teardown: removing the last listener closes the subscription.
     await spark().streams.removeListener(listener);
     await spark().streams.removeListener(isolatedListener);
     await spark().streams.removeListener(throwingListener);

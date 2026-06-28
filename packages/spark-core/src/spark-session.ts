@@ -65,11 +65,9 @@ export interface Transport {
   ): Promise<Record<string, unknown>[]>;
 
   /**
-   * Execute a command and yield decoded non-Arrow result frames as the server
-   * pushes them. Used by long-running subscriptions (e.g. the listener bus)
-   * where {@link executeCommandResponses}' collect-and-return would block on
-   * the stream forever. Each yielded entry is a `type`-discriminated record,
-   * same shape as {@link executeCommandResponses} entries.
+   * Execute a command and yield decoded result frames as the server pushes
+   * them. For long-running subscriptions (e.g. the listener bus) where
+   * {@link executeCommandResponses}' collect-and-return would never resolve.
    */
   executeCommandStream?(
     sessionId: string,
@@ -163,7 +161,7 @@ export class SparkSession {
   private readonly _tagSet: Set<string> = new Set();
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
-  /** @internal Lazy session-scoped listener bus; shared across `spark.streams` instances. */
+  /** @internal */
   private _streamingListenerBus: StreamingQueryListenerBus | undefined;
 
   /** @internal Called by SparkSessionBuilder to construct the session. */
@@ -214,13 +212,13 @@ export class SparkSession {
     return new StreamingQueryManager(this);
   }
 
-  /** @internal Lazy session-scoped listener bus shared across `spark.streams` accessors. */
+  /** @internal */
   _getOrCreateListenerBus(): StreamingQueryListenerBus {
     this._streamingListenerBus ??= new StreamingQueryListenerBus(this);
     return this._streamingListenerBus;
   }
 
-  /** @internal Read-only access for components that should dispatch only when listeners exist. */
+  /** @internal Returns the bus if one was lazy-created, otherwise undefined. */
   _peekListenerBus(): StreamingQueryListenerBus | undefined {
     return this._streamingListenerBus;
   }
