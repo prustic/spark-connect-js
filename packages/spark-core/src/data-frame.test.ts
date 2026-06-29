@@ -203,6 +203,19 @@ describe("GroupedData", () => {
     }
   });
 
+  it("df.agg() is a shorthand for df.groupBy().agg() with no grouping columns", () => {
+    const { spark } = createSession();
+    const df = spark
+      .sql("SELECT * FROM t")
+      .agg(col("salary").alias("total"), col("score").alias("avg_score"));
+
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupingExpressions.length, 0);
+      assert.equal(df._plan.aggregateExpressions.length, 2);
+    }
+  });
+
   it("count() builds aggregate with count function", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t").groupBy("dept").count();

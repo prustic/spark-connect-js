@@ -97,6 +97,17 @@ export class DataFrame {
     return new GroupedData(this, groupExprs);
   }
 
+  /**
+   * Aggregate over the whole DataFrame. Shorthand for `groupBy().agg(...)`,
+   * matching PySpark and Scala.
+   *
+   * @example
+   *   df.agg(count("*").alias("rows"), avg("salary").alias("mean"))
+   */
+  agg(...exprs: Column[]): DataFrame {
+    return this.groupBy().agg(...exprs);
+  }
+
   /** Multi-dimensional cube aggregation (all grouping-column combinations). */
   cube(...columns: Array<Column | string>): GroupedData {
     const groupExprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
