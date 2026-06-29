@@ -26,7 +26,10 @@ import { InvalidInputError } from "../errors.js";
 export type Row = Record<string, unknown>;
 
 function require(r: Row, col: string): unknown {
-  if (!(col in r)) {
+  if (r === null || r === undefined) {
+    throw new InvalidInputError(`Cannot read column "${col}" from a null/undefined row.`);
+  }
+  if (!Object.prototype.hasOwnProperty.call(r, col)) {
     const available = Object.keys(r).join(", ");
     throw new InvalidInputError(`Column "${col}" not found in row. Available: ${available}`);
   }
@@ -41,12 +44,12 @@ function mismatch(col: string, expected: string, actual: unknown): InvalidInputE
 /**
  * Typed runtime accessors for {@link Row} values. Each getter checks the
  * column exists and the value matches the expected JavaScript type. Returns
- * `null` when the value is `null`; throws {@link InvalidInputError} on a
+ * `null` when the value is `null`. Throws {@link InvalidInputError} on a
  * type mismatch or missing column.
  *
- * Use when the schema isn't known at compile time (the alternative,
- * `df.as<Schema>().collect()`, gives full compile-time typing instead).
- * Matches the Scala `Row.getInt` / `getLong` / `getAs[T]` pattern.
+ * Use when the schema isn't known at compile time. The alternative,
+ * `df.as<Schema>().collect()`, gives full compile-time typing instead.
+ * Matches the Scala `Row.getInt`, `getLong`, and `getAs[T]` pattern.
  *
  * @example
  *   import { row } from "@spark-connect-js/core";

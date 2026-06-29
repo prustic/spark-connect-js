@@ -121,4 +121,16 @@ describe("row runtime accessors", () => {
       assert.match(err.message, /Available: intCol, longCol/);
     }
   });
+
+  it("treats prototype-inherited properties as not found", () => {
+    // `"toString" in r` is true via prototype, but it's not an own property.
+    // Plain `in` would mistakenly accept it and return Object.prototype.toString.
+    assert.throws(() => row.getString(r, "toString"), /Column "toString" not found/);
+    assert.throws(() => row.getString(r, "hasOwnProperty"), /not found/);
+  });
+
+  it("rejects null/undefined rows with a domain error", () => {
+    assert.throws(() => row.getInt(null as unknown as Row, "col"), /null\/undefined row/);
+    assert.throws(() => row.getInt(undefined as unknown as Row, "col"), /null\/undefined row/);
+  });
 });

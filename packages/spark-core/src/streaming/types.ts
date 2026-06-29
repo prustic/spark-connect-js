@@ -34,10 +34,10 @@ export interface StreamingQueryStatus {
 
 /**
  * One progress report from a streaming query. Spark Connect sends progress
- * as a JSON string; this is the parsed shape.
+ * as a JSON string. This is the parsed shape.
  *
- * The named fields below cover the values Spark sets on nearly every report;
- * the index signature lets newer Spark versions or third-party
+ * The named fields below cover the values Spark sets on nearly every report.
+ * The index signature lets newer Spark versions or third-party
  * `StreamingQueryListener` events add fields without breaking compilation.
  */
 export interface StreamingQueryProgress {

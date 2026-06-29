@@ -81,13 +81,12 @@ export class DataFrame<R extends Row = Row> {
 
   /**
    * Narrow this DataFrame's row type for typed `collect()`, `first()`, etc.
-   * Compile-time only; the underlying data is unchanged. Matches Scala's
-   * `Dataset.as[T]` precedent.
+   * The cast is compile-time only. Matches Scala's `Dataset.as[T]` precedent.
    *
    * Shape-preserving transformations (`filter`, `where`, `limit`, `sort`,
    * `orderBy`, etc.) keep the narrowed type. Shape-changing transformations
-   * (`select`, `withColumn`, `drop`, `groupBy().agg()`, etc.) reset to `Row`;
-   * re-narrow with another `.as<NewR>()` if needed.
+   * (`select`, `withColumn`, `drop`, `groupBy().agg()`, etc.) reset to `Row`.
+   * Re-narrow with another `.as<NewR>()` after them if needed.
    *
    * @example
    *   const rows = await df.as<{ count: bigint; mean: number }>().collect();
