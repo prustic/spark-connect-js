@@ -14,13 +14,14 @@ Connects to `sc://localhost:15002` by default; override with `SPARK_REMOTE`. Req
 
 Output looks like:
 
-```
+```text
 started    abc12...  run=def34...
 active queries: [abc12...]
 progress   batch=0 inputRowsPerSecond=0.0
 progress   batch=1 inputRowsPerSecond=5.1
 progress   batch=2 inputRowsPerSecond=5.0
 progress   batch=3 inputRowsPerSecond=5.0
+last batch: 4
 terminated abc12... (clean)
 after stop: 0 active queries
 session stopped

@@ -38,9 +38,15 @@ const query = await session.readStream
 const activeIds = (await session.streams.active()).map((q) => q.id);
 console.log(`active queries: [${activeIds.join(", ")}]`);
 
-// Let the query run for ~5 seconds. Each trigger interval fires
-// onQueryProgress with the batch stats.
-await new Promise((r) => setTimeout(r, 5_000));
+// Block until the query terminates or 5 seconds elapse, whichever first.
+// onQueryProgress fires for each trigger interval in between.
+await query.awaitTermination(5_000);
+
+// query.lastProgress() returns the most recent batch directly, as a
+// pull-style alternative to the listener bus.
+const last = await query.lastProgress();
+const lastBatchId = (last?.["batchId"] as number | undefined) ?? "none";
+console.log(`last batch: ${lastBatchId}`);
 
 await query.stop();
 await session.streams.removeListener(listener);
