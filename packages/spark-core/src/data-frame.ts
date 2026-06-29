@@ -26,6 +26,17 @@ function inferLiteralValue(s: string): string | number | boolean | null {
 declare const console: { log(msg: string): void };
 
 /**
+ * Generate a random non-negative 63-bit `bigint` plan identifier. Matches
+ * PySpark Connect's `random.randint(0, (1 << 63) - 1)` so the value fits in
+ * the proto's signed `int64 plan_id` field without sign games.
+ */
+function newPlanId(): bigint {
+  const high = BigInt(Math.floor(Math.random() * 0x80000000)); // 31 bits
+  const low = BigInt(Math.floor(Math.random() * 0x100000000)); // 32 bits
+  return (high << 32n) | low;
+}
+
+/**
  * A distributed collection of rows with a named schema, obtained from a
  * {@link SparkSession} (for example via `spark.read.parquet(path)` or
  * `spark.sql(...)`).
@@ -57,12 +68,29 @@ export class DataFrame {
 
   /** @internal Factory used by SparkSession.  Users never call `new DataFrame()`. */
   static _fromPlan(session: SparkSession, plan: LogicalPlan): DataFrame {
-    return new DataFrame(session, plan);
+    // Attach a per-DataFrame planId so `df.col(name)` can reference this
+    // specific frame via `RelationCommon.plan_id` on the wire.
+    const tagged = plan.planId === undefined ? { ...plan, planId: newPlanId() } : plan;
+    return new DataFrame(session, tagged);
   }
 
   private constructor(session: SparkSession, plan: LogicalPlan) {
     this._session = session;
     this._plan = plan;
+  }
+
+  /**
+   * Return a {@link Column} bound to this DataFrame. Use to disambiguate
+   * columns in self-joins and same-schema joins where the unqualified column
+   * name would be ambiguous on the server side.
+   *
+   * @example
+   *   const a = df.alias("a");
+   *   const b = df.alias("b");
+   *   a.join(b, a.col("id").eq(b.col("id")));
+   */
+  col(name: string): Column {
+    return new Column({ type: "unresolvedAttribute", name, planId: this._plan.planId });
   }
 
   // Transformations

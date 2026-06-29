@@ -14,6 +14,18 @@ describe("buildRelation()", () => {
     }
   });
 
+  it("stamps RelationCommon.planId when the plan carries one", () => {
+    const plan: LogicalPlan = { type: "sql", query: "SELECT 1", planId: 42n };
+    const rel = buildRelation(plan);
+    assert.equal(rel.common?.planId, 42n);
+  });
+
+  it("omits RelationCommon when the plan has no planId", () => {
+    const plan: LogicalPlan = { type: "sql", query: "SELECT 1" };
+    const rel = buildRelation(plan);
+    assert.equal(rel.common, undefined);
+  });
+
   it("builds a Read/DataSource relation", () => {
     const plan: LogicalPlan = {
       type: "read",
@@ -179,6 +191,17 @@ describe("buildExpression()", () => {
     assert.equal(result.exprType.case, "unresolvedAttribute");
     if (result.exprType.case === "unresolvedAttribute") {
       assert.equal(result.exprType.value.unparsedIdentifier, "col1");
+      assert.equal(result.exprType.value.planId, undefined);
+    }
+  });
+
+  it("forwards planId on unresolved attribute when present (df.col disambiguation)", () => {
+    const expr: CoreExpression = { type: "unresolvedAttribute", name: "id", planId: 99n };
+    const result = buildExpression(expr);
+    if (result.exprType.case === "unresolvedAttribute") {
+      assert.equal(result.exprType.value.planId, 99n);
+    } else {
+      assert.fail("expected unresolvedAttribute");
     }
   });
 

@@ -52,7 +52,10 @@ describe("SparkSession.sql()", () => {
   it("returns a DataFrame with a SQL plan", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM users");
-    assert.deepStrictEqual(df._plan, { type: "sql", query: "SELECT * FROM users" });
+    assert.equal(df._plan.type, "sql");
+    if (df._plan.type === "sql") {
+      assert.equal(df._plan.query, "SELECT * FROM users");
+    }
   });
 });
 
@@ -91,6 +94,47 @@ describe("SparkSession.read", () => {
     if (df._plan.type === "read") {
       assert.equal(df._plan.format, "parquet");
       assert.deepStrictEqual(df._plan.options, {});
+    }
+  });
+});
+
+describe("DataFrame.col() per-frame column access", () => {
+  it("attaches a per-DataFrame planId via _fromPlan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.equal(typeof df._plan.planId, "bigint");
+  });
+
+  it("two DataFrames built from the same source get distinct planIds", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    assert.notEqual(a._plan.planId, b._plan.planId);
+  });
+
+  it("df.col(name) builds an unresolvedAttribute carrying the DataFrame's planId", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const c = df.col("id");
+    assert.equal(c._expr.type, "unresolvedAttribute");
+    if (c._expr.type === "unresolvedAttribute") {
+      assert.equal(c._expr.name, "id");
+      assert.equal(c._expr.planId, df._plan.planId);
+    }
+  });
+
+  it("a.col() and b.col() carry different planIds for self-join disambiguation", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    const ac = a.col("id");
+    const bc = b.col("id");
+    if (ac._expr.type === "unresolvedAttribute" && bc._expr.type === "unresolvedAttribute") {
+      assert.notEqual(ac._expr.planId, bc._expr.planId);
+      assert.equal(ac._expr.planId, a._plan.planId);
+      assert.equal(bc._expr.planId, b._plan.planId);
+    } else {
+      assert.fail("expected unresolvedAttribute expressions");
     }
   });
 });
@@ -186,7 +230,10 @@ describe("DataFrame.collect()", () => {
     const rows = await df.collect();
 
     assert.equal(t.calls.length, 1);
-    assert.deepStrictEqual(t.calls[0], { type: "sql", query: "SELECT 1 as id" });
+    const plan = t.calls[0] as { type: string; query: string; planId?: bigint };
+    assert.equal(plan.type, "sql");
+    assert.equal(plan.query, "SELECT 1 as id");
+    assert.equal(typeof plan.planId, "bigint");
     assert.deepStrictEqual(rows, [{ id: 1 }]);
   });
 });
