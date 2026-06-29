@@ -60,23 +60,41 @@ function newPlanId(): bigint {
  *
  * @see [Spark source: Dataset.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala)
  */
-export class DataFrame {
+export class DataFrame<R extends Row = Row> {
   /** @internal */
   readonly _session: SparkSession;
   /** @internal The logical plan tree this DataFrame represents */
   readonly _plan: LogicalPlan;
 
   /** @internal Factory used by SparkSession.  Users never call `new DataFrame()`. */
-  static _fromPlan(session: SparkSession, plan: LogicalPlan): DataFrame {
+  static _fromPlan<R extends Row = Row>(session: SparkSession, plan: LogicalPlan): DataFrame<R> {
     // Attach a per-DataFrame planId so `df.col(name)` can reference this
     // specific frame via `RelationCommon.plan_id` on the wire.
     const tagged = plan.planId === undefined ? { ...plan, planId: newPlanId() } : plan;
-    return new DataFrame(session, tagged);
+    return new DataFrame<R>(session, tagged);
   }
 
   private constructor(session: SparkSession, plan: LogicalPlan) {
     this._session = session;
     this._plan = plan;
+  }
+
+  /**
+   * Narrow this DataFrame's row type for typed `collect()`, `first()`, etc.
+   * Compile-time only; the underlying data is unchanged. Matches Scala's
+   * `Dataset.as[T]` precedent.
+   *
+   * Shape-preserving transformations (`filter`, `where`, `limit`, `sort`,
+   * `orderBy`, etc.) keep the narrowed type. Shape-changing transformations
+   * (`select`, `withColumn`, `drop`, `groupBy().agg()`, etc.) reset to `Row`;
+   * re-narrow with another `.as<NewR>()` if needed.
+   *
+   * @example
+   *   const rows = await df.as<{ count: bigint; mean: number }>().collect();
+   *   // rows is typed Array<{ count: bigint; mean: number }>
+   */
+  as<NewR extends Row>(): DataFrame<NewR> {
+    return this as unknown as DataFrame<NewR>;
   }
 
   /**
@@ -96,8 +114,8 @@ export class DataFrame {
   // Transformations
 
   /** Filter rows by a boolean Column expression. */
-  filter(condition: Column): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  filter(condition: Column): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "filter",
       child: this._plan,
       condition: condition._expr,
@@ -105,7 +123,7 @@ export class DataFrame {
   }
 
   /** Alias for filter(). */
-  where(condition: Column): DataFrame {
+  where(condition: Column): DataFrame<R> {
     return this.filter(condition);
   }
 
@@ -149,8 +167,8 @@ export class DataFrame {
   }
 
   /** Limit the number of rows. */
-  limit(n: number): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  limit(n: number): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "limit",
       child: this._plan,
       limit: n,
@@ -161,7 +179,7 @@ export class DataFrame {
    * Sort by one or more columns (ascending by default).
    * Use col("x").desc() for descending order.
    */
-  sort(...columns: Array<Column | string>): DataFrame {
+  sort(...columns: Array<Column | string>): DataFrame<R> {
     const order: SortOrder[] = columns.map((c) => {
       const expr = typeof c === "string" ? col(c)._expr : c._expr;
       if (typeof c !== "string" && expr.type === "sortOrder") {
@@ -177,7 +195,7 @@ export class DataFrame {
         nullOrdering: "nulls_last" as const,
       };
     });
-    return DataFrame._fromPlan(this._session, {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "sort",
       child: this._plan,
       order,
@@ -186,7 +204,7 @@ export class DataFrame {
   }
 
   /** Alias for sort(). */
-  orderBy(...columns: Array<Column | string>): DataFrame {
+  orderBy(...columns: Array<Column | string>): DataFrame<R> {
     return this.sort(...columns);
   }
 
@@ -293,8 +311,8 @@ export class DataFrame {
   }
 
   /** Remove duplicate rows, optionally considering only a subset of columns. */
-  dropDuplicates(...columnNames: string[]): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  dropDuplicates(...columnNames: string[]): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "deduplicate",
       child: this._plan,
       columnNames: columnNames.length > 0 ? columnNames : undefined,
@@ -303,13 +321,13 @@ export class DataFrame {
   }
 
   /** Alias for dropDuplicates() with no arguments. */
-  distinct(): DataFrame {
+  distinct(): DataFrame<R> {
     return this.dropDuplicates();
   }
 
   /** Skip the first N rows. */
-  offset(n: number): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  offset(n: number): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "offset",
       child: this._plan,
       offset: n,
@@ -375,8 +393,8 @@ export class DataFrame {
   // Sampling
 
   /** Return a random sample of rows. */
-  sample(fraction: number, withReplacement = false, seed?: number): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  sample(fraction: number, withReplacement = false, seed?: number): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "sample",
       child: this._plan,
       lowerBound: 0.0,
@@ -389,8 +407,8 @@ export class DataFrame {
   // Null handling
 
   /** Replace null values. If cols is empty, applies to all columns. */
-  fillna(value: string | number | boolean, cols: string[] = []): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  fillna(value: string | number | boolean, cols: string[] = []): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "fillNa",
       child: this._plan,
       cols,
@@ -399,8 +417,8 @@ export class DataFrame {
   }
 
   /** Drop rows with null values. */
-  dropna(how: "any" | "all" = "any", cols: string[] = []): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  dropna(how: "any" | "all" = "any", cols: string[] = []): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "dropNa",
       child: this._plan,
       cols,
@@ -424,8 +442,8 @@ export class DataFrame {
   /**
    * Assign an alias to this DataFrame, useful for self-joins.
    */
-  alias(name: string): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  alias(name: string): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "subqueryAlias",
       child: this._plan,
       alias: name,
@@ -440,9 +458,9 @@ export class DataFrame {
    * @example df.hint("broadcast")
    * @example df.join(right.hint("broadcast"), ...)
    */
-  hint(name: string, ...parameters: Array<string | number | boolean>): DataFrame {
+  hint(name: string, ...parameters: Array<string | number | boolean>): DataFrame<R> {
     const paramExprs = parameters.map((p): Expression => ({ type: "literal", value: p }));
-    return DataFrame._fromPlan(this._session, {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "hint",
       child: this._plan,
       name,
@@ -486,7 +504,7 @@ export class DataFrame {
   // Sort within partitions
 
   /** Sort within each partition (non-global sort). */
-  sortWithinPartitions(...columns: Array<Column | string>): DataFrame {
+  sortWithinPartitions(...columns: Array<Column | string>): DataFrame<R> {
     const order: SortOrder[] = columns.map((c) => {
       const expr = typeof c === "string" ? col(c)._expr : c._expr;
       if (typeof c !== "string" && expr.type === "sortOrder") {
@@ -502,7 +520,7 @@ export class DataFrame {
         nullOrdering: "nulls_last" as const,
       };
     });
-    return DataFrame._fromPlan(this._session, {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "sort",
       child: this._plan,
       order,
@@ -519,17 +537,17 @@ export class DataFrame {
    * @param numPartitions - Target number of partitions
    * @param columns - Optional partitioning columns
    */
-  repartition(numPartitions: number, ...columns: Array<Column | string>): DataFrame {
+  repartition(numPartitions: number, ...columns: Array<Column | string>): DataFrame<R> {
     if (columns.length > 0) {
       const exprs = columns.map((c) => (typeof c === "string" ? col(c)._expr : c._expr));
-      return DataFrame._fromPlan(this._session, {
+      return DataFrame._fromPlan<R>(this._session, {
         type: "repartitionByExpression",
         child: this._plan,
         partitionExprs: exprs,
         numPartitions,
       });
     }
-    return DataFrame._fromPlan(this._session, {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "repartition",
       child: this._plan,
       numPartitions,
@@ -544,8 +562,8 @@ export class DataFrame {
    *
    * @param numPartitions - Target number of partitions
    */
-  coalesce(numPartitions: number): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  coalesce(numPartitions: number): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "repartition",
       child: this._plan,
       numPartitions,
@@ -559,7 +577,7 @@ export class DataFrame {
    * @param numPartitions - Target number of partitions
    * @param columns - Partitioning columns
    */
-  repartitionByRange(numPartitions: number, ...columns: Array<Column | string>): DataFrame {
+  repartitionByRange(numPartitions: number, ...columns: Array<Column | string>): DataFrame<R> {
     const exprs = columns.map((c) => {
       const expr = typeof c === "string" ? col(c)._expr : c._expr;
       if (expr.type === "sortOrder") {
@@ -572,7 +590,7 @@ export class DataFrame {
         nullOrdering: "nulls_last" as const,
       };
     });
-    return DataFrame._fromPlan(this._session, {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "repartitionByExpression",
       child: this._plan,
       partitionExprs: exprs,
@@ -703,7 +721,7 @@ export class DataFrame {
    * Persist this DataFrame with the default storage level (MEMORY_AND_DISK).
    * Returns this DataFrame for method chaining.
    */
-  async cache(): Promise<DataFrame> {
+  async cache(): Promise<DataFrame<R>> {
     return this.persist(MEMORY_AND_DISK);
   }
 
@@ -713,7 +731,7 @@ export class DataFrame {
    *
    * @param storageLevel - How to store the cached data
    */
-  async persist(storageLevel: StorageLevel = MEMORY_AND_DISK): Promise<DataFrame> {
+  async persist(storageLevel: StorageLevel = MEMORY_AND_DISK): Promise<DataFrame<R>> {
     await this._session._analyzePlan({
       type: "persist",
       plan: this._plan,
@@ -727,7 +745,7 @@ export class DataFrame {
    *
    * @param blocking - Whether to block until the operation completes
    */
-  async unpersist(blocking = false): Promise<DataFrame> {
+  async unpersist(blocking = false): Promise<DataFrame<R>> {
     await this._session._analyzePlan({
       type: "unpersist",
       plan: this._plan,
@@ -823,7 +841,7 @@ export class DataFrame {
    * For large datasets, prefer toLocalIterator() or forEach() to
    * avoid loading everything into memory.
    */
-  async collect(): Promise<Row[]> {
+  async collect(): Promise<R[]> {
     const decoder = this._ensureDecoder();
 
     const chunks: Uint8Array[] = [];
@@ -831,7 +849,7 @@ export class DataFrame {
       chunks.push(batch);
     }
 
-    return decoder(chunks);
+    return (await decoder(chunks)) as R[];
   }
 
   /**
@@ -874,11 +892,11 @@ export class DataFrame {
    *     console.log(row);
    *   }
    */
-  async *toLocalIterator(): AsyncIterableIterator<Row> {
+  async *toLocalIterator(): AsyncIterableIterator<R> {
     const decoder = this._ensureDecoder();
 
     for await (const chunk of this._session._executePlan(this._plan)) {
-      const rows = await decoder([chunk]);
+      const rows = (await decoder([chunk])) as R[];
       for (const row of rows) {
         yield row;
       }
@@ -891,7 +909,7 @@ export class DataFrame {
    * @example
    *   await df.forEach((row) => console.log(row.name, row.salary));
    */
-  async forEach(fn: (row: Row) => void): Promise<void> {
+  async forEach(fn: (row: R) => void): Promise<void> {
     for await (const row of this.toLocalIterator()) {
       fn(row);
     }
@@ -913,7 +931,7 @@ export class DataFrame {
   /**
    * Return the first row as a Row object, or null if the DataFrame is empty.
    */
-  async first(): Promise<Row | null> {
+  async first(): Promise<R | null> {
     const rows = await this.limit(1).collect();
     return rows[0] ?? null;
   }
@@ -921,7 +939,7 @@ export class DataFrame {
   /**
    * Return the first `n` rows as an array (alias for limit + collect).
    */
-  async head(n = 1): Promise<Row[]> {
+  async head(n = 1): Promise<R[]> {
     return this.limit(n).collect();
   }
 
@@ -929,7 +947,7 @@ export class DataFrame {
    * Return the first `n` rows as an array.
    * Alias for head(). Matches PySpark's take() semantics.
    */
-  async take(n: number): Promise<Row[]> {
+  async take(n: number): Promise<R[]> {
     return this.head(n);
   }
 

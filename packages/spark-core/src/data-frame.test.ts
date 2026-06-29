@@ -139,6 +139,40 @@ describe("DataFrame.col() per-frame column access", () => {
   });
 });
 
+describe("DataFrame.as<R>() typed view", () => {
+  it("is a pure type cast (runtime is unchanged)", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const typed = df.as<{ id: bigint; name: string }>();
+    // Same instance, same plan, same session
+    assert.equal(typed._plan, df._plan);
+    assert.equal(typed._session, df._session);
+  });
+
+  it("preserves the typed view through shape-preserving transforms", () => {
+    type Row = { id: bigint; name: string };
+    const { spark } = createSession();
+    const typed = spark
+      .sql("SELECT * FROM t")
+      .as<Row>()
+      .filter(col("id").gt(0n))
+      .limit(10)
+      .sort(col("id").desc())
+      .distinct();
+    // Compile-time check: typed is DataFrame<Row>. Runtime: just confirm the
+    // plan got built correctly.
+    assert.equal(typed._plan.type, "deduplicate");
+  });
+
+  it("re-narrows after a shape-changing transform", () => {
+    type In = { id: bigint; salary: number };
+    type Out = { total: number };
+    const { spark } = createSession();
+    const typed = spark.sql("SELECT * FROM t").as<In>().agg(col("salary").alias("total")).as<Out>();
+    assert.equal(typed._plan.type, "aggregate");
+  });
+});
+
 describe("DataFrame transformations (lazy)", () => {
   it("filter() wraps plan in a filter node", () => {
     const { spark } = createSession();
