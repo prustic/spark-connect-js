@@ -232,6 +232,14 @@ export class SparkSession {
   }
 
   /**
+   * Read a catalog table or temp view as a {@link DataFrame}. Shorthand for
+   * `spark.read.table(name)`.
+   */
+  table(tableName: string): DataFrame {
+    return this.read.table(tableName);
+  }
+
+  /**
    * Create a DataFrame with a single `id` column containing a sequence of
    * integers from `start` (inclusive) to `end` (exclusive), incrementing by `step`.
    *

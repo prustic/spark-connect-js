@@ -589,6 +589,15 @@ describe("DataFrameReader shortcuts", () => {
     }
   });
 
+  it("spark.table() is a session-level shortcut for spark.read.table()", () => {
+    const { spark } = createSession();
+    const df = spark.table("my_db.my_table");
+    assert.equal(df._plan.type, "readTable");
+    if (df._plan.type === "readTable") {
+      assert.equal(df._plan.tableName, "my_db.my_table");
+    }
+  });
+
   it("json() builds a read plan with json format", () => {
     const { spark } = createSession();
     const df = spark.read.json("/data/file.json");

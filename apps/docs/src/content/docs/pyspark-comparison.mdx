@@ -111,6 +111,16 @@ df.sort(col("salary").desc());
 
 Passing a raw JS value where a `Column` is expected is a compile-time error. PySpark surfaces the same mistake only at runtime.
 
+## `when()` returns a builder, not a Column
+
+PySpark's `F.when(...)` returns a `Column`. Ours returns a `WhenBuilder`, terminated with `.otherwise(default)` or `.toColumn()` for a `NULL` default. The separate type means the compiler stops a half-built chain from passing as a column.
+
+```ts
+when(col("age").gt(lit(18)), lit("adult"))
+  .when(col("age").gt(lit(12)), lit("teen"))
+  .otherwise(lit("child"));
+```
+
 ## Every action is async
 
 Actions return `Promise<T>`. Transformations stay synchronous because they only build the plan.

@@ -66,6 +66,9 @@ export type GrpcStatusCode = (typeof GrpcStatusCode)[keyof typeof GrpcStatusCode
  * Carries the gRPC `code`, and when available the Spark `errorClass`
  * (for example `"TABLE_OR_VIEW_NOT_FOUND"`) and SQL state code.
  *
+ * `.message` already includes the `[errorClass]` prefix when the class is
+ * known. Print it verbatim instead of re-prefixing.
+ *
  * @example
  * ```ts
  * try {
