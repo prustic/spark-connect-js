@@ -188,9 +188,11 @@ export class StreamingQueryListenerBus {
 
   private async _dispatchEvent(eventType: string, eventJson: string): Promise<void> {
     if (eventType === "progress") {
-      const event = safeParse<StreamingQueryProgress>(eventJson);
-      if (event !== undefined) {
-        await this._dispatch((l) => l.onQueryProgress?.(event));
+      // Bus wraps `progress` events as `{progress: {...}}`; `idle` and `terminated` aren't.
+      const wrapper = safeParse<{ progress?: StreamingQueryProgress }>(eventJson);
+      const progress = wrapper?.progress;
+      if (progress !== undefined) {
+        await this._dispatch((l) => l.onQueryProgress?.(progress));
       }
       return;
     }
