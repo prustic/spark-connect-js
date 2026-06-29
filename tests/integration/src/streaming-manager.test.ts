@@ -4,6 +4,7 @@ import { Trigger } from "@spark-connect-js/node";
 import type {
   StreamingQuery,
   StreamingQueryListener,
+  StreamingQueryProgress,
   QueryStartedEvent,
   QueryTerminatedEvent,
 } from "@spark-connect-js/node";
@@ -95,14 +96,14 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
 
   it("fires onQueryStarted / onQueryProgress / onQueryTerminated across a query lifecycle", async () => {
     const started: QueryStartedEvent[] = [];
-    const progressCount = { n: 0 };
+    const progress: StreamingQueryProgress[] = [];
     const terminated: QueryTerminatedEvent[] = [];
     const listener: StreamingQueryListener = {
       onQueryStarted: (e) => {
         started.push(e);
       },
-      onQueryProgress: () => {
-        progressCount.n += 1;
+      onQueryProgress: (e) => {
+        progress.push(e);
       },
       onQueryTerminated: (e) => {
         terminated.push(e);
@@ -130,8 +131,10 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
     let query: StreamingQuery | undefined;
     try {
       query = await startRateMemoryQuery(`mgr_listener_${Math.random().toString(36).slice(2, 10)}`);
-      const sawProgress = await waitUntil(async () => progressCount.n >= 1, 10_000);
+      const sawProgress = await waitUntil(async () => progress.length >= 1, 10_000);
       assert.ok(sawProgress, "expected onQueryProgress to fire within 10s");
+      // Regression: progress event is unwrapped, batchId is top-level.
+      assert.equal(typeof progress[0]["batchId"], "number");
       assert.ok(goodCount.n >= 1, "isolated listener should have received events too");
       assert.equal(started.length, 1);
       assert.match(started[0].runId, UUID_RE);

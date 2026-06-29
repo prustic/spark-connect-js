@@ -26,5 +26,3 @@ terminated abc12... (clean)
 after stop: 0 active queries
 session stopped
 ```
-
-See the [Structured Streaming](https://prustic.github.io/spark-connect-js/guides/structured-streaming/) guide for commentary.

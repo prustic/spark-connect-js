@@ -188,8 +188,8 @@ export class StreamingQueryListenerBus {
 
   private async _dispatchEvent(eventType: string, eventJson: string): Promise<void> {
     if (eventType === "progress") {
-      // The server wraps progress in `{ "progress": { ... } }`; unwrap so the
-      // callback receives a flat StreamingQueryProgress (matching PySpark Connect).
+      // The server wraps progress in `{ "progress": { ... } }`. Unwrap so the
+      // callback receives a flat StreamingQueryProgress, matching PySpark Connect.
       const wrapper = safeParse<{ progress?: StreamingQueryProgress }>(eventJson);
       const progress = wrapper?.progress;
       if (progress !== undefined) {

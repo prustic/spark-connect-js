@@ -301,8 +301,8 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
   });
 
   it("unwraps the server's `progress` wrapper so callbacks see a flat StreamingQueryProgress", async () => {
-    // Server sends `{"progress": {"batchId": 42, "inputRowsPerSecond": 5}}`;
-    // the wrapper must be peeled off (matches PySpark Connect's bus).
+    // Server sends `{"progress": {"batchId": 42, "inputRowsPerSecond": 5}}`.
+    // The wrapper must be peeled off (matches PySpark Connect's bus).
     const t = scriptedTransport();
     const spark = newSession(t);
     const seen: StreamingQueryProgress[] = [];
