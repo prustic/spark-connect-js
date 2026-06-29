@@ -34,17 +34,42 @@ export interface StreamingQueryStatus {
 
 /**
  * One progress report from a streaming query. Spark Connect sends progress
- * as a JSON string; this is the parsed shape. Field set is intentionally
- * `Record<string, unknown>` because Spark's `StreamingQueryProgress` evolves
- * across versions and we don't want to ratchet a tight type into the public
- * API. Common fields you'll see:
+ * as a JSON string; this is the parsed shape.
  *
- *   - `id`, `runId`, `name`, `timestamp`, `batchId`
- *   - `numInputRows`, `inputRowsPerSecond`, `processedRowsPerSecond`
- *   - `durationMs` (object of per-phase durations)
- *   - `stateOperators`, `sources`, `sink`
+ * The named fields below cover the values Spark sets on nearly every report;
+ * the index signature lets newer Spark versions or third-party
+ * `StreamingQueryListener` events add fields without breaking compilation.
  */
-export type StreamingQueryProgress = Record<string, unknown>;
+export interface StreamingQueryProgress {
+  /** Spark-internal query identifier (the `StreamingQuery.id`). */
+  id?: string;
+  /** Run identifier for the current execution attempt. */
+  runId?: string;
+  /** Optional query name supplied via `writeStream.queryName(...)`. */
+  name?: string;
+  /** ISO-8601 timestamp the batch was emitted at. */
+  timestamp?: string;
+  /** Monotonically increasing batch number within this run. */
+  batchId?: number;
+  /** End-to-end duration of the batch in milliseconds. */
+  batchDuration?: number;
+  /** Per-phase durations (e.g. `addBatch`, `getOffset`, `triggerExecution`). */
+  durationMs?: Record<string, number>;
+  /** Total input rows processed in this batch. Long on the server. */
+  numInputRows?: number | bigint;
+  /** Average input rate over this batch. */
+  inputRowsPerSecond?: number;
+  /** Average processed rate over this batch. */
+  processedRowsPerSecond?: number;
+  /** Per-state-operator metrics. */
+  stateOperators?: unknown[];
+  /** Per-source progress (offsets, rows, rates). */
+  sources?: unknown[];
+  /** Sink description. */
+  sink?: unknown;
+  /** Forward-compat for fields Spark adds in newer versions. */
+  [key: string]: unknown;
+}
 
 /**
  * The exception that caused a streaming query to fail, as reported by the
