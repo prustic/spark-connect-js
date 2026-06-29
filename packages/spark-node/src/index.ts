@@ -41,6 +41,7 @@ export {
   Column,
   col,
   lit,
+  row,
   GroupedData,
   DataFrameStat,
   DataType,
