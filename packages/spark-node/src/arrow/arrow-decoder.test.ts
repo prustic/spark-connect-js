@@ -21,16 +21,22 @@ import {
   List,
   makeBuilder,
   makeData,
+  type DataType,
 } from "apache-arrow";
 
+// apache-arrow's makeBuilder is parameterised on a Type literal that we
+// cannot recover from a runtime DataType value, so its return type leaks as
+// any without an explicit generic argument. Pin the generic to DataType once
+// here so the rest of the file works with concrete Vector values.
+function buildVector(type: DataType, values: readonly unknown[]): Vector {
+  const builder = makeBuilder<DataType>({ type, nullValues: [null] });
+  for (const v of values) builder.append(v);
+  return builder.finish().toVector();
+}
+
 /** Build an IPC stream from a column-builder map. */
-function makeIpc(fields: Field[], values: unknown[][]): Uint8Array {
-  const vectors: Vector[] = fields.map((f, i) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const builder = makeBuilder({ type: f.type, nullValues: [null] });
-    for (const v of values[i]) builder.append(v);
-    return builder.finish().toVector();
-  });
+function makeIpc(fields: Field<DataType>[], values: unknown[][]): Uint8Array {
+  const vectors: Vector[] = fields.map((f, i) => buildVector(f.type, values[i]));
 
   const data = makeData({
     type: new Struct(fields as never),
