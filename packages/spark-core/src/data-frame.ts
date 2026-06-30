@@ -1052,12 +1052,10 @@ export class DataFrame<R extends Row = Row> {
 
     const fmt = (val: unknown): string => {
       if (val === null || val === undefined) return "null";
-      if (typeof val === "object") {
-        const s = JSON.stringify(val);
-        return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      const s = String(val);
+      const s =
+        typeof val === "object"
+          ? JSON.stringify(val)
+          : (val as number | string | bigint | boolean).toString();
       return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
     };
 
