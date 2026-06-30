@@ -183,12 +183,12 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     t.pushFrame({ listenerBusListenerAdded: true });
     await spark.streams.addListener({
       onQueryProgress: (e) => {
-        a.push((e["batchId"] as number | undefined)?.toString() ?? "?");
+        a.push(e.batchId?.toString() ?? "?");
       },
     });
     await spark.streams.addListener({
       onQueryProgress: (e) => {
-        b.push((e["batchId"] as number | undefined)?.toString() ?? "?");
+        b.push(e.batchId?.toString() ?? "?");
       },
     });
     t.pushFrame({
@@ -217,7 +217,7 @@ describe("StreamingQueryListenerBus (via spark.streams.addListener)", () => {
     });
     await spark.streams.addListener({
       onQueryProgress: (e) => {
-        good.push(e["batchId"] as number);
+        good.push(e.batchId as number);
       },
     });
     t.pushFrame({

@@ -94,6 +94,8 @@ export {
 export {
   type Relation,
   RelationSchema,
+  type RelationCommon,
+  RelationCommonSchema,
   type Read,
   ReadSchema,
   type Project,

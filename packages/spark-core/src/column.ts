@@ -2,6 +2,17 @@ import type { Expression } from "./plan/logical-plan.js";
 import type { WindowSpec } from "./window.js";
 
 /**
+ * Either a {@link Column} or a primitive literal that {@link lit} can wrap.
+ * Methods on `Column` that accept `ColOrLiteral` auto-wrap primitives, so
+ * `col("age").gt(18)` is equivalent to `col("age").gt(lit(18))`.
+ */
+export type ColOrLiteral = Column | string | number | boolean | bigint | null;
+
+function liftCol(v: ColOrLiteral): Column {
+  return v instanceof Column ? v : lit(v);
+}
+
+/**
  * A reference to a column expression, typically obtained from {@link col} or
  * from methods on a {@link DataFrame} such as `df.col("name")`.
  *
@@ -35,57 +46,58 @@ export class Column {
 
   // Comparison operators
   // Each returns a new Column wrapping a comparison expression node.
+  // Primitive arguments are auto-wrapped via `lit(...)`.
 
-  gt(other: Column): Column {
-    return new Column({ type: "gt", left: this._expr, right: other._expr });
+  gt(other: ColOrLiteral): Column {
+    return new Column({ type: "gt", left: this._expr, right: liftCol(other)._expr });
   }
 
-  lt(other: Column): Column {
-    return new Column({ type: "lt", left: this._expr, right: other._expr });
+  lt(other: ColOrLiteral): Column {
+    return new Column({ type: "lt", left: this._expr, right: liftCol(other)._expr });
   }
 
-  eq(other: Column): Column {
-    return new Column({ type: "eq", left: this._expr, right: other._expr });
+  eq(other: ColOrLiteral): Column {
+    return new Column({ type: "eq", left: this._expr, right: liftCol(other)._expr });
   }
 
-  neq(other: Column): Column {
-    return new Column({ type: "neq", left: this._expr, right: other._expr });
+  neq(other: ColOrLiteral): Column {
+    return new Column({ type: "neq", left: this._expr, right: liftCol(other)._expr });
   }
 
-  gte(other: Column): Column {
-    return new Column({ type: "gte", left: this._expr, right: other._expr });
+  gte(other: ColOrLiteral): Column {
+    return new Column({ type: "gte", left: this._expr, right: liftCol(other)._expr });
   }
 
-  lte(other: Column): Column {
-    return new Column({ type: "lte", left: this._expr, right: other._expr });
+  lte(other: ColOrLiteral): Column {
+    return new Column({ type: "lte", left: this._expr, right: liftCol(other)._expr });
   }
 
   // Logical operators
 
-  and(other: Column): Column {
-    return new Column({ type: "and", left: this._expr, right: other._expr });
+  and(other: ColOrLiteral): Column {
+    return new Column({ type: "and", left: this._expr, right: liftCol(other)._expr });
   }
 
-  or(other: Column): Column {
-    return new Column({ type: "or", left: this._expr, right: other._expr });
+  or(other: ColOrLiteral): Column {
+    return new Column({ type: "or", left: this._expr, right: liftCol(other)._expr });
   }
 
   // Arithmetic
 
-  plus(other: Column): Column {
-    return new Column({ type: "add", left: this._expr, right: other._expr });
+  plus(other: ColOrLiteral): Column {
+    return new Column({ type: "add", left: this._expr, right: liftCol(other)._expr });
   }
 
-  minus(other: Column): Column {
-    return new Column({ type: "subtract", left: this._expr, right: other._expr });
+  minus(other: ColOrLiteral): Column {
+    return new Column({ type: "subtract", left: this._expr, right: liftCol(other)._expr });
   }
 
-  multiply(other: Column): Column {
-    return new Column({ type: "multiply", left: this._expr, right: other._expr });
+  multiply(other: ColOrLiteral): Column {
+    return new Column({ type: "multiply", left: this._expr, right: liftCol(other)._expr });
   }
 
-  divide(other: Column): Column {
-    return new Column({ type: "divide", left: this._expr, right: other._expr });
+  divide(other: ColOrLiteral): Column {
+    return new Column({ type: "divide", left: this._expr, right: liftCol(other)._expr });
   }
 
   // Aliasing
@@ -180,40 +192,40 @@ export class Column {
   // Null-safe equality
 
   /** Null-safe equality comparison (returns true when both sides are null). */
-  eqNullSafe(other: Column): Column {
+  eqNullSafe(other: ColOrLiteral): Column {
     return new Column({
       type: "unresolvedFunction",
       name: "<=>",
-      arguments: [this._expr, other._expr],
+      arguments: [this._expr, liftCol(other)._expr],
     });
   }
 
   // Bitwise operators
 
   /** Bitwise AND. */
-  bitwiseAND(other: Column): Column {
+  bitwiseAND(other: ColOrLiteral): Column {
     return new Column({
       type: "unresolvedFunction",
       name: "&",
-      arguments: [this._expr, other._expr],
+      arguments: [this._expr, liftCol(other)._expr],
     });
   }
 
   /** Bitwise OR. */
-  bitwiseOR(other: Column): Column {
+  bitwiseOR(other: ColOrLiteral): Column {
     return new Column({
       type: "unresolvedFunction",
       name: "|",
-      arguments: [this._expr, other._expr],
+      arguments: [this._expr, liftCol(other)._expr],
     });
   }
 
   /** Bitwise XOR. */
-  bitwiseXOR(other: Column): Column {
+  bitwiseXOR(other: ColOrLiteral): Column {
     return new Column({
       type: "unresolvedFunction",
       name: "^",
-      arguments: [this._expr, other._expr],
+      arguments: [this._expr, liftCol(other)._expr],
     });
   }
 
@@ -286,7 +298,7 @@ export class Column {
   }
 
   /** Test whether this column's value is between lower and upper (inclusive). */
-  between(lower: Column, upper: Column): Column {
+  between(lower: ColOrLiteral, upper: ColOrLiteral): Column {
     return this.gte(lower).and(this.lte(upper));
   }
 

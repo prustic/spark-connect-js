@@ -134,7 +134,7 @@ describe("StreamingQueryListener (spark.streams.addListener)", () => {
       const sawProgress = await waitUntil(async () => progress.length >= 1, 10_000);
       assert.ok(sawProgress, "expected onQueryProgress to fire within 10s");
       // Regression: progress event is unwrapped, batchId is top-level.
-      assert.equal(typeof progress[0]["batchId"], "number");
+      assert.equal(typeof progress[0].batchId, "number");
       assert.ok(goodCount.n >= 1, "isolated listener should have received events too");
       assert.equal(started.length, 1);
       assert.match(started[0].runId, UUID_RE);

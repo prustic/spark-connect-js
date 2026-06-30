@@ -12,9 +12,8 @@ const listener: StreamingQueryListener = {
     console.log(`started    ${e.id} run=${e.runId}`);
   },
   onQueryProgress: (e) => {
-    const batchId = e["batchId"] as number;
-    const inputRate = (e["inputRowsPerSecond"] as number | undefined) ?? 0;
-    console.log(`progress   batch=${batchId} inputRowsPerSecond=${inputRate.toFixed(1)}`);
+    const inputRate = e.inputRowsPerSecond ?? 0;
+    console.log(`progress   batch=${e.batchId} inputRowsPerSecond=${inputRate.toFixed(1)}`);
   },
   onQueryTerminated: (e) => {
     console.log(`terminated ${e.id} ${e.exception ?? "(clean)"}`);
@@ -45,8 +44,7 @@ await query.awaitTermination(5_000);
 // query.lastProgress() returns the most recent batch directly, as a
 // pull-style alternative to the listener bus.
 const last = await query.lastProgress();
-const lastBatchId = (last?.["batchId"] as number | undefined) ?? "none";
-console.log(`last batch: ${lastBatchId}`);
+console.log(`last batch: ${last?.batchId ?? "none"}`);
 
 await query.stop();
 await session.streams.removeListener(listener);

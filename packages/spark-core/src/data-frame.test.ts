@@ -52,7 +52,10 @@ describe("SparkSession.sql()", () => {
   it("returns a DataFrame with a SQL plan", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM users");
-    assert.deepStrictEqual(df._plan, { type: "sql", query: "SELECT * FROM users" });
+    assert.equal(df._plan.type, "sql");
+    if (df._plan.type === "sql") {
+      assert.equal(df._plan.query, "SELECT * FROM users");
+    }
   });
 });
 
@@ -92,6 +95,81 @@ describe("SparkSession.read", () => {
       assert.equal(df._plan.format, "parquet");
       assert.deepStrictEqual(df._plan.options, {});
     }
+  });
+});
+
+describe("DataFrame.col() per-frame column access", () => {
+  it("attaches a per-DataFrame planId via _fromPlan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.equal(typeof df._plan.planId, "bigint");
+  });
+
+  it("two DataFrames built from the same source get distinct planIds", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    assert.notEqual(a._plan.planId, b._plan.planId);
+  });
+
+  it("df.col(name) builds an unresolvedAttribute carrying the DataFrame's planId", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const c = df.col("id");
+    assert.equal(c._expr.type, "unresolvedAttribute");
+    if (c._expr.type === "unresolvedAttribute") {
+      assert.equal(c._expr.name, "id");
+      assert.equal(c._expr.planId, df._plan.planId);
+    }
+  });
+
+  it("a.col() and b.col() carry different planIds for self-join disambiguation", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    const ac = a.col("id");
+    const bc = b.col("id");
+    if (ac._expr.type === "unresolvedAttribute" && bc._expr.type === "unresolvedAttribute") {
+      assert.notEqual(ac._expr.planId, bc._expr.planId);
+      assert.equal(ac._expr.planId, a._plan.planId);
+      assert.equal(bc._expr.planId, b._plan.planId);
+    } else {
+      assert.fail("expected unresolvedAttribute expressions");
+    }
+  });
+});
+
+describe("DataFrame.as<R>() typed view", () => {
+  it("is a pure type cast (runtime is unchanged)", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const typed = df.as<{ id: bigint; name: string }>();
+    // Same instance, same plan, same session
+    assert.equal(typed._plan, df._plan);
+    assert.equal(typed._session, df._session);
+  });
+
+  it("preserves the typed view through shape-preserving transforms", () => {
+    type Row = { id: bigint; name: string };
+    const { spark } = createSession();
+    const typed = spark
+      .sql("SELECT * FROM t")
+      .as<Row>()
+      .filter(col("id").gt(0n))
+      .limit(10)
+      .sort(col("id").desc())
+      .distinct();
+    // Compile-time check: typed is DataFrame<Row>. Runtime: just confirm the
+    // plan got built correctly.
+    assert.equal(typed._plan.type, "deduplicate");
+  });
+
+  it("re-narrows after a shape-changing transform", () => {
+    type In = { id: bigint; salary: number };
+    type Out = { total: number };
+    const { spark } = createSession();
+    const typed = spark.sql("SELECT * FROM t").as<In>().agg(col("salary").alias("total")).as<Out>();
+    assert.equal(typed._plan.type, "aggregate");
   });
 });
 
@@ -186,7 +264,10 @@ describe("DataFrame.collect()", () => {
     const rows = await df.collect();
 
     assert.equal(t.calls.length, 1);
-    assert.deepStrictEqual(t.calls[0], { type: "sql", query: "SELECT 1 as id" });
+    const plan = t.calls[0] as { type: string; query: string; planId?: bigint };
+    assert.equal(plan.type, "sql");
+    assert.equal(plan.query, "SELECT 1 as id");
+    assert.equal(typeof plan.planId, "bigint");
     assert.deepStrictEqual(rows, [{ id: 1 }]);
   });
 });
@@ -200,6 +281,19 @@ describe("GroupedData", () => {
     if (df._plan.type === "aggregate") {
       assert.equal(df._plan.groupingExpressions.length, 1);
       assert.equal(df._plan.aggregateExpressions.length, 1);
+    }
+  });
+
+  it("df.agg() is a shorthand for df.groupBy().agg() with no grouping columns", () => {
+    const { spark } = createSession();
+    const df = spark
+      .sql("SELECT * FROM t")
+      .agg(col("salary").alias("total"), col("score").alias("avg_score"));
+
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupingExpressions.length, 0);
+      assert.equal(df._plan.aggregateExpressions.length, 2);
     }
   });
 
