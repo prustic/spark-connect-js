@@ -13,15 +13,24 @@ import { InvalidInputError } from "../errors.js";
  *   2. Destructuring works naturally: `const { name, age } = row;`
  *   3. No prototype overhead for millions of rows.
  *
- * Values may be:
- *   - `bigint` for Spark LongType columns (to preserve precision)
- *   - `Uint8Array` for BinaryType columns
+ * Values:
+ *   - `number` for `IntegerType`, `ShortType`, `ByteType`, `FloatType`, `DoubleType`
+ *   - `string` for `StringType` and `DecimalType` (decimals decode as
+ *     fixed-point strings honoring scale, e.g. `"1.50"` for `DECIMAL(10,2)`,
+ *     since JS has no native arbitrary-precision decimal)
+ *   - `boolean` for `BooleanType`
+ *   - `Uint8Array` for `BinaryType`
+ *   - `Date` for `DateType` and `TimestampType`. Sub-millisecond precision is
+ *     lost: Spark's micro/nano timestamps truncate to ms.
+ *   - `Map<K, V>` for `MapType`. Preserves non-string keys, unlike a plain
+ *     object. Note that `JSON.stringify(map)` is `"{}"`.
+ *   - `object` for `StructType`. Nested rows recurse with the same rules.
+ *   - `unknown[]` for `ArrayType`. Recurses with the same rules.
  *   - `null` for nullable columns
- *   - `Date` for TimestampType / DateType (with precision caveats)
  *
- * For compile-time typed access, narrow with `df.as<Schema>().collect()`.
- * For runtime typed access (when the schema is not known statically), use
- * the {@link row} accessor namespace.
+ * For compile-time typed access, narrow with `df.as<Schema>().collect()`. For
+ * runtime typed access (schema not known statically), use the {@link row}
+ * accessor namespace.
  */
 export type Row = Record<string, unknown>;
 
