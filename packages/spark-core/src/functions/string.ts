@@ -2,7 +2,7 @@
  * String functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js";
+import { Column, fnExpr, toExpr, _lit, _liftCol, type ColOrName, fn } from "./_helpers.js";
 
 /** Converts a string column to upper case. */
 export function upper(column: ColOrName): Column {
@@ -83,12 +83,7 @@ export function regexp_replace(
   replacement: Column | string,
 ): Column {
   return new Column(
-    fnExpr(
-      "regexp_replace",
-      toExpr(column),
-      pattern instanceof Column ? pattern._expr : _lit(pattern)._expr,
-      replacement instanceof Column ? replacement._expr : _lit(replacement)._expr,
-    ),
+    fnExpr("regexp_replace", toExpr(column), _liftCol(pattern)._expr, _liftCol(replacement)._expr),
   );
 }
 
