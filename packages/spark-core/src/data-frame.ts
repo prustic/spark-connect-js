@@ -25,6 +25,42 @@ function inferLiteralValue(s: string): string | number | boolean | null {
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
 
+// Render a Row value in Spark's show() style. Mirrors PySpark and Scala.
+function renderCell(val: unknown): string {
+  if (val === null || val === undefined) return "null";
+
+  if (val instanceof Date) {
+    const iso = val.toISOString();
+    const date = iso.slice(0, 10);
+    const time = iso.slice(11, 23);
+    if (time === "00:00:00.000") return date;
+    return `${date} ${time.replace(/\.?0+$/, "")}`;
+  }
+
+  if (val instanceof Map) {
+    const entries = Array.from(
+      val as Map<unknown, unknown>,
+      ([k, v]) => `${renderCell(k)} -> ${renderCell(v)}`,
+    );
+    return `{${entries.join(", ")}}`;
+  }
+
+  if (val instanceof Uint8Array) {
+    const hex = Array.from(val, (b) => b.toString(16).toUpperCase().padStart(2, "0"));
+    return `[${hex.join(" ")}]`;
+  }
+
+  if (Array.isArray(val)) {
+    return `[${(val as unknown[]).map(renderCell).join(", ")}]`;
+  }
+
+  if (typeof val === "object") {
+    return `{${Object.values(val).map(renderCell).join(", ")}}`;
+  }
+
+  return (val as number | string | bigint | boolean).toString();
+}
+
 /**
  * Generate a random non-negative 63-bit `bigint` plan identifier. Matches
  * PySpark Connect's `random.randint(0, (1 << 63) - 1)` so the value fits in
@@ -1051,11 +1087,7 @@ export class DataFrame<R extends Row = Row> {
     const maxWidth = truncate ? 20 : Infinity;
 
     const fmt = (val: unknown): string => {
-      if (val === null || val === undefined) return "null";
-      const s =
-        typeof val === "object"
-          ? JSON.stringify(val)
-          : (val as number | string | bigint | boolean).toString();
+      const s = renderCell(val);
       return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
     };
 
