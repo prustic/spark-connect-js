@@ -299,14 +299,10 @@ export class SparkSession {
   /**
    * Create a DataFrame from pre-built Arrow IPC streaming bytes.
    *
-   * @param data - Arrow IPC **streaming** format bytes. The Arrow **file**
-   * format (magic prefix `ARROW1\0\0`) is not accepted and is rejected client
-   * side because the server allocates a large decoder for the whole payload
-   * up-front, which OOMs on non-stream input.
-   * @param schema - Optional DDL-formatted schema string (e.g. `"id INT, name STRING"`)
-   *
-   * @throws `InvalidInputError` if `data` is empty or is the Arrow file
-   * format instead of the streaming format.
+   * @param data - Arrow IPC **streaming** format bytes. File-format input
+   * (magic prefix `ARROW1\0\0`) is rejected.
+   * @param schema - Optional DDL-formatted schema string (e.g. `"id INT, name STRING"`).
+   * @throws `InvalidInputError` on empty input or file-format bytes.
    */
   createDataFrame(data: Uint8Array, schema?: string): DataFrame;
   createDataFrame(input: Uint8Array | Row[], schema?: string): DataFrame {

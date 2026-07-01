@@ -46,7 +46,7 @@ describe("ArrowEncoder.encode()", () => {
   it("round-trips bigints via Int64", async () => {
     const bytes = ArrowEncoder.encode([{ big: 9_000_000_000n }]);
     const rows = await ArrowDecoder.decode([bytes]);
-    // Long decode policy is parked; safe-range values return number.
+    // Long decode policy is parked. Safe-range values return number.
     assert.equal(rows[0]["big"], 9_000_000_000);
   });
 
@@ -93,6 +93,19 @@ describe("ArrowEncoder.encode()", () => {
         if (!(err instanceof InvalidInputError)) return false;
         assert.match(err.message, /unsupported/);
         assert.match(err.message, /tuple/);
+        return true;
+      },
+    );
+  });
+
+  it("throws a clear error when a column mixes categories", () => {
+    assert.throws(
+      () => ArrowEncoder.encode([{ v: 1 }, { v: "hello" }]),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /column "v"/);
+        assert.match(err.message, /mixes number and string/);
+        assert.match(err.message, /row 1/);
         return true;
       },
     );

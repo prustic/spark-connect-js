@@ -57,7 +57,7 @@ describe("createDataFrame(bytes): Arrow IPC input validation", () => {
 
   it("accepts pre-built stream-format Arrow bytes", async () => {
     // Build via apache-arrow directly. Note that apache-arrow's default
-    // tableFromArrays uses Dictionary<Int32, Utf8> for strings; ints are
+    // tableFromArrays uses Dictionary<Int32, Utf8> for strings. Ints are
     // materialized, so this test uses an int column.
     const table = tableFromArrays({ id: [10, 20, 30] });
     const bytes = tableToIPC(table, "stream");

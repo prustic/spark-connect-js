@@ -56,29 +56,55 @@ function buildColumnVector(name: string, values: unknown[]): Vector {
     return vectorFromArray(values as (string | null)[], new Utf8());
   }
 
-  if (typeof sample === "string") {
-    return vectorFromArray(values as (string | null)[], new Utf8());
-  }
-  if (typeof sample === "boolean") {
-    return vectorFromArray(values as (boolean | null)[], new Bool());
-  }
-  if (typeof sample === "bigint") {
-    return vectorFromArray(values as (bigint | null)[], new Int64());
-  }
-  if (sample instanceof Date) {
-    return vectorFromArray(values as (Date | null)[], new TimestampMillisecond());
-  }
-  if (typeof sample === "number") {
-    const allInts = values.every((v) => v === null || v === undefined || Number.isInteger(v));
-    if (allInts) {
-      return vectorFromArray(values as (number | null)[], new Int32());
-    }
-    return vectorFromArray(values as (number | null)[], new Float64());
+  const category = categoryOf(sample);
+  if (category === null) {
+    throw new InvalidInputError(
+      `createDataFrame([...]): unsupported value type "${typeName(sample)}" in column "${name}". ` +
+        "Supported types: string, number, boolean, bigint, Date, null. " +
+        "For richer types, build the Arrow IPC bytes yourself and pass a Uint8Array.",
+    );
   }
 
-  throw new InvalidInputError(
-    `createDataFrame([...]): unsupported value type "${typeof sample}" in column "${name}". ` +
-      "Supported types: string, number, boolean, bigint, Date, null. " +
-      "For richer types, build the Arrow IPC bytes yourself and pass a Uint8Array.",
-  );
+  // Every non-null value must be the same category. Apache-arrow's builders
+  // fail loudly but with low-level messages that name neither the column nor
+  // the offending value, so we check ourselves first.
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v === null || v === undefined) continue;
+    if (categoryOf(v) !== category) {
+      throw new InvalidInputError(
+        `createDataFrame([...]): column "${name}" mixes ${category} and ${typeName(v)} ` +
+          `values (row ${i}). Split into separate columns or normalize the type.`,
+      );
+    }
+  }
+
+  switch (category) {
+    case "string":
+      return vectorFromArray(values as (string | null)[], new Utf8());
+    case "boolean":
+      return vectorFromArray(values as (boolean | null)[], new Bool());
+    case "bigint":
+      return vectorFromArray(values as (bigint | null)[], new Int64());
+    case "Date":
+      return vectorFromArray(values as (Date | null)[], new TimestampMillisecond());
+    case "number": {
+      const allInts = values.every((v) => v === null || v === undefined || Number.isInteger(v));
+      const type = allInts ? new Int32() : new Float64();
+      return vectorFromArray(values as (number | null)[], type);
+    }
+  }
+}
+
+type Category = "string" | "number" | "boolean" | "bigint" | "Date";
+
+function categoryOf(v: unknown): Category | null {
+  if (v instanceof Date) return "Date";
+  const t = typeof v;
+  if (t === "string" || t === "number" || t === "boolean" || t === "bigint") return t;
+  return null;
+}
+
+function typeName(v: unknown): string {
+  return v instanceof Date ? "Date" : typeof v;
 }
