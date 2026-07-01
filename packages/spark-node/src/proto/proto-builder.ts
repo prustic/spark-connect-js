@@ -854,7 +854,12 @@ function buildRelationInner(plan: LogicalPlan): Relation {
 function buildLiteral(value: string | number | boolean | null) {
   if (value === null) {
     return create(Expression_LiteralSchema, {
-      literalType: { case: undefined, value: undefined },
+      literalType: {
+        case: "null",
+        value: create(DataTypeSchema, {
+          kind: { case: "null", value: create(DataType_NULLSchema, {}) },
+        }),
+      },
     });
   }
   if (typeof value === "string") {

@@ -12,18 +12,12 @@ describe("lit() safety", () => {
   });
 
   it("lit(null).cast(string) produces a typed null column", async () => {
-    const rows = await spark()
-      .range(1)
-      .withColumn("s", lit(null).cast("string"))
-      .collect();
+    const rows = await spark().range(1).withColumn("s", lit(null).cast("string")).collect();
     assert.equal(rows[0]["s"], null);
   });
 
   it("lit(null).cast(int) produces a typed null column", async () => {
-    const rows = await spark()
-      .range(1)
-      .withColumn("i", lit(null).cast("int"))
-      .collect();
+    const rows = await spark().range(1).withColumn("i", lit(null).cast("int")).collect();
     assert.equal(rows[0]["i"], null);
   });
 
