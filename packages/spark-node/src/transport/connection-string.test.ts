@@ -189,4 +189,61 @@ describe("parseConnectionString: error cases", () => {
       InvalidConfigError,
     );
   });
+
+  it("rejects http:// scheme with a clear message naming the scheme", () => {
+    assert.throws(
+      () => parseConnectionString("http://localhost:15002"),
+      (err: unknown) => {
+        if (!(err instanceof InvalidConfigError)) return false;
+        assert.match(err.message, /"sc:\/\/"/);
+        assert.match(err.message, /"http:\/\/"/);
+        return true;
+      },
+    );
+  });
+
+  it("rejects https:// scheme", () => {
+    assert.throws(
+      () => parseConnectionString("https://example.com:443"),
+      (err: unknown) => {
+        if (!(err instanceof InvalidConfigError)) return false;
+        assert.match(err.message, /"https:\/\/"/);
+        return true;
+      },
+    );
+  });
+
+  it("rejects sc://user@host userinfo", () => {
+    assert.throws(
+      () => parseConnectionString("sc://user@host:15002"),
+      (err: unknown) => {
+        if (!(err instanceof InvalidConfigError)) return false;
+        assert.match(err.message, /userinfo "user@"/);
+        assert.match(err.message, /user_id/);
+        return true;
+      },
+    );
+  });
+
+  it("rejects sc://user:pass@host userinfo", () => {
+    assert.throws(
+      () => parseConnectionString("sc://user:pass@host:15002"),
+      (err: unknown) => {
+        if (!(err instanceof InvalidConfigError)) return false;
+        assert.match(err.message, /userinfo "user:pass@"/);
+        return true;
+      },
+    );
+  });
+
+  it("rejects bare user@host without sc:// scheme", () => {
+    assert.throws(
+      () => parseConnectionString("user@host:15002"),
+      (err: unknown) => {
+        if (!(err instanceof InvalidConfigError)) return false;
+        assert.match(err.message, /userinfo "user@"/);
+        return true;
+      },
+    );
+  });
 });
