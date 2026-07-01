@@ -577,19 +577,8 @@ export class SparkSessionBuilder {
 
 // Validation helpers shared between session and builder
 
-/**
- * Validate a Spark Connect operation tag. The proto comment requires tags
- * to be non-empty and free of `,`; the server splits on commas internally.
- *
- * @see ExecutePlanRequest.tags in spark/connect/base.proto
- */
-/**
- * Reject empty input and the Arrow **file** format for `createDataFrame`.
- * The Arrow file format begins with the magic bytes `ARROW1\0\0`; passing
- * that to Spark's LocalRelation reader triggers a JVM heap allocation for
- * the entire payload up-front and OOMs the server. Only the streaming
- * format (schema message header) is accepted.
- */
+// File format OOMs Spark's LocalRelation reader (whole-payload allocation).
+// Only stream format is accepted.
 const ARROW_FILE_MAGIC = new Uint8Array([0x41, 0x52, 0x52, 0x4f, 0x57, 0x31, 0x00, 0x00]);
 
 function validateArrowIpcStream(data: Uint8Array): void {
@@ -616,6 +605,12 @@ function validateArrowIpcStream(data: Uint8Array): void {
   }
 }
 
+/**
+ * Validate a Spark Connect operation tag. The proto comment requires tags
+ * to be non-empty and free of `,`; the server splits on commas internally.
+ *
+ * @see ExecutePlanRequest.tags in spark/connect/base.proto
+ */
 function validateTag(tag: string): void {
   if (tag.length === 0) {
     throw new InvalidInputError("Spark Connect operation tag must be non-empty.");
