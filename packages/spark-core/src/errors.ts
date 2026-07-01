@@ -180,3 +180,31 @@ export class UnsupportedOperationError extends SparkClientError {
     this.name = "UnsupportedOperationError";
   }
 }
+
+// ---------------------------------------------------------------------------
+// Predicates
+// ---------------------------------------------------------------------------
+
+/**
+ * True when `err` indicates the server-side session backing this client is no
+ * longer valid. Happens after a server restart, an explicit session close from
+ * the server, or a mid-session handoff to a different server. Recover by
+ * building a fresh `SparkSession`.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await df.collect();
+ * } catch (err) {
+ *   if (isSessionInvalidated(err)) {
+ *     spark = SparkSessionBuilder.remote(REMOTE).getOrCreate();
+ *     return retry();
+ *   }
+ *   throw err;
+ * }
+ * ```
+ */
+export function isSessionInvalidated(err: unknown): boolean {
+  if (!(err instanceof SparkConnectError)) return false;
+  return err.errorClass?.startsWith("INVALID_HANDLE.") ?? false;
+}

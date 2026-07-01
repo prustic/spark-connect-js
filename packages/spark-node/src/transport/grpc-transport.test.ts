@@ -59,6 +59,28 @@ describe("GrpcTransport: credentials selection", () => {
   });
 });
 
+describe("GrpcTransport: handshake deadline", () => {
+  it("defaults handshakeTimeoutMs to 10000", () => {
+    const t = new GrpcTransport({ host: "localhost", port: 15002 });
+    assert.equal((t as unknown as { handshakeTimeoutMs: number }).handshakeTimeoutMs, 10_000);
+  });
+
+  it("honours a custom handshakeTimeoutMs", () => {
+    const t = new GrpcTransport({ host: "localhost", port: 15002, handshakeTimeoutMs: 500 });
+    assert.equal((t as unknown as { handshakeTimeoutMs: number }).handshakeTimeoutMs, 500);
+  });
+
+  it("accepts handshakeTimeoutMs = 0 to disable the deadline", () => {
+    const t = new GrpcTransport({ host: "localhost", port: 15002, handshakeTimeoutMs: 0 });
+    assert.equal((t as unknown as { handshakeTimeoutMs: number }).handshakeTimeoutMs, 0);
+  });
+
+  it("resolves _ensureHandshake immediately when the deadline is disabled", async () => {
+    const t = new GrpcTransport({ host: "192.0.2.1", port: 15002, handshakeTimeoutMs: 0 });
+    await (t as unknown as { _ensureHandshake(): Promise<void> })._ensureHandshake();
+  });
+});
+
 describe("GrpcTransport: ExecutePlanRequest shape", () => {
   type RequestBuilder = (
     sessionId: string,

@@ -351,5 +351,6 @@ export {
   InvalidInputError,
   UnsupportedOperationError,
   GrpcStatusCode,
+  isSessionInvalidated,
 } from "./errors.js";
 export type { GrpcStatusCode as GrpcStatusCodeType } from "./errors.js";
