@@ -245,9 +245,15 @@ describe("buildExpression()", () => {
     }
   });
 
-  it("builds null literal", () => {
+  it("builds null literal with a NullType DataType", () => {
     const result = buildExpression({ type: "literal", value: null });
     assert.equal(result.exprType.case, "literal");
+    if (result.exprType.case === "literal") {
+      assert.equal(result.exprType.value.literalType.case, "null");
+      if (result.exprType.value.literalType.case === "null") {
+        assert.equal(result.exprType.value.literalType.value.kind.case, "null");
+      }
+    }
   });
 
   it("builds alias expression", () => {

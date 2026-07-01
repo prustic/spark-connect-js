@@ -51,6 +51,7 @@ import {
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
   Expression_CastSchema,
+  DataType_NULLSchema,
   Expression_ExpressionStringSchema,
   type Catalog,
   CatalogSchema,
@@ -953,7 +954,12 @@ export function buildExpression(expr: CoreExpression): Expression {
           exprType: {
             case: "literal",
             value: create(Expression_LiteralSchema, {
-              literalType: { case: undefined, value: undefined },
+              literalType: {
+                case: "null",
+                value: create(DataTypeSchema, {
+                  kind: { case: "null", value: create(DataType_NULLSchema, {}) },
+                }),
+              },
             }),
           },
         });

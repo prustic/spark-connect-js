@@ -220,6 +220,8 @@ export {
 export {
   type DataType,
   DataTypeSchema,
+  type DataType_NULL,
+  DataType_NULLSchema,
   type DataType_Unparsed,
   DataType_UnparsedSchema,
 } from "./gen/spark/connect/types_pb.js";

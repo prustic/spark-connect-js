@@ -1,5 +1,6 @@
 import type { Expression } from "./plan/logical-plan.js";
 import type { WindowSpec } from "./window.js";
+import { InvalidInputError } from "./errors.js";
 
 /**
  * Either a {@link Column} or a primitive literal that {@link lit} can wrap.
@@ -397,12 +398,15 @@ export function col(name: string): Column {
 }
 
 /**
- * Wrap a JavaScript value as a literal column expression.
+ * Wrap a JavaScript value as a literal column expression. `lit(null)` produces
+ * a `NullType` null literal that can be re-typed with `.cast(...)`. Passing
+ * `undefined` throws `InvalidInputError` (JS `undefined` has no Spark analog).
  *
  * @example
  * ```ts
  * df.withColumn("flag", lit(true));
  * df.filter(col("age").gte(lit(18)));
+ * df.withColumn("name", lit(null).cast("string"));
  * ```
  *
  * @remarks
@@ -411,5 +415,11 @@ export function col(name: string): Column {
  * `bigint` literals when you need `LongType` semantics on the server.
  */
 export function lit(value: string | number | boolean | bigint | null): Column {
+  if (value === undefined) {
+    throw new InvalidInputError(
+      "lit(undefined) is not a valid literal. Pass null for a NULL literal " +
+        "(and .cast(type) it if you need a specific type), or pass a concrete value.",
+    );
+  }
   return new Column({ type: "literal", value });
 }
