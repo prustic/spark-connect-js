@@ -221,7 +221,7 @@ export interface AggregatePlan {
   groupType?: "groupby" | "rollup" | "cube" | "pivot";
   pivot?: {
     col: Expression;
-    values: Array<string | number | boolean>;
+    values: Array<string | number | boolean | null>;
   };
 }
 

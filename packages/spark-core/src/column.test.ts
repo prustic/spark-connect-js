@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { col, lit } from "./column.js";
+import { InvalidInputError } from "./errors.js";
 
 describe("col()", () => {
   it("creates an unresolved attribute expression", () => {
@@ -32,6 +33,18 @@ describe("lit()", () => {
 
   it("creates a null literal", () => {
     assert.deepStrictEqual(lit(null)._expr, { type: "literal", value: null });
+  });
+
+  it("throws InvalidInputError on undefined", () => {
+    assert.throws(
+      () => lit(undefined as unknown as null),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /undefined/);
+        assert.match(err.message, /null/);
+        return true;
+      },
+    );
   });
 });
 

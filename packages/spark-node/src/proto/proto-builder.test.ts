@@ -245,9 +245,15 @@ describe("buildExpression()", () => {
     }
   });
 
-  it("builds null literal", () => {
+  it("builds null literal with a NullType DataType", () => {
     const result = buildExpression({ type: "literal", value: null });
     assert.equal(result.exprType.case, "literal");
+    if (result.exprType.case === "literal") {
+      assert.equal(result.exprType.value.literalType.case, "null");
+      if (result.exprType.value.literalType.case === "null") {
+        assert.equal(result.exprType.value.literalType.value.kind.case, "null");
+      }
+    }
   });
 
   it("builds alias expression", () => {
@@ -1222,6 +1228,33 @@ describe("buildRelation() - aggregate groupTypes", () => {
       assert.equal(result.relType.value.groupType, 4); // PIVOT
       assert.ok(result.relType.value.pivot);
       assert.equal(result.relType.value.pivot.values.length, 3);
+    }
+  });
+
+  it("pivot with a null value emits a NullType literal (not LITERALTYPE_NOT_SET)", () => {
+    const result = buildRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupType: "pivot",
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "dept" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "salary" }],
+        },
+      ],
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "year" },
+        values: [null],
+      },
+    });
+    if (result.relType.case === "aggregate" && result.relType.value.pivot) {
+      const lit = result.relType.value.pivot.values[0];
+      assert.equal(lit.literalType.case, "null");
+      if (lit.literalType.case === "null") {
+        assert.equal(lit.literalType.value.kind.case, "null");
+      }
     }
   });
 });
