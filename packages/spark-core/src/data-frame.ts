@@ -37,6 +37,56 @@ function newPlanId(): bigint {
 }
 
 /**
+ * Render a decoded `Row` value in Spark's `show()` style. Mirrors PySpark
+ * and Scala:
+ *   - dates as `YYYY-MM-DD` when the time is midnight UTC, otherwise as
+ *     `YYYY-MM-DD HH:MM:SS[.fff]` with trailing-zero milliseconds stripped
+ *   - maps as `{k -> v, ...}`
+ *   - structs as `{v1, v2, ...}` (values only)
+ *   - arrays as `[v1, v2, ...]`
+ *   - binary as `[XX YY ZZ]` uppercase hex bytes
+ *   - other primitives via `toString()`
+ *
+ * Exported for unit testing. Public callers use {@link DataFrame.show}.
+ *
+ * @internal
+ */
+export function renderCell(val: unknown): string {
+  if (val === null || val === undefined) return "null";
+
+  if (val instanceof Date) {
+    const iso = val.toISOString();
+    const date = iso.slice(0, 10);
+    const time = iso.slice(11, 23);
+    if (time === "00:00:00.000") return date;
+    return `${date} ${time.replace(/\.?0+$/, "")}`;
+  }
+
+  if (val instanceof Map) {
+    const entries = Array.from(
+      val as Map<unknown, unknown>,
+      ([k, v]) => `${renderCell(k)} -> ${renderCell(v)}`,
+    );
+    return `{${entries.join(", ")}}`;
+  }
+
+  if (val instanceof Uint8Array) {
+    const hex = Array.from(val, (b) => b.toString(16).toUpperCase().padStart(2, "0"));
+    return `[${hex.join(" ")}]`;
+  }
+
+  if (Array.isArray(val)) {
+    return `[${(val as unknown[]).map(renderCell).join(", ")}]`;
+  }
+
+  if (typeof val === "object") {
+    return `{${Object.values(val).map(renderCell).join(", ")}}`;
+  }
+
+  return (val as number | string | bigint | boolean).toString();
+}
+
+/**
  * A distributed collection of rows with a named schema, obtained from a
  * {@link SparkSession} (for example via `spark.read.parquet(path)` or
  * `spark.sql(...)`).
@@ -1051,11 +1101,7 @@ export class DataFrame<R extends Row = Row> {
     const maxWidth = truncate ? 20 : Infinity;
 
     const fmt = (val: unknown): string => {
-      if (val === null || val === undefined) return "null";
-      const s =
-        typeof val === "object"
-          ? JSON.stringify(val)
-          : (val as number | string | bigint | boolean).toString();
+      const s = renderCell(val);
       return s.length > maxWidth ? s.slice(0, maxWidth - 3) + "..." : s;
     };
 
