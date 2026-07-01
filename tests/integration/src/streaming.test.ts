@@ -1,6 +1,13 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { SparkConnectError, Trigger } from "@spark-connect-js/node";
+import {
+  SparkConnectError,
+  Trigger,
+  col,
+  count,
+  window,
+  session_window,
+} from "@spark-connect-js/node";
 import { spark, stopSession } from "./setup.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -96,6 +103,60 @@ describe("Structured Streaming round-trip", () => {
       const plan = await query.explain(true);
       assert.equal(typeof plan, "string");
       assert.ok(plan.length > 0, "expected a non-empty explain plan");
+    } finally {
+      await query.stop();
+    }
+  });
+
+  it("withWatermark + window: append-mode event-time aggregation runs against a rate source", async () => {
+    const queryName = `q_win_${Math.random().toString(36).slice(2, 10)}`;
+    const query = await spark()
+      .readStream.format("rate")
+      .option("rowsPerSecond", "20")
+      .option("numPartitions", "1")
+      .load()
+      .withWatermark("timestamp", "2 seconds")
+      .groupBy(window(col("timestamp"), "1 second"))
+      .agg(count("*").alias("events"))
+      .writeStream.format("memory")
+      .queryName(queryName)
+      .outputMode("append")
+      .trigger(Trigger.processingTime("500 milliseconds"))
+      .start();
+
+    try {
+      const ok = await waitUntil(async () => (await query.lastProgress()) !== null, 10_000);
+      assert.ok(ok, "expected lastProgress() within 10s from a windowed+watermarked query");
+      assert.equal(await query.isActive(), true);
+    } finally {
+      await query.stop();
+    }
+  });
+
+  it("session_window: dynamic-gap sessions are accepted by the server and query becomes active", async () => {
+    // Progress-emission timing for session_window in append mode depends on
+    // watermark advance vs gap and can stall for many seconds on a rate source.
+    // The point of this test is proving the plan round-trips, so we assert
+    // start success + isActive rather than waiting on lastProgress.
+    const queryName = `q_sess_${Math.random().toString(36).slice(2, 10)}`;
+    const query = await spark()
+      .readStream.format("rate")
+      .option("rowsPerSecond", "20")
+      .option("numPartitions", "1")
+      .load()
+      .withWatermark("timestamp", "2 seconds")
+      .groupBy(session_window(col("timestamp"), "1 second"))
+      .agg(count("*").alias("events"))
+      .writeStream.format("memory")
+      .queryName(queryName)
+      .outputMode("append")
+      .trigger(Trigger.processingTime("500 milliseconds"))
+      .start();
+
+    try {
+      assert.equal(await query.isActive(), true);
+      const status = await query.status();
+      assert.equal(typeof status.message, "string");
     } finally {
       await query.stop();
     }

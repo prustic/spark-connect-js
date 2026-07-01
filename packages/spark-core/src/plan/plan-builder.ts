@@ -470,6 +470,15 @@ export class PlanBuilder {
           },
         };
 
+      case "watermark":
+        return {
+          withWatermark: {
+            input: PlanBuilder.toRelation(plan.child),
+            eventTime: plan.eventTime,
+            delayThreshold: plan.delayThreshold,
+          },
+        };
+
       default: {
         const _exhaustive: never = plan;
         throw new UnsupportedOperationError(

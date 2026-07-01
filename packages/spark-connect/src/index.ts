@@ -128,6 +128,8 @@ export {
   WithColumnsSchema,
   type WithColumnsRenamed,
   WithColumnsRenamedSchema,
+  type WithWatermark,
+  WithWatermarkSchema,
   type ShowString,
   ShowStringSchema,
   type Read_DataSource,
