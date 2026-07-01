@@ -107,6 +107,12 @@ export interface Transport {
 export type ArrowDecoderFn = (chunks: Uint8Array[]) => Promise<Row[]>;
 
 /**
+ * Encodes plain JavaScript {@link Row} objects into Arrow IPC streaming bytes
+ * for `SparkSession.createDataFrame([...])`. Injected by the runtime adapter.
+ */
+export type ArrowEncoderFn = (rows: Row[]) => Uint8Array;
+
+/**
  * Construction parameters for a {@link SparkSession}. Most users build a session
  * via the runtime adapter's builder (e.g. `SparkSessionBuilder` from
  * `@spark-connect-js/node`); this config is what the builder hands to
@@ -124,6 +130,13 @@ export interface SparkSessionConfig {
    * provided, `collect()` and similar actions will throw at runtime.
    */
   arrowDecoder?: ArrowDecoderFn;
+
+  /**
+   * `Row[]` to Arrow IPC encoder injected by the runtime adapter. If not
+   * provided, `createDataFrame([...])` with plain rows will throw at
+   * runtime. Passing a `Uint8Array` still works without an encoder.
+   */
+  arrowEncoder?: ArrowEncoderFn;
 
   /** Optional session ID override for reattaching to an existing server-side session. */
   sessionId?: string;
@@ -162,6 +175,8 @@ export class SparkSession {
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
   /** @internal */
+  readonly _arrowEncoder: ArrowEncoderFn | undefined;
+  /** @internal */
   private _streamingListenerBus: StreamingQueryListenerBus | undefined;
 
   /** @internal Called by SparkSessionBuilder to construct the session. */
@@ -174,6 +189,7 @@ export class SparkSession {
     this.transport = config.transport;
     this.remote = config.remote;
     this._arrowDecoder = config.arrowDecoder;
+    this._arrowEncoder = config.arrowEncoder;
   }
 
   // Builder
@@ -263,21 +279,59 @@ export class SparkSession {
   }
 
   /**
-   * Create a DataFrame from Arrow IPC data.
+   * Create a DataFrame from a plain array of row objects. The runtime adapter
+   * encodes the rows to Arrow IPC internally, so callers do not need to build
+   * the Arrow bytes themselves.
    *
-   * @param data  - Arrow IPC streaming format bytes
-   * @param schema - Optional DDL-formatted schema string (e.g. "id INT, name STRING")
+   * Type inference walks the first non-null value per column:
+   *   - `string` becomes `Utf8` (never `Dictionary<Int32, Utf8>`, which Spark
+   *     LocalRelation misreads as bare integer indices)
+   *   - `number` becomes `Int32` if every value is an integer, otherwise `Float64`
+   *   - `boolean` becomes `Bool`
+   *   - `bigint` becomes `Int64`
+   *   - `Date` becomes `Timestamp[ms]`
+   *   - `null` and `undefined` in a column with a typed sibling are preserved as null
    *
-   * @example
-   *   const arrowData = ArrowEncoder.encode(rows, schema);
-   *   const df = spark.createDataFrame(arrowData);
+   * For richer types (Decimal, Struct, Array, Map, Binary), build the Arrow
+   * IPC bytes yourself and pass a `Uint8Array` to the other overload.
    */
-  createDataFrame(data: Uint8Array, schema?: string): DataFrame {
-    return DataFrame._fromPlan(this, {
-      type: "localRelation",
-      data,
-      schema,
-    });
+  createDataFrame(rows: Row[], schema?: string): DataFrame;
+  /**
+   * Create a DataFrame from pre-built Arrow IPC streaming bytes.
+   *
+   * @param data - Arrow IPC **streaming** format bytes. File-format input
+   * (magic prefix `ARROW1\0\0`) is rejected.
+   * @param schema - Optional DDL-formatted schema string (e.g. `"id INT, name STRING"`).
+   * @throws `InvalidInputError` on empty input or file-format bytes.
+   */
+  createDataFrame(data: Uint8Array, schema?: string): DataFrame;
+  createDataFrame(input: Uint8Array | Row[], schema?: string): DataFrame {
+    if (input instanceof Uint8Array) {
+      validateArrowIpcStream(input);
+      return DataFrame._fromPlan(this, {
+        type: "localRelation",
+        data: input,
+        schema,
+      });
+    }
+    if (Array.isArray(input)) {
+      if (!this._arrowEncoder) {
+        throw new InvalidConfigError(
+          "createDataFrame([...]) requires an Arrow encoder. " +
+            "Use `connect()` from `@spark-connect-js/node` (it wires the encoder automatically) " +
+            "or pass `arrowEncoder` in SparkSessionConfig.",
+        );
+      }
+      const data = this._arrowEncoder(input);
+      return DataFrame._fromPlan(this, {
+        type: "localRelation",
+        data,
+        schema,
+      });
+    }
+    throw new InvalidInputError(
+      "createDataFrame expected a Uint8Array (Arrow IPC stream bytes) or an array of Row objects.",
+    );
   }
 
   /** @internal Used by DataFrame to send plans via the injected transport */
@@ -479,6 +533,12 @@ export class SparkSessionBuilder {
     return this;
   }
 
+  /** Inject an Arrow IPC encoder. Required for `createDataFrame([...])` with plain rows. */
+  arrowEncoder(encoder: ArrowEncoderFn): this {
+    this.config.arrowEncoder = encoder;
+    return this;
+  }
+
   /**
    * Reuse an existing server-side session by ID. Must be a canonical UUID
    * string in the form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`. If unset, a
@@ -512,6 +572,34 @@ export class SparkSessionBuilder {
 }
 
 // Validation helpers shared between session and builder
+
+// File format OOMs Spark's LocalRelation reader (whole-payload allocation).
+// Only stream format is accepted.
+const ARROW_FILE_MAGIC = new Uint8Array([0x41, 0x52, 0x52, 0x4f, 0x57, 0x31, 0x00, 0x00]);
+
+function validateArrowIpcStream(data: Uint8Array): void {
+  if (data.length === 0) {
+    throw new InvalidInputError(
+      "createDataFrame received an empty Uint8Array. Expected Arrow IPC streaming format bytes.",
+    );
+  }
+  if (data.length >= ARROW_FILE_MAGIC.length) {
+    let isFile = true;
+    for (let i = 0; i < ARROW_FILE_MAGIC.length; i++) {
+      if (data[i] !== ARROW_FILE_MAGIC[i]) {
+        isFile = false;
+        break;
+      }
+    }
+    if (isFile) {
+      throw new InvalidInputError(
+        "createDataFrame received Arrow IPC file-format bytes (magic prefix ARROW1). " +
+          "Only the streaming format is supported. If you built the payload with apache-arrow's " +
+          "tableToIPC, pass 'stream' as the second argument.",
+      );
+    }
+  }
+}
 
 /**
  * Validate a Spark Connect operation tag. The proto comment requires tags
