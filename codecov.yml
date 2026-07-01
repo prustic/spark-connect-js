@@ -21,6 +21,11 @@ flags:
     paths:
       - packages/spark-node/
     carryforward: true
+  integration:
+    paths:
+      - packages/spark-core/
+      - packages/spark-node/
+    carryforward: true
 
 comment:
   layout: "reach,diff,flags,components"
@@ -31,4 +36,5 @@ ignore:
   - "packages/spark-connect/**"
   - "examples/**"
   - "tooling/**"
+  - "tests/**"
   - "**/*.test.js"
