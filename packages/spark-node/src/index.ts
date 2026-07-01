@@ -30,6 +30,7 @@ export type { ParsedConnectionString } from "./transport/connection-string.js";
 export { DEFAULT_RETRY_POLICY } from "./transport/retry.js";
 export type { RetryPolicy } from "./transport/retry.js";
 export { ArrowDecoder } from "./arrow/arrow-decoder.js";
+export { ArrowEncoder } from "./arrow/arrow-encoder.js";
 export { SparkProcessManager } from "./process/spark-process-manager.js";
 /** @internal Used by GrpcTransport; not part of the public API */
 export { buildRelation, buildExpression } from "./proto/proto-builder.js";
@@ -346,6 +347,7 @@ export type {
   FieldDescriptor,
   Transport,
   ArrowDecoderFn,
+  ArrowEncoderFn,
   SaveMode,
   StorageLevel,
   CatalogOperation,
@@ -367,6 +369,7 @@ import { SparkSession } from "@spark-connect-js/core";
 import { GrpcTransport } from "./transport/grpc-transport.js";
 import { parseConnectionString } from "./transport/connection-string.js";
 import { ArrowDecoder } from "./arrow/arrow-decoder.js";
+import { ArrowEncoder } from "./arrow/arrow-encoder.js";
 
 /**
  * Create a fully-wired SparkSession for Node.js.
@@ -403,7 +406,8 @@ export function connect(remote: string): SparkSession {
   const builder = SparkSession.builder()
     .remote(remote)
     .transport(transport)
-    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks));
+    .arrowDecoder((chunks) => ArrowDecoder.decode(chunks))
+    .arrowEncoder((rows) => ArrowEncoder.encode(rows));
 
   if (parsed.sessionId !== undefined) {
     builder.sessionId(parsed.sessionId);

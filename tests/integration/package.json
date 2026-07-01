@@ -23,6 +23,7 @@
     "@spark-connect-js/eslint-config": "workspace:*",
     "@spark-connect-js/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "apache-arrow": "^21.1.0",
     "eslint": "catalog:",
     "typescript": "catalog:"
   }

@@ -341,6 +341,7 @@ export type {
   SparkSessionConfig,
   Transport,
   ArrowDecoderFn,
+  ArrowEncoderFn,
   ExecuteOptions,
 } from "./spark-session.js";
 export {
