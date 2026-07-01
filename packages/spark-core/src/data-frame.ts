@@ -154,8 +154,8 @@ export class DataFrame<R extends Row = Row> {
    * A string is parsed server-side as SQL via `expr(...)`.
    *
    * @example
-   *   df.filter(col("age").gte(18));
-   *   df.filter("age >= 18 AND region = 'EU'");
+   *   df.filter(col("status").eq(lit("active")));
+   *   df.filter("status = 'active' AND region IN ('EU', 'US')");
    */
   filter(condition: Column | string): DataFrame<R> {
     const cond = typeof condition === "string" ? sqlExpr(condition) : condition;

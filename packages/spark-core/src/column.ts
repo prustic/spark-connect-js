@@ -10,8 +10,8 @@ import { InvalidInputError } from "./errors.js";
 export type ColOrLiteral = Column | string | number | boolean | bigint | null;
 
 /**
- * Wrap a `ColOrLiteral` into a `Column`. Column values pass through;
- * primitives get wrapped in `lit()`. Used by `Column` methods and by
+ * Wrap a `ColOrLiteral` into a `Column`. Column values pass through.
+ * Primitives get wrapped in `lit()`. Used by `Column` methods and by
  * DSL functions that accept either a Column or a primitive literal.
  *
  * @internal
