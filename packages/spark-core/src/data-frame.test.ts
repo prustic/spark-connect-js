@@ -5,7 +5,6 @@ import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import { col, lit } from "./column.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
-import { renderCell } from "./data-frame.js";
 
 /** Minimal mock transport that records calls without doing I/O. */
 function mockTransport(_rows?: Record<string, unknown>[]): Transport & { calls: LogicalPlan[] } {
@@ -1462,75 +1461,5 @@ describe("DataFrameReader.text()", () => {
       assert.equal(df._plan.format, "text");
       assert.equal(df._plan.path, "/data/file.txt");
     }
-  });
-});
-
-describe("renderCell (show formatting)", () => {
-  it("renders null and undefined as 'null'", () => {
-    assert.equal(renderCell(null), "null");
-    assert.equal(renderCell(undefined), "null");
-  });
-
-  it("renders primitives via toString", () => {
-    assert.equal(renderCell(42), "42");
-    assert.equal(renderCell(3.14), "3.14");
-    assert.equal(renderCell("hello"), "hello");
-    assert.equal(renderCell(true), "true");
-    assert.equal(renderCell(false), "false");
-    assert.equal(renderCell(9_000_000_000n), "9000000000");
-  });
-
-  it("renders midnight UTC dates as date-only", () => {
-    assert.equal(renderCell(new Date("2026-06-29T00:00:00.000Z")), "2026-06-29");
-  });
-
-  it("renders timestamps in Spark space-separated format", () => {
-    assert.equal(renderCell(new Date("2026-06-29T13:45:06.123Z")), "2026-06-29 13:45:06.123");
-  });
-
-  it("strips trailing zero milliseconds", () => {
-    assert.equal(renderCell(new Date("2026-06-29T13:45:06.500Z")), "2026-06-29 13:45:06.5");
-  });
-
-  it("strips trailing zero milliseconds down to whole seconds", () => {
-    assert.equal(renderCell(new Date("2026-06-29T13:45:06.000Z")), "2026-06-29 13:45:06");
-  });
-
-  it("renders Map<int, string> in Spark arrow notation", () => {
-    const m = new Map<unknown, unknown>([
-      [1, "a"],
-      [2, "b"],
-    ]);
-    assert.equal(renderCell(m), "{1 -> a, 2 -> b}");
-  });
-
-  it("renders nested Map values via recursion", () => {
-    const m = new Map<unknown, unknown>([["k", new Date("2026-06-29T00:00:00.000Z")]]);
-    assert.equal(renderCell(m), "{k -> 2026-06-29}");
-  });
-
-  it("renders Uint8Array as bracketed uppercase hex bytes", () => {
-    assert.equal(renderCell(new Uint8Array([0x6f, 0x72, 0x61])), "[6F 72 61]");
-    assert.equal(renderCell(new Uint8Array([0, 1, 15, 255])), "[00 01 0F FF]");
-  });
-
-  it("renders arrays with element-wise recursion", () => {
-    assert.equal(renderCell([1, 2, 3]), "[1, 2, 3]");
-    assert.equal(
-      renderCell([new Date("2026-06-29T00:00:00.000Z"), new Date("2026-07-01T00:00:00.000Z")]),
-      "[2026-06-29, 2026-07-01]",
-    );
-  });
-
-  it("renders structs as Spark-style brace-comma values", () => {
-    assert.equal(renderCell({ name: "Alice", age: 30 }), "{Alice, 30}");
-  });
-
-  it("renders nested structs", () => {
-    assert.equal(renderCell({ inner: { x: 1, y: 2 }, label: "pt" }), "{{1, 2}, pt}");
-  });
-
-  it("renders decimals (already strings) without quotes", () => {
-    assert.equal(renderCell("1.50"), "1.50");
   });
 });

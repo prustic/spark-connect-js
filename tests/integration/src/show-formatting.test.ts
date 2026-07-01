@@ -69,4 +69,52 @@ describe("show() Spark-style formatting", () => {
     const out = await captureShow(() => df.show(20, false));
     assert.match(out, /\[2026-06-29, 2026-07-01\]/);
   });
+
+  it("renders NULL cells as the literal 'null'", async () => {
+    const df = spark().sql(`SELECT CAST(NULL AS STRING) AS n`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\| null +\|/);
+  });
+
+  it("drops the fractional part when milliseconds are all zero", async () => {
+    const df = spark().sql(`SELECT TIMESTAMP '2026-06-29 13:45:06' AS t`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /2026-06-29 13:45:06 /);
+    assert.doesNotMatch(out, /13:45:06\.0/);
+  });
+
+  it("renders nested Map values via recursion", async () => {
+    const df = spark().sql(`SELECT map('k', DATE '2026-06-29') AS m`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /\{k -> 2026-06-29\}/);
+  });
+
+  it("renders nested struct as brace-comma values recursively", async () => {
+    const df = spark().sql(
+      `SELECT named_struct('inner', named_struct('x', 1, 'y', 2), 'label', 'pt') AS s`,
+    );
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /\{\{1, 2\}, pt\}/);
+  });
+
+  it("renders BINARY columns as uppercase hex bytes", async () => {
+    const df = spark().sql(`SELECT unhex('6F7261') AS b`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\[6F 72 61\]/);
+  });
+
+  it("renders BOOLEAN columns as 'true' and 'false'", async () => {
+    const df = spark().sql(`SELECT true AS t, false AS f`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\| true +\| false +\|/);
+  });
+
+  it("renders large longs without the JS bigint 'n' suffix", async () => {
+    // A value above Number.MAX_SAFE_INTEGER decodes to bigint under the current
+    // value-driven long-decode policy; renderCell must strip the JS `n` suffix.
+    const df = spark().sql(`SELECT CAST(9007199254740993 AS BIGINT) AS big`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /9007199254740993/);
+    assert.doesNotMatch(out, /9007199254740993n/);
+  });
 });

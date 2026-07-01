@@ -25,33 +25,8 @@ function inferLiteralValue(s: string): string | number | boolean | null {
 // console is available in Node, Deno, and all browsers, but not in the ES2023 lib.
 declare const console: { log(msg: string): void };
 
-/**
- * Generate a random non-negative 63-bit `bigint` plan identifier. Matches
- * PySpark Connect's `random.randint(0, (1 << 63) - 1)` so the value fits in
- * the proto's signed `int64 plan_id` field without sign games.
- */
-function newPlanId(): bigint {
-  const high = BigInt(Math.floor(Math.random() * 0x80000000)); // 31 bits
-  const low = BigInt(Math.floor(Math.random() * 0x100000000)); // 32 bits
-  return (high << 32n) | low;
-}
-
-/**
- * Render a decoded `Row` value in Spark's `show()` style. Mirrors PySpark
- * and Scala:
- *   - dates as `YYYY-MM-DD` when the time is midnight UTC, otherwise as
- *     `YYYY-MM-DD HH:MM:SS[.fff]` with trailing-zero milliseconds stripped
- *   - maps as `{k -> v, ...}`
- *   - structs as `{v1, v2, ...}` (values only)
- *   - arrays as `[v1, v2, ...]`
- *   - binary as `[XX YY ZZ]` uppercase hex bytes
- *   - other primitives via `toString()`
- *
- * Exported for unit testing. Public callers use {@link DataFrame.show}.
- *
- * @internal
- */
-export function renderCell(val: unknown): string {
+// Render a Row value in Spark's show() style. Mirrors PySpark and Scala.
+function renderCell(val: unknown): string {
   if (val === null || val === undefined) return "null";
 
   if (val instanceof Date) {
@@ -84,6 +59,17 @@ export function renderCell(val: unknown): string {
   }
 
   return (val as number | string | bigint | boolean).toString();
+}
+
+/**
+ * Generate a random non-negative 63-bit `bigint` plan identifier. Matches
+ * PySpark Connect's `random.randint(0, (1 << 63) - 1)` so the value fits in
+ * the proto's signed `int64 plan_id` field without sign games.
+ */
+function newPlanId(): bigint {
+  const high = BigInt(Math.floor(Math.random() * 0x80000000)); // 31 bits
+  const low = BigInt(Math.floor(Math.random() * 0x100000000)); // 32 bits
+  return (high << 32n) | low;
 }
 
 /**
