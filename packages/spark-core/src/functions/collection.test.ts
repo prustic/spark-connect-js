@@ -41,7 +41,7 @@ import {
   map_concat,
 } from "./collection.js";
 
-import type { Column } from "../column.js";
+import { col, type Column } from "../column.js";
 
 function assertFn(c: Column, name: string, argCount?: number) {
   assert.equal(c._expr.type, "unresolvedFunction");
@@ -117,6 +117,39 @@ describe("collection functions", () => {
     assert.equal(r2._expr.type, "unresolvedFunction");
     const r3 = slice("arr", 1, 3);
     assert.equal(r3._expr.type, "unresolvedFunction");
+  });
+
+  it("element_at with a numeric index wraps it in lit()", () => {
+    const result = element_at("arr", 1);
+    if (result._expr.type === "unresolvedFunction") {
+      const idxExpr = result._expr.arguments[1];
+      assert.equal(idxExpr.type, "literal");
+      if (idxExpr.type === "literal") {
+        assert.equal(idxExpr.value, 1);
+      }
+    }
+  });
+
+  it("element_at with a string index treats it as a column name", () => {
+    const result = element_at("arr", "idx_col");
+    if (result._expr.type === "unresolvedFunction") {
+      const idxExpr = result._expr.arguments[1];
+      assert.equal(idxExpr.type, "unresolvedAttribute");
+      if (idxExpr.type === "unresolvedAttribute") {
+        assert.equal(idxExpr.name, "idx_col");
+      }
+    }
+  });
+
+  it("element_at with a Column index forwards its expression as-is", () => {
+    const result = element_at("arr", col("idx"));
+    if (result._expr.type === "unresolvedFunction") {
+      const idxExpr = result._expr.arguments[1];
+      assert.equal(idxExpr.type, "unresolvedAttribute");
+      if (idxExpr.type === "unresolvedAttribute") {
+        assert.equal(idxExpr.name, "idx");
+      }
+    }
   });
 
   it("explode/explode_outer/posexplode/posexplode_outer", () => {

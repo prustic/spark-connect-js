@@ -2,6 +2,7 @@ import type { SparkSession } from "./spark-session.js";
 import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { Column, col } from "./column.js";
+import { expr as sqlExpr } from "./functions/conditional.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
@@ -148,17 +149,25 @@ export class DataFrame<R extends Row = Row> {
 
   // Transformations
 
-  /** Filter rows by a boolean Column expression. */
-  filter(condition: Column): DataFrame<R> {
+  /**
+   * Filter rows by a boolean Column expression or a SQL predicate string.
+   * A string is parsed server-side as SQL via `expr(...)`.
+   *
+   * @example
+   *   df.filter(col("status").eq(lit("active")));
+   *   df.filter("status = 'active' AND region IN ('EU', 'US')");
+   */
+  filter(condition: Column | string): DataFrame<R> {
+    const cond = typeof condition === "string" ? sqlExpr(condition) : condition;
     return DataFrame._fromPlan<R>(this._session, {
       type: "filter",
       child: this._plan,
-      condition: condition._expr,
+      condition: cond._expr,
     });
   }
 
   /** Alias for filter(). */
-  where(condition: Column): DataFrame<R> {
+  where(condition: Column | string): DataFrame<R> {
     return this.filter(condition);
   }
 

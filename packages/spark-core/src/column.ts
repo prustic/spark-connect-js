@@ -9,7 +9,14 @@ import { InvalidInputError } from "./errors.js";
  */
 export type ColOrLiteral = Column | string | number | boolean | bigint | null;
 
-function liftCol(v: ColOrLiteral): Column {
+/**
+ * Wrap a `ColOrLiteral` into a `Column`. Column values pass through.
+ * Primitives get wrapped in `lit()`. Used by `Column` methods and by
+ * DSL functions that accept either a Column or a primitive literal.
+ *
+ * @internal
+ */
+export function liftCol(v: ColOrLiteral): Column {
   return v instanceof Column ? v : lit(v);
 }
 

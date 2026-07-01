@@ -2,7 +2,7 @@
  * String functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js";
+import { Column, fnExpr, toExpr, _lit, _liftCol, type ColOrName, fn } from "./_helpers.js";
 
 /** Converts a string column to upper case. */
 export function upper(column: ColOrName): Column {
@@ -72,10 +72,18 @@ export function substring(column: ColOrName, pos: number, len: number): Column {
   return new Column(fnExpr("substring", toExpr(column), _lit(pos)._expr, _lit(len)._expr));
 }
 
-/** Replaces all substrings of the specified string value that match the pattern with the replacement. */
-export function regexp_replace(column: ColOrName, pattern: string, replacement: string): Column {
+/**
+ * Replaces all substrings that match the regex pattern with the replacement.
+ * `pattern` and `replacement` accept a `Column` (per-row values) or a string
+ * literal.
+ */
+export function regexp_replace(
+  column: ColOrName,
+  pattern: Column | string,
+  replacement: Column | string,
+): Column {
   return new Column(
-    fnExpr("regexp_replace", toExpr(column), _lit(pattern)._expr, _lit(replacement)._expr),
+    fnExpr("regexp_replace", toExpr(column), _liftCol(pattern)._expr, _liftCol(replacement)._expr),
   );
 }
 

@@ -47,7 +47,7 @@ import {
   pi,
 } from "./math.js";
 
-import type { Column } from "../column.js";
+import { col, type Column } from "../column.js";
 
 // Helper: assert unresolvedFunction with correct name
 function assertFn(col: Column, name: string) {
@@ -89,6 +89,29 @@ describe("math functions", () => {
     const result = pow("x", 2);
     if (result._expr.type === "unresolvedFunction") {
       assert.equal(result._expr.name, "power");
+    }
+  });
+
+  it("pow() with a numeric literal exponent wraps it in lit()", () => {
+    const result = pow("x", 3);
+    if (result._expr.type === "unresolvedFunction") {
+      const exponentExpr = result._expr.arguments[1];
+      assert.equal(exponentExpr.type, "literal");
+      if (exponentExpr.type === "literal") {
+        assert.equal(exponentExpr.value, 3);
+      }
+    }
+  });
+
+  it("pow() with a Column exponent forwards its expression as-is", () => {
+    const exponent = col("exp");
+    const result = pow("base", exponent);
+    if (result._expr.type === "unresolvedFunction") {
+      const exponentExpr = result._expr.arguments[1];
+      assert.equal(exponentExpr.type, "unresolvedAttribute");
+      if (exponentExpr.type === "unresolvedAttribute") {
+        assert.equal(exponentExpr.name, "exp");
+      }
     }
   });
 
