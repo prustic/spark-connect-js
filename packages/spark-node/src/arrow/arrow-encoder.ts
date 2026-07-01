@@ -59,9 +59,6 @@ function buildColumnVector(name: string, values: unknown[]): Vector {
     );
   }
 
-  // Every non-null value must be the same category. Apache-arrow's builders
-  // fail loudly but with low-level messages that name neither the column nor
-  // the offending value, so we check ourselves first.
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
     if (v === null || v === undefined) continue;
