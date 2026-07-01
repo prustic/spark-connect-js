@@ -190,6 +190,29 @@ describe("DataFrame transformations (lazy)", () => {
     assert.equal(df._plan.type, "filter");
   });
 
+  it("filter() with a SQL predicate string wraps it in expr()", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").filter("x >= 10");
+    assert.equal(df._plan.type, "filter");
+    if (df._plan.type === "filter") {
+      // The condition should be an ExpressionString expression, not a raw
+      // string being handed to the plan builder.
+      assert.equal(df._plan.condition.type, "expressionString");
+      if (df._plan.condition.type === "expressionString") {
+        assert.equal(df._plan.condition.expression, "x >= 10");
+      }
+    }
+  });
+
+  it("where() with a SQL predicate string works the same as filter(string)", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").where("x >= 10");
+    assert.equal(df._plan.type, "filter");
+    if (df._plan.type === "filter") {
+      assert.equal(df._plan.condition.type, "expressionString");
+    }
+  });
+
   it("select() wraps plan in a project node", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t").select("a", "b");

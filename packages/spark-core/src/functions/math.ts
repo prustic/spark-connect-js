@@ -39,9 +39,18 @@ export function cbrt(column: ColOrName): Column {
   return fn("cbrt", column);
 }
 
-/** Returns the value of the first argument raised to the power of the second argument. */
-export function pow(column: ColOrName, exponent: number): Column {
-  return new Column(fnExpr("power", toExpr(column), _lit(exponent)._expr));
+/**
+ * Returns the value of the first argument raised to the power of the second.
+ * `exponent` accepts a `Column` (per-row exponent) or a numeric literal.
+ */
+export function pow(column: ColOrName, exponent: Column | number): Column {
+  return new Column(
+    fnExpr(
+      "power",
+      toExpr(column),
+      exponent instanceof Column ? exponent._expr : _lit(exponent)._expr,
+    ),
+  );
 }
 
 /** Computes the natural logarithm of the given value. */
