@@ -273,9 +273,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.0.1
-      apache-arrow:
-        specifier: ^21.1.0
-        version: 21.1.0
       eslint:
         specifier: 'catalog:'
         version: 10.6.0

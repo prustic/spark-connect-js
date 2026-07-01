@@ -1,7 +1,6 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { InvalidInputError } from "@spark-connect-js/node";
+import { ArrowEncoder, InvalidInputError } from "@spark-connect-js/node";
 import { spark, stopSession } from "./setup.js";
 
 describe("createDataFrame([]): plain-rows overload", () => {
@@ -56,11 +55,7 @@ describe("createDataFrame(bytes): Arrow IPC input validation", () => {
   });
 
   it("accepts pre-built stream-format Arrow bytes", async () => {
-    // Build via apache-arrow directly. Note that apache-arrow's default
-    // tableFromArrays uses Dictionary<Int32, Utf8> for strings. Ints are
-    // materialized, so this test uses an int column.
-    const table = tableFromArrays({ id: [10, 20, 30] });
-    const bytes = tableToIPC(table, "stream");
+    const bytes = ArrowEncoder.encode([{ id: 10 }, { id: 20 }, { id: 30 }]);
     const df = spark().createDataFrame(bytes);
     const rows = await df.collect();
     assert.equal(rows.length, 3);

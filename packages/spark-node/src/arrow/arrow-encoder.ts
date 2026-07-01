@@ -1,15 +1,3 @@
-/**
- * Encode plain JS `Row[]` values into Arrow IPC streaming bytes for
- * `SparkSession.createDataFrame([...])`.
- *
- * Strings are always emitted as materialized `Utf8` vectors, never
- * `Dictionary<Int32, Utf8>`. apache-arrow's `tableFromArrays` defaults to
- * dictionary encoding for string columns, but Spark's LocalRelation reader
- * does not apply the dictionary batch, so the server sees bare integer
- * indices instead of the string values. Bypassing dictionary encoding at
- * build time is the fix.
- */
-
 import { InvalidInputError, type Row } from "@spark-connect-js/core";
 import {
   Table,
@@ -24,6 +12,12 @@ import {
   type Vector,
 } from "apache-arrow";
 
+/**
+ * Encode `Row[]` values into Arrow IPC streaming bytes for
+ * `SparkSession.createDataFrame([...])`. Strings emit as `Utf8`, never
+ * `Dictionary<Int32, Utf8>`, because Spark's LocalRelation reader ignores
+ * the dictionary batch and would see bare integer indices.
+ */
 export class ArrowEncoder {
   static encode(rows: Row[]): Uint8Array {
     if (rows.length === 0) {
