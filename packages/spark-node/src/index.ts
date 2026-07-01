@@ -53,6 +53,7 @@ export {
   InvalidInputError,
   UnsupportedOperationError,
   GrpcStatusCode,
+  isSessionInvalidated,
   DataFrameWriter,
   DataFrameWriterV2,
   DataStreamReader,

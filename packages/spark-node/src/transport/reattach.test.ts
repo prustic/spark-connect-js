@@ -12,6 +12,7 @@ const fastPolicy: RetryPolicy = {
   maxBackoffMs: 1,
   backoffMultiplier: 1,
   jitterMs: 0,
+  maxConsecutiveNoProgressReattaches: 0,
 };
 const noSleep = (): Promise<void> => Promise.resolve();
 
@@ -186,5 +187,103 @@ describe("iterateWithReattach", () => {
       }),
     );
     assert.deepStrictEqual(reattachCalls, [undefined]);
+  });
+
+  it("bails with REATTACH_NO_PROGRESS after N consecutive zero-yield reattaches", async () => {
+    const capPolicy: RetryPolicy = { ...fastPolicy, maxConsecutiveNoProgressReattaches: 3 };
+    await assert.rejects(
+      collect(
+        iterateWithReattach({
+          initial: () => gen(transientError()),
+          reattach: () => gen(transientError()),
+          retryPolicy: capPolicy,
+          sleep: noSleep,
+        }),
+      ),
+      (err: unknown) => {
+        if (!(err instanceof Error)) return false;
+        assert.match(err.message, /no progress/i);
+        assert.match(err.message, /3 consecutive stream attempts/);
+        return true;
+      },
+    );
+  });
+
+  it("resets the no-progress counter when a stream yields a batch before failing", async () => {
+    const capPolicy: RetryPolicy = { ...fastPolicy, maxConsecutiveNoProgressReattaches: 3 };
+    const batches = await collect(
+      iterateWithReattach({
+        initial: () => gen(transientError()),
+        reattach: (() => {
+          let n = 0;
+          return () => {
+            n++;
+            if (n === 1) return gen(transientError());
+            if (n === 2) return gen(arrowBatch("r1", [1]), transientError());
+            return gen(resultComplete("r2"));
+          };
+        })(),
+        retryPolicy: capPolicy,
+        sleep: noSleep,
+      }),
+    );
+    assert.deepStrictEqual(
+      batches.map((b) => Array.from(b)),
+      [[1]],
+    );
+  });
+
+  it("does not enforce the no-progress ceiling when maxConsecutiveNoProgressReattaches is 0", async () => {
+    let calls = 0;
+    const disabledPolicy: RetryPolicy = {
+      ...fastPolicy,
+      maxRetries: 10,
+      maxConsecutiveNoProgressReattaches: 0,
+    };
+    const batches = await collect(
+      iterateWithReattach({
+        initial: () => gen(transientError()),
+        reattach: () => {
+          calls++;
+          if (calls >= 5) return gen(resultComplete("done"));
+          return gen(transientError());
+        },
+        retryPolicy: disabledPolicy,
+        sleep: noSleep,
+      }),
+    );
+    assert.equal(batches.length, 0);
+    assert.equal(calls, 5);
+  });
+
+  it("resets the retry attempt counter (and its backoff) when a stream yields a batch", async () => {
+    const growingPolicy: RetryPolicy = {
+      maxRetries: 10,
+      initialBackoffMs: 10,
+      maxBackoffMs: 10_000,
+      backoffMultiplier: 2,
+      jitterMs: 0,
+      maxConsecutiveNoProgressReattaches: 0,
+    };
+    const sleeps: number[] = [];
+    const recordSleep = (ms: number): Promise<void> => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    let call = 0;
+    await collect(
+      iterateWithReattach({
+        initial: () => gen(arrowBatch("r1", [1]), transientError()),
+        reattach: () => {
+          call++;
+          if (call === 1) return gen(arrowBatch("r2", [2]), transientError());
+          if (call === 2) return gen(arrowBatch("r3", [3]), transientError());
+          return gen(resultComplete("r4"));
+        },
+        retryPolicy: growingPolicy,
+        sleep: recordSleep,
+      }),
+    );
+    assert.deepStrictEqual(sleeps, [10, 10, 10]);
   });
 });

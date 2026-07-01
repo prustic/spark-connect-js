@@ -146,7 +146,13 @@ export interface GrpcTransportOptions {
    * `DefaultPolicy`.
    */
   retryPolicy?: RetryPolicy;
+  /**
+   * Deadline in ms for the initial channel handshake. `0` disables. Default 10_000.
+   */
+  handshakeTimeoutMs?: number;
 }
+
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 10_000;
 
 /**
  * gRPC-based transport for Spark Connect.
@@ -166,7 +172,9 @@ export class GrpcTransport implements Transport {
   private readonly userContext: UserContext;
   private readonly clientType: string;
   private readonly retryPolicy: RetryPolicy;
+  private readonly handshakeTimeoutMs: number;
   private client: grpc.Client | null = null;
+  private handshakePromise: Promise<void> | null = null;
   /**
    * Server-side session IDs observed in responses, keyed by client session ID.
    * Echoed back on subsequent requests so the server can detect a stale
@@ -192,6 +200,7 @@ export class GrpcTransport implements Transport {
     });
     this.clientType = buildClientType(options.userAgent);
     this.retryPolicy = options.retryPolicy ?? DEFAULT_RETRY_POLICY;
+    this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
   }
 
   /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
@@ -215,6 +224,7 @@ export class GrpcTransport implements Transport {
       this.client.close();
       this.client = null;
     }
+    this.handshakePromise = null;
   }
 
   /** Execute a command (write, createView, etc.) via ExecutePlan RPC. */
@@ -388,14 +398,14 @@ export class GrpcTransport implements Transport {
   }
 
   /** @internal */
-  private _streamWithReattach(
+  private async *_streamWithReattach(
     sessionId: string,
     operationId: string,
     request: ExecutePlanRequest,
     onResponse?: (response: ExecutePlanResponse) => void,
   ): AsyncIterable<Uint8Array> {
-    const client = this._getClient();
-    return iterateWithReattach({
+    const client = await this._ready();
+    yield* iterateWithReattach({
       initial: () => this._openExecutePlanStream(client, request),
       reattach: (lastResponseId: string | undefined) =>
         this._openReattachStream(client, sessionId, operationId, lastResponseId),
@@ -454,8 +464,8 @@ export class GrpcTransport implements Transport {
   }
 
   /** Release the session on the server. */
-  releaseSession(sessionId: string): Promise<void> {
-    const client = this._getClient();
+  async releaseSession(sessionId: string): Promise<void> {
+    const client = await this._ready();
 
     const request = create(ReleaseSessionRequestSchema, {
       sessionId,
@@ -493,11 +503,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Send an AnalyzePlan request (unary RPC). */
-  analyzePlan(
+  async analyzePlan(
     sessionId: string,
     request: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const client = this._getClient();
+    const client = await this._ready();
 
     const analyzeRequest = buildAnalyzePlanRequest(
       sessionId,
@@ -536,8 +546,8 @@ export class GrpcTransport implements Transport {
   }
 
   /** Interrupt running operations. Returns server-reported interrupted IDs. */
-  interrupt(sessionId: string, request: Record<string, unknown>): Promise<string[]> {
-    const client = this._getClient();
+  async interrupt(sessionId: string, request: Record<string, unknown>): Promise<string[]> {
+    const client = await this._ready();
 
     const interruptRequest = create(InterruptRequestSchema, {
       sessionId,
@@ -576,8 +586,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Read or write Spark runtime configuration via the Config RPC. */
-  config(sessionId: string, operation: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const client = this._getClient();
+  async config(
+    sessionId: string,
+    operation: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const client = await this._ready();
 
     const configRequest = create(ConfigRequestSchema, {
       sessionId,
@@ -635,11 +648,11 @@ export class GrpcTransport implements Transport {
     }
   }
 
-  private _fetchErrorDetails(
+  private async _fetchErrorDetails(
     sessionId: string,
     errorId: string,
   ): Promise<FetchErrorDetailsResponse> {
-    const client = this._getClient();
+    const client = await this._ready();
     const request = create(FetchErrorDetailsRequestSchema, {
       sessionId,
       userContext: this.userContext,
@@ -674,6 +687,44 @@ export class GrpcTransport implements Transport {
       this.client = new grpc.Client(this.endpoint, this.credentials, this.channelOptions);
     }
     return this.client;
+  }
+
+  /** Return the gRPC client after the initial channel handshake succeeds. */
+  private async _ready(): Promise<grpc.Client> {
+    await this._ensureHandshake();
+    return this._getClient();
+  }
+
+  /**
+   * Await the gRPC channel becoming ready, subject to `handshakeTimeoutMs`.
+   * Called once lazily on the first RPC. Returns a shared promise so
+   * concurrent first callers see the same handshake result.
+   */
+  private _ensureHandshake(): Promise<void> {
+    if (this.handshakeTimeoutMs <= 0) return Promise.resolve();
+    if (this.handshakePromise) return this.handshakePromise;
+    const client = this._getClient();
+    const deadline = Date.now() + this.handshakeTimeoutMs;
+    this.handshakePromise = new Promise<void>((resolve, reject) => {
+      client.waitForReady(deadline, (err) => {
+        if (err) {
+          reject(
+            new SparkConnectError(
+              `Spark Connect channel not ready within ${String(this.handshakeTimeoutMs)}ms. ` +
+                `Verify host, port, and TLS configuration for ${this.endpoint}.`,
+              {
+                code: grpc.status.DEADLINE_EXCEEDED,
+                errorClass: "CONNECTION_TIMEOUT",
+                cause: err,
+              },
+            ),
+          );
+          return;
+        }
+        resolve();
+      });
+    });
+    return this.handshakePromise;
   }
 }
 
