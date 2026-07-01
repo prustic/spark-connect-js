@@ -38,15 +38,7 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test:coverage
-
-      # Integration coverage: c8 must be the direct parent of `node`, so we
-      # orchestrate spark:up / c8-wrapped test run / spark:down here rather
-      # than reusing `pnpm test:integration` (which chains through pnpm+turbo
-      # and drops NODE_V8_COVERAGE before it reaches node --test).
-      - run: pnpm --filter @spark-connect-js/integration-tests spark:up
-      - run: pnpm exec c8 --reporter=lcov --reports-dir=tests/integration/coverage --include='packages/spark-core/dist/**' --include='packages/spark-node/dist/**' node --test $(find tests/integration/dist -name '*.test.js')
-      - run: pnpm --filter @spark-connect-js/integration-tests spark:down
-        if: always()
+      - run: pnpm test:integration:coverage
 
       - uses: codecov/codecov-action@v5
         if: always()
