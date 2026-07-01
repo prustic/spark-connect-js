@@ -14,6 +14,18 @@ describe("buildRelation()", () => {
     }
   });
 
+  it("stamps RelationCommon.planId when the plan carries one", () => {
+    const plan: LogicalPlan = { type: "sql", query: "SELECT 1", planId: 42n };
+    const rel = buildRelation(plan);
+    assert.equal(rel.common?.planId, 42n);
+  });
+
+  it("omits RelationCommon when the plan has no planId", () => {
+    const plan: LogicalPlan = { type: "sql", query: "SELECT 1" };
+    const rel = buildRelation(plan);
+    assert.equal(rel.common, undefined);
+  });
+
   it("builds a Read/DataSource relation", () => {
     const plan: LogicalPlan = {
       type: "read",
@@ -179,6 +191,17 @@ describe("buildExpression()", () => {
     assert.equal(result.exprType.case, "unresolvedAttribute");
     if (result.exprType.case === "unresolvedAttribute") {
       assert.equal(result.exprType.value.unparsedIdentifier, "col1");
+      assert.equal(result.exprType.value.planId, undefined);
+    }
+  });
+
+  it("forwards planId on unresolved attribute when present (df.col disambiguation)", () => {
+    const expr: CoreExpression = { type: "unresolvedAttribute", name: "id", planId: 99n };
+    const result = buildExpression(expr);
+    if (result.exprType.case === "unresolvedAttribute") {
+      assert.equal(result.exprType.value.planId, 99n);
+    } else {
+      assert.fail("expected unresolvedAttribute");
     }
   });
 
@@ -222,9 +245,15 @@ describe("buildExpression()", () => {
     }
   });
 
-  it("builds null literal", () => {
+  it("builds null literal with a NullType DataType", () => {
     const result = buildExpression({ type: "literal", value: null });
     assert.equal(result.exprType.case, "literal");
+    if (result.exprType.case === "literal") {
+      assert.equal(result.exprType.value.literalType.case, "null");
+      if (result.exprType.value.literalType.case === "null") {
+        assert.equal(result.exprType.value.literalType.value.kind.case, "null");
+      }
+    }
   });
 
   it("builds alias expression", () => {
@@ -1199,6 +1228,33 @@ describe("buildRelation() - aggregate groupTypes", () => {
       assert.equal(result.relType.value.groupType, 4); // PIVOT
       assert.ok(result.relType.value.pivot);
       assert.equal(result.relType.value.pivot.values.length, 3);
+    }
+  });
+
+  it("pivot with a null value emits a NullType literal (not LITERALTYPE_NOT_SET)", () => {
+    const result = buildRelation({
+      type: "aggregate",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      groupType: "pivot",
+      groupingExpressions: [{ type: "unresolvedAttribute", name: "dept" }],
+      aggregateExpressions: [
+        {
+          type: "aggregateFunction",
+          name: "sum",
+          arguments: [{ type: "unresolvedAttribute", name: "salary" }],
+        },
+      ],
+      pivot: {
+        col: { type: "unresolvedAttribute", name: "year" },
+        values: [null],
+      },
+    });
+    if (result.relType.case === "aggregate" && result.relType.value.pivot) {
+      const lit = result.relType.value.pivot.values[0];
+      assert.equal(lit.literalType.case, "null");
+      if (lit.literalType.case === "null") {
+        assert.equal(lit.literalType.value.kind.case, "null");
+      }
     }
   });
 });

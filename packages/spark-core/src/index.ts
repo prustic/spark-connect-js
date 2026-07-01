@@ -15,7 +15,20 @@
 
 export { SparkSession, SparkSessionBuilder, DataFrameReader } from "./spark-session.js";
 export { DataFrame } from "./data-frame.js";
-export { DataStreamReader, DataStreamWriter, StreamingQuery, Trigger } from "./streaming/index.js";
+export {
+  DataStreamReader,
+  DataStreamWriter,
+  StreamingQuery,
+  StreamingQueryManager,
+  StreamingQueryListenerBase,
+  Trigger,
+} from "./streaming/index.js";
+export type {
+  StreamingQueryListener,
+  QueryStartedEvent,
+  QueryIdleEvent,
+  QueryTerminatedEvent,
+} from "./streaming/index.js";
 export type {
   StreamingOutputMode,
   StreamingQueryStatus,
@@ -322,11 +335,13 @@ export {
 // Re-export type-only interfaces for consumers that need them without pulling
 // in implementation modules.
 export type { Row } from "./types/row.js";
+export { row } from "./types/row.js";
 export type { Schema, FieldDescriptor } from "./types/schema.js";
 export type {
   SparkSessionConfig,
   Transport,
   ArrowDecoderFn,
+  ArrowEncoderFn,
   ExecuteOptions,
 } from "./spark-session.js";
 export {

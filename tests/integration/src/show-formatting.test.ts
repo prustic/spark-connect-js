@@ -1,0 +1,120 @@
+import { describe, it, after } from "node:test";
+import assert from "node:assert/strict";
+import { spark, stopSession } from "./setup.js";
+
+/**
+ * Capture console.log output during the callback. show() writes each table
+ * line via console.log, so capturing gives us the full rendered table.
+ */
+async function captureShow(run: () => Promise<void>): Promise<string> {
+  const original = console.log;
+  const lines: string[] = [];
+  console.log = (msg: string) => {
+    lines.push(msg);
+  };
+  try {
+    await run();
+  } finally {
+    console.log = original;
+  }
+  return lines.join("\n");
+}
+
+describe("show() Spark-style formatting", () => {
+  after(stopSession);
+
+  it("renders DATE columns without quotes or T/Z markers", async () => {
+    const df = spark().sql(`SELECT DATE '2026-06-29' AS d`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /2026-06-29/);
+    assert.doesNotMatch(out, /"2026-06-29/);
+    assert.doesNotMatch(out, /T\d\d:\d\d:\d\d/);
+    assert.doesNotMatch(out, /Z\b/);
+  });
+
+  it("renders TIMESTAMP columns as space-separated with trailing zeros stripped", async () => {
+    const df = spark().sql(`SELECT TIMESTAMP '2026-06-29 13:45:06.5' AS t`);
+    // The full timestamp is 21 chars, so run without truncation.
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /2026-06-29 13:45:06\.5/);
+    assert.doesNotMatch(out, /"2026-06-29/);
+  });
+
+  it("renders DECIMAL columns as fixed-point strings without quotes", async () => {
+    const df = spark().sql(`SELECT CAST(1.5 AS DECIMAL(10,2)) AS amt`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /1\.50/);
+    assert.doesNotMatch(out, /"1\.50"/);
+    assert.doesNotMatch(out, /"150"/);
+  });
+
+  it("renders MAP columns in Spark arrow notation", async () => {
+    const df = spark().sql(`SELECT map(1, 'a', 2, 'b') AS m`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /1 -> a/);
+    assert.match(out, /2 -> b/);
+    assert.doesNotMatch(out, /"1":/);
+  });
+
+  it("renders STRUCT columns as brace-comma values", async () => {
+    const df = spark().sql(`SELECT named_struct('name', 'Alice', 'age', 30) AS s`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\{Alice, 30\}/);
+    assert.doesNotMatch(out, /"name":"Alice"/);
+  });
+
+  it("renders ARRAY columns with element-wise recursion", async () => {
+    const df = spark().sql(`SELECT array(DATE '2026-06-29', DATE '2026-07-01') AS xs`);
+    // truncate=false so the full array survives for the regex check.
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /\[2026-06-29, 2026-07-01\]/);
+  });
+
+  it("renders NULL cells as the literal 'null'", async () => {
+    const df = spark().sql(`SELECT CAST(NULL AS STRING) AS n`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\| null +\|/);
+  });
+
+  it("drops the fractional part when milliseconds are all zero", async () => {
+    const df = spark().sql(`SELECT TIMESTAMP '2026-06-29 13:45:06' AS t`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /2026-06-29 13:45:06 /);
+    assert.doesNotMatch(out, /13:45:06\.0/);
+  });
+
+  it("renders nested Map values via recursion", async () => {
+    const df = spark().sql(`SELECT map('k', DATE '2026-06-29') AS m`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /\{k -> 2026-06-29\}/);
+  });
+
+  it("renders nested struct as brace-comma values recursively", async () => {
+    const df = spark().sql(
+      `SELECT named_struct('inner', named_struct('x', 1, 'y', 2), 'label', 'pt') AS s`,
+    );
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /\{\{1, 2\}, pt\}/);
+  });
+
+  it("renders BINARY columns as uppercase hex bytes", async () => {
+    const df = spark().sql(`SELECT unhex('6F7261') AS b`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\[6F 72 61\]/);
+  });
+
+  it("renders BOOLEAN columns as 'true' and 'false'", async () => {
+    const df = spark().sql(`SELECT true AS t, false AS f`);
+    const out = await captureShow(() => df.show());
+    assert.match(out, /\| true +\| false +\|/);
+  });
+
+  it("renders large longs without the JS bigint 'n' suffix", async () => {
+    // A value above Number.MAX_SAFE_INTEGER decodes to bigint under the current
+    // value-driven long-decode policy; renderCell must strip the JS `n` suffix.
+    const df = spark().sql(`SELECT CAST(9007199254740993 AS BIGINT) AS big`);
+    const out = await captureShow(() => df.show(20, false));
+    assert.match(out, /9007199254740993/);
+    assert.doesNotMatch(out, /9007199254740993n/);
+  });
+});

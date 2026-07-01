@@ -17,7 +17,7 @@ import type { StorageLevel } from "../storage-level.js";
  * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  */
 export type Expression =
-  | { type: "unresolvedAttribute"; name: string }
+  | { type: "unresolvedAttribute"; name: string; planId?: bigint }
   | { type: "literal"; value: string | number | boolean | bigint | null }
   | { type: "alias"; inner: Expression; name: string }
   // Comparison / logical / arithmetic operators
@@ -89,7 +89,7 @@ export type FrameBoundary =
  * @see [Spark source: LogicalPlan.scala](https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/LogicalPlan.scala)
  * @see [Spark Connect proto: relations.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/relations.proto)
  */
-export type LogicalPlan =
+export type LogicalPlan = (
   | ReadPlan
   | ReadTablePlan
   | LocalRelationPlan
@@ -125,7 +125,16 @@ export type LogicalPlan =
   | StatCovPlan
   | StatCrosstabPlan
   | StatFreqItemsPlan
-  | StatApproxQuantilePlan;
+  | StatApproxQuantilePlan
+) & {
+  /**
+   * Per-DataFrame identifier set by `DataFrame._fromPlan`. Surfaces as
+   * `RelationCommon.plan_id` on the wire, letting the server resolve
+   * `df.col(name)` references in self-joins and same-schema joins where the
+   * unqualified column name is ambiguous.
+   */
+  planId?: bigint;
+};
 
 /**
  * Read from a data source.
@@ -212,7 +221,7 @@ export interface AggregatePlan {
   groupType?: "groupby" | "rollup" | "cube" | "pivot";
   pivot?: {
     col: Expression;
-    values: Array<string | number | boolean>;
+    values: Array<string | number | boolean | null>;
   };
 }
 

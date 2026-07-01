@@ -23,6 +23,7 @@ import { UnsupportedOperationError } from "@spark-connect-js/core";
 import {
   type Relation,
   RelationSchema,
+  RelationCommonSchema,
   ReadSchema,
   Read_DataSourceSchema,
   Read_NamedTableSchema,
@@ -50,6 +51,7 @@ import {
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
   Expression_CastSchema,
+  DataType_NULLSchema,
   Expression_ExpressionStringSchema,
   type Catalog,
   CatalogSchema,
@@ -131,9 +133,19 @@ const OPERATOR_FN: Record<string, string> = {
 
 /**
  * Convert a spark-core LogicalPlan tree into a Spark Connect Relation
- * protobuf message, ready for serialization.
+ * protobuf message, ready for serialization. Stamps `RelationCommon.plan_id`
+ * when the plan carries one (set by `DataFrame._fromPlan`) so the server can
+ * resolve `df.col(name)` references in self-joins.
  */
 export function buildRelation(plan: LogicalPlan): Relation {
+  const rel = buildRelationInner(plan);
+  if (plan.planId !== undefined) {
+    rel.common = create(RelationCommonSchema, { sourceInfo: "", planId: plan.planId });
+  }
+  return rel;
+}
+
+function buildRelationInner(plan: LogicalPlan): Relation {
   switch (plan.type) {
     case "read":
       return create(RelationSchema, {
@@ -842,7 +854,12 @@ export function buildRelation(plan: LogicalPlan): Relation {
 function buildLiteral(value: string | number | boolean | null) {
   if (value === null) {
     return create(Expression_LiteralSchema, {
-      literalType: { case: undefined, value: undefined },
+      literalType: {
+        case: "null",
+        value: create(DataTypeSchema, {
+          kind: { case: "null", value: create(DataType_NULLSchema, {}) },
+        }),
+      },
     });
   }
   if (typeof value === "string") {
@@ -931,6 +948,7 @@ export function buildExpression(expr: CoreExpression): Expression {
           case: "unresolvedAttribute",
           value: create(Expression_UnresolvedAttributeSchema, {
             unparsedIdentifier: expr.name,
+            ...(expr.planId !== undefined && { planId: expr.planId }),
           }),
         },
       });
@@ -941,7 +959,12 @@ export function buildExpression(expr: CoreExpression): Expression {
           exprType: {
             case: "literal",
             value: create(Expression_LiteralSchema, {
-              literalType: { case: undefined, value: undefined },
+              literalType: {
+                case: "null",
+                value: create(DataTypeSchema, {
+                  kind: { case: "null", value: create(DataType_NULLSchema, {}) },
+                }),
+              },
             }),
           },
         });

@@ -94,6 +94,8 @@ export {
 export {
   type Relation,
   RelationSchema,
+  type RelationCommon,
+  RelationCommonSchema,
   type Read,
   ReadSchema,
   type Project,
@@ -218,6 +220,8 @@ export {
 export {
   type DataType,
   DataTypeSchema,
+  type DataType_NULL,
+  DataType_NULLSchema,
   type DataType_Unparsed,
   DataType_UnparsedSchema,
 } from "./gen/spark/connect/types_pb.js";
@@ -334,6 +338,29 @@ export {
   StreamingQueryCommandResult_ExceptionResultSchema,
   type StreamingQueryCommandResult_AwaitTerminationResult,
   StreamingQueryCommandResult_AwaitTerminationResultSchema,
+  // StreamingQueryManager
+  type StreamingQueryManagerCommand,
+  StreamingQueryManagerCommandSchema,
+  type StreamingQueryManagerCommand_AwaitAnyTerminationCommand,
+  StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema,
+  type StreamingQueryManagerCommandResult,
+  StreamingQueryManagerCommandResultSchema,
+  type StreamingQueryManagerCommandResult_ActiveResult,
+  StreamingQueryManagerCommandResult_ActiveResultSchema,
+  type StreamingQueryManagerCommandResult_StreamingQueryInstance,
+  StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema,
+  type StreamingQueryManagerCommandResult_AwaitAnyTerminationResult,
+  StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema,
+  type StreamingQueryManagerCommandResult_ListStreamingQueryListenerResult,
+  StreamingQueryManagerCommandResult_ListStreamingQueryListenerResultSchema,
+  // StreamingQueryListener bus
+  type StreamingQueryListenerBusCommand,
+  StreamingQueryListenerBusCommandSchema,
+  type StreamingQueryListenerEvent,
+  StreamingQueryListenerEventSchema,
+  type StreamingQueryListenerEventsResult,
+  StreamingQueryListenerEventsResultSchema,
+  StreamingQueryEventType,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

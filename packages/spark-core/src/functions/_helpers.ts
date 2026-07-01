@@ -3,7 +3,7 @@
  * @internal Not part of the public API.
  */
 
-import { Column, col as _col, lit as _lit } from "../column.js";
+import { Column, col as _col, lit as _lit, liftCol as _liftCol } from "../column.js";
 import type { Expression } from "../plan/logical-plan.js";
 
 export type ColOrName = Column | string;
@@ -25,4 +25,4 @@ export function fn(name: string, ...args: ColOrName[]): Column {
 }
 
 // Re-export for convenience in function modules
-export { Column, _col, _lit };
+export { Column, _col, _lit, _liftCol };
