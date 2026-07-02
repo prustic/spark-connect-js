@@ -113,6 +113,7 @@ import {
   UnpivotSchema,
   Unpivot_ValuesSchema,
   Aggregate_PivotSchema,
+  WithWatermarkSchema,
 } from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -835,6 +836,18 @@ function buildRelationInner(plan: LogicalPlan): Relation {
             cols: plan.cols,
             probabilities: plan.probabilities,
             relativeError: plan.relativeError,
+          }),
+        },
+      });
+
+    case "watermark":
+      return create(RelationSchema, {
+        relType: {
+          case: "withWatermark",
+          value: create(WithWatermarkSchema, {
+            input: buildRelation(plan.child),
+            eventTime: plan.eventTime,
+            delayThreshold: plan.delayThreshold,
           }),
         },
       });

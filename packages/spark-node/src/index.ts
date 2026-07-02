@@ -167,6 +167,8 @@ export {
   trunc,
   extract,
   date_part,
+  window,
+  session_window,
   // Math
   abs,
   round,

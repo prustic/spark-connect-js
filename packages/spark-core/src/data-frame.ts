@@ -354,6 +354,42 @@ export class DataFrame<R extends Row = Row> {
     });
   }
 
+  /**
+   * Attach an event-time watermark to a streaming DataFrame.
+   *
+   * Bounds how late an event can arrive before Spark considers it dropped
+   * for stateful streaming operators (windowed aggregations, stream-stream
+   * joins, `dropDuplicates`). No effect on a batch DataFrame.
+   *
+   * @param eventTimeColumn - name of the event-time column
+   * @param delayThreshold - Spark interval string, e.g. `"10 minutes"`, `"1 hour"`
+   *
+   * @example
+   *   spark.readStream.format("rate").load()
+   *     .withWatermark("timestamp", "10 minutes")
+   *     .groupBy(window(col("timestamp"), "5 minutes"))
+   *     .agg(count("*").alias("events"))
+   */
+  withWatermark(eventTimeColumn: string, delayThreshold: string): DataFrame<R> {
+    if (typeof eventTimeColumn !== "string" || eventTimeColumn.length === 0) {
+      throw new InvalidInputError(
+        "withWatermark eventTimeColumn must be a non-empty string column name.",
+      );
+    }
+    if (typeof delayThreshold !== "string" || delayThreshold.trim().length === 0) {
+      throw new InvalidInputError(
+        "withWatermark delayThreshold must be a non-empty Spark interval string " +
+          'such as "10 minutes" or "1 hour".',
+      );
+    }
+    return DataFrame._fromPlan<R>(this._session, {
+      type: "watermark",
+      child: this._plan,
+      eventTime: eventTimeColumn,
+      delayThreshold,
+    });
+  }
+
   /** Remove duplicate rows, optionally considering only a subset of columns. */
   dropDuplicates(...columnNames: string[]): DataFrame<R> {
     return DataFrame._fromPlan<R>(this._session, {

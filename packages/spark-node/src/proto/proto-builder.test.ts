@@ -1164,6 +1164,21 @@ describe("buildRelation() - stat functions", () => {
       assert.equal(result.relType.value.relativeError, 0.01);
     }
   });
+
+  it("builds a WithWatermark relation", () => {
+    const result = buildRelation({
+      type: "watermark",
+      child: { type: "sql", query: "SELECT * FROM events" },
+      eventTime: "ts",
+      delayThreshold: "10 minutes",
+    });
+    assert.equal(result.relType.case, "withWatermark");
+    if (result.relType.case === "withWatermark") {
+      assert.equal(result.relType.value.eventTime, "ts");
+      assert.equal(result.relType.value.delayThreshold, "10 minutes");
+      assert.equal(result.relType.value.input?.relType.case, "sql");
+    }
+  });
 });
 
 describe("buildRelation() - aggregate groupTypes", () => {

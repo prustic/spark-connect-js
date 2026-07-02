@@ -824,6 +824,38 @@ describe("DataFrame.withColumnsRenamed()", () => {
   });
 });
 
+describe("DataFrame.withWatermark()", () => {
+  it("wraps plan in a watermark node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM events").withWatermark("ts", "10 minutes");
+    assert.equal(df._plan.type, "watermark");
+    if (df._plan.type === "watermark") {
+      assert.equal(df._plan.eventTime, "ts");
+      assert.equal(df._plan.delayThreshold, "10 minutes");
+    }
+  });
+
+  it("rejects empty column name", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("", "10 minutes"),
+      InvalidInputError,
+    );
+  });
+
+  it("rejects empty or whitespace-only delay threshold", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", ""),
+      InvalidInputError,
+    );
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", "   "),
+      InvalidInputError,
+    );
+  });
+});
+
 describe("DataFrame.alias()", () => {
   it("wraps plan in a subqueryAlias node", () => {
     const { spark } = createSession();
