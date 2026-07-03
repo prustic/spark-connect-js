@@ -724,4 +724,17 @@ describe("PlanBuilder toRelation", () => {
     assert.deepStrictEqual(replacements[0].oldValue, { literal: { boolean: false } });
     assert.deepStrictEqual(replacements[0].newValue, { literal: { boolean: true } });
   });
+
+  it("watermark", () => {
+    const result = PlanBuilder.toRelation({
+      type: "watermark",
+      child: { type: "sql", query: "SELECT * FROM events" },
+      eventTime: "ts",
+      delayThreshold: "10 minutes",
+    });
+    const withWatermark = (result as { withWatermark: Record<string, unknown> }).withWatermark;
+    assert.equal(withWatermark.eventTime, "ts");
+    assert.equal(withWatermark.delayThreshold, "10 minutes");
+    assert.ok(withWatermark.input);
+  });
 });

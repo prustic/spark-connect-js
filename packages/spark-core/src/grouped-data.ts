@@ -23,13 +23,13 @@ export class GroupedData {
   private readonly _df: DataFrame;
   private readonly _groupExprs: Expression[];
   private readonly _groupType: "groupby" | "rollup" | "cube" | "pivot";
-  private readonly _pivot?: { col: Expression; values: Array<string | number | boolean> };
+  private readonly _pivot?: { col: Expression; values: Array<string | number | boolean | null> };
 
   constructor(
     df: DataFrame,
     groupExprs: Expression[],
     groupType: "groupby" | "rollup" | "cube" | "pivot" = "groupby",
-    pivot?: { col: Expression; values: Array<string | number | boolean> },
+    pivot?: { col: Expression; values: Array<string | number | boolean | null> },
   ) {
     this._df = df;
     this._groupExprs = [...groupExprs];
@@ -121,7 +121,10 @@ export class GroupedData {
   }
 
   /** Pivot a column for aggregation. */
-  pivot(pivotCol: Column | string, values: Array<string | number | boolean> = []): GroupedData {
+  pivot(
+    pivotCol: Column | string,
+    values: Array<string | number | boolean | null> = [],
+  ): GroupedData {
     const pivotExpr = typeof pivotCol === "string" ? col(pivotCol)._expr : pivotCol._expr;
     return new GroupedData(this._df, this._groupExprs, "pivot", {
       col: pivotExpr,

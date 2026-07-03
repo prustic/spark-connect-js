@@ -1,7 +1,11 @@
+import { GrpcStatusCode } from "@spark-connect-js/core";
+import * as grpc from "@grpc/grpc-js";
+
 /**
- * Retry policy for unary Spark Connect RPCs.
+ * Retry policy shared by unary RPCs (via {@link withRetry}) and by the
+ * server-streaming reattach loop (via `iterateWithReattach` in `reattach.ts`).
  *
- * Defaults match `pyspark.sql.connect.client.retries.DefaultPolicy`:
+ * Backoff defaults match `pyspark.sql.connect.client.retries.DefaultPolicy`:
  *   max_retries = 15
  *   initial_backoff = 50 ms
  *   max_backoff = 60_000 ms
@@ -19,10 +23,6 @@
  *
  * @see python/pyspark/sql/connect/client/retries.py
  */
-
-import { GrpcStatusCode } from "@spark-connect-js/core";
-import * as grpc from "@grpc/grpc-js";
-
 export interface RetryPolicy {
   /** Maximum number of attempts after the initial try. Default 15. */
   maxRetries: number;
@@ -34,6 +34,11 @@ export interface RetryPolicy {
   backoffMultiplier: number;
   /** Random ms added to each backoff to spread thundering herds. Default 500. */
   jitterMs: number;
+  /**
+   * Bail after this many consecutive reattaches yield no responses. `0` disables.
+   * Default 3. Effective ceiling is `min(this, maxRetries + 1)`.
+   */
+  maxConsecutiveNoProgressReattaches?: number;
 }
 
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
@@ -42,6 +47,7 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxBackoffMs: 60_000,
   backoffMultiplier: 4,
   jitterMs: 500,
+  maxConsecutiveNoProgressReattaches: 3,
 };
 
 const RETRYABLE_CURSOR = "INVALID_CURSOR.DISCONNECTED";

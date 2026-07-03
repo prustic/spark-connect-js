@@ -10,6 +10,7 @@
     "spark:up": "docker compose up -d --wait",
     "spark:down": "docker compose down",
     "test:integration": "pnpm spark:up && node --test $(find dist -name '*.test.js') && pnpm spark:down",
+    "test:integration:coverage": "pnpm spark:up && (cd ../.. && pnpm exec c8 -r lcov -o tests/integration/coverage --include='packages/spark-core/dist/**' --include='packages/spark-node/dist/**' node --test $(find tests/integration/dist -name '*.test.js')); pnpm spark:down",
     "lint": "eslint"
   },
   "engines": {

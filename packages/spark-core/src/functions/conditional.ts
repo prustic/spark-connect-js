@@ -9,7 +9,9 @@ import { Column, fnExpr, toExpr, type ColOrName, fn } from "./_helpers.js";
 import type { Expression } from "../plan/logical-plan.js";
 
 /**
- * Begins a CASE WHEN chain. Use `.when()` / `.otherwise()` on the result.
+ * Begins a CASE WHEN chain. Returns a {@link WhenBuilder}. Terminate the
+ * chain with {@link WhenBuilder.otherwise} for an explicit default, or
+ * {@link WhenBuilder.toColumn} for a `NULL` default.
  *
  * @example
  *   when(col("age").gt(lit(18)), lit("adult"))

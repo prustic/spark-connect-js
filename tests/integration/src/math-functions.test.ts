@@ -37,9 +37,9 @@ describe("math functions", () => {
       .withColumn("ceil_div", ceil(col("id").divide(lit(3))))
       .withColumn("floor_div", floor(col("id").divide(lit(3))))
       .collect();
-    assert.equal(rows[0]["abs_neg"], 1);
-    assert.equal(rows[0]["ceil_div"], 1);
-    assert.equal(rows[0]["floor_div"], 0);
+    assert.equal(rows[0]["abs_neg"], 1n);
+    assert.equal(rows[0]["ceil_div"], 1n);
+    assert.equal(rows[0]["floor_div"], 0n);
   });
 
   it("sqrt / pow", async () => {
@@ -83,7 +83,7 @@ describe("math functions", () => {
       .range(1, 6)
       .withColumn("fact", factorial(col("id")))
       .collect();
-    assert.equal(rows[4]["fact"], 120); // 5! = 120
+    assert.equal(rows[4]["fact"], 120n); // 5! = 120
   });
 
   it("greatest / least", async () => {
@@ -94,8 +94,8 @@ describe("math functions", () => {
       .withColumn("max_ab", greatest("a", "b"))
       .withColumn("min_ab", least("a", "b"))
       .collect();
-    assert.equal(rows[0]["max_ab"], 7); // max(3, 7)
-    assert.equal(rows[0]["min_ab"], 3); // min(3, 7)
+    assert.equal(rows[0]["max_ab"], 7n); // max(3, 7)
+    assert.equal(rows[0]["min_ab"], 3n); // min(3, 7)
   });
 
   it("hex / unhex", async () => {

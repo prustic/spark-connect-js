@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
+import { InvalidInputError } from "./errors.js";
 
 function makeSession(analyzeResponse: Record<string, unknown>): {
   spark: SparkSession;
@@ -162,5 +163,45 @@ describe("SparkSessionBuilder.sessionId", () => {
         },
       });
     builder.sessionId("550e8400-e29b-41d4-a716-446655440000");
+  });
+});
+
+describe("SparkSession.createDataFrame input validation", () => {
+  function newSession(): SparkSession {
+    return SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      })
+      .getOrCreate();
+  }
+
+  it("throws InvalidInputError on an empty Uint8Array", () => {
+    assert.throws(() => newSession().createDataFrame(new Uint8Array()), InvalidInputError);
+  });
+
+  it("rejects Arrow file-format bytes with a message naming the fix", () => {
+    // ARROW1\0\0 magic prefix, plus a byte to satisfy the length check.
+    const fileMagic = new Uint8Array([0x41, 0x52, 0x52, 0x4f, 0x57, 0x31, 0x00, 0x00, 0x00]);
+    assert.throws(
+      () => newSession().createDataFrame(fileMagic),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /file-format/);
+        assert.match(err.message, /streaming/);
+        assert.match(err.message, /tableToIPC/);
+        return true;
+      },
+    );
+  });
+
+  it("accepts non-file-format bytes without throwing", () => {
+    // Streaming format starts with a continuation marker (0xFFFFFFFF), not
+    // the ARROW1 magic. Passing something that merely isn't the file magic
+    // should reach the plan builder (which does not execute here).
+    const notFile = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    assert.doesNotThrow(() => newSession().createDataFrame(notFile));
   });
 });

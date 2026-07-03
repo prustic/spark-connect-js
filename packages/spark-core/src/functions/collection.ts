@@ -111,9 +111,14 @@ export function sequence(start: ColOrName, stop: ColOrName, step?: ColOrName): C
   return fn("sequence", start, stop);
 }
 
-/** Returns the element at the given (1-based) index in the array or the value for the given key in a map. */
-export function element_at(column: ColOrName, index: ColOrName): Column {
-  return fn("element_at", column, index);
+/**
+ * Returns the element at the given (1-based) index in the array or the value
+ * for the given key in a map. `index` accepts a `Column`, a column-name string,
+ * or a numeric literal. For a literal map key use `lit("key")` explicitly.
+ */
+export function element_at(column: ColOrName, index: ColOrName | number): Column {
+  const idxExpr = typeof index === "number" ? _lit(index)._expr : toExpr(index);
+  return new Column(fnExpr("element_at", toExpr(column), idxExpr));
 }
 
 /** Returns the element at the given (0-based) index in the array. */

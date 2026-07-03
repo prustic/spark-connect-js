@@ -28,7 +28,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
@@ -38,7 +38,7 @@ jobs:
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test:coverage
-      - run: pnpm test:integration
+      - run: pnpm test:integration:coverage
 
       - uses: codecov/codecov-action@v5
         if: always()
@@ -53,5 +53,13 @@ jobs:
         with:
           files: packages/spark-node/coverage/lcov.info
           flags: spark-node
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: tests/integration/coverage/lcov.info
+          flags: integration
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}

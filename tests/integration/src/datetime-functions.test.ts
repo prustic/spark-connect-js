@@ -76,7 +76,7 @@ describe("datetime functions", () => {
       .withColumn("back_str", from_unixtime(unix_timestamp(col("ts")), "yyyy/MM/dd"))
       .collect();
 
-    assert.equal(typeof rows[0]["epoch"], "number");
+    assert.equal(typeof rows[0]["epoch"], "bigint");
     // TODO: cast needed because Row is Record<string, unknown> (see roadmap M3)
     assert.ok((rows[0]["back_str"] as string).startsWith("2024/"));
   });

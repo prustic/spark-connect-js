@@ -39,7 +39,7 @@ describe("cube / rollup", () => {
     // There should be a grand total row with both nulls
     const grandTotal = rows.find((r) => r["department"] === null && r["year"] === null);
     assert.ok(grandTotal);
-    assert.equal(grandTotal["total"], 412000);
+    assert.equal(grandTotal["total"], 412000n);
   });
 
   it("rollup() produces hierarchical subtotals", async () => {
@@ -52,7 +52,7 @@ describe("cube / rollup", () => {
     assert.ok(rows.length > 2);
     const grandTotal = rows.find((r) => r["department"] === null && r["year"] === null);
     assert.ok(grandTotal);
-    assert.equal(grandTotal["cnt"], 5);
+    assert.equal(grandTotal["cnt"], 5n);
   });
 });
 
@@ -70,9 +70,9 @@ describe("pivot", () => {
     const eng = rows.find((r) => r["department"] === "Engineering");
     assert.ok(eng);
     // Engineering 2020: Alice(90000) + Eve(95000) = 185000
-    assert.equal(eng["2020"], 185000);
+    assert.equal(eng["2020"], 185000n);
     // Engineering 2021: Bob(85000)
-    assert.equal(eng["2021"], 85000);
+    assert.equal(eng["2021"], 85000n);
   });
 });
 

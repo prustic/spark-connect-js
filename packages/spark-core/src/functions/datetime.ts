@@ -146,3 +146,49 @@ export function extract(field: string, column: ColOrName): Column {
 
 /** Alias for {@link extract}. */
 export const date_part = extract;
+
+/**
+ * Bucket rows into tumbling or sliding event-time windows.
+ *
+ * Returns a `struct { start, end }` timestamp column. Combine with
+ * `withWatermark` and `groupBy` for stateful streaming aggregations.
+ *
+ * @param timeColumn - event-time column (timestamp)
+ * @param windowDuration - Spark interval string, e.g. `"5 minutes"`
+ * @param slideDuration - optional slide; defaults to `windowDuration` (tumbling)
+ * @param startTime - optional offset from epoch, e.g. `"15 seconds"`
+ *
+ * @example
+ *   df.groupBy(window(col("ts"), "5 minutes"))
+ */
+export function window(
+  timeColumn: ColOrName,
+  windowDuration: string,
+  slideDuration?: string,
+  startTime?: string,
+): Column {
+  const args = [toExpr(timeColumn), _lit(windowDuration)._expr];
+  if (slideDuration !== undefined) {
+    args.push(_lit(slideDuration)._expr);
+    if (startTime !== undefined) args.push(_lit(startTime)._expr);
+  } else if (startTime !== undefined) {
+    args.push(_lit(windowDuration)._expr, _lit(startTime)._expr);
+  }
+  return new Column(fnExpr("window", ...args));
+}
+
+/**
+ * Bucket rows into event-time session windows with a fixed gap.
+ *
+ * Returns a `struct { start, end }` timestamp column. A new session opens
+ * when the gap between consecutive events exceeds `gapDuration`.
+ *
+ * @param timeColumn - event-time column (timestamp)
+ * @param gapDuration - Spark interval string, e.g. `"10 minutes"`
+ *
+ * @remarks PySpark also accepts a `Column` `gapDuration` (dynamic per-row gap).
+ * Only the fixed-string form is supported here; dynamic-gap is a follow-up.
+ */
+export function session_window(timeColumn: ColOrName, gapDuration: string): Column {
+  return new Column(fnExpr("session_window", toExpr(timeColumn), _lit(gapDuration)._expr));
+}

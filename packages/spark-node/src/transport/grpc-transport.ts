@@ -66,6 +66,14 @@ import {
   type WriteStreamOperationStartResult,
   type StreamingQueryCommand,
   type StreamingQueryCommandResult,
+  StreamingQueryManagerCommandSchema,
+  StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema,
+  type StreamingQueryManagerCommand,
+  type StreamingQueryManagerCommandResult,
+  StreamingQueryListenerBusCommandSchema,
+  type StreamingQueryListenerBusCommand,
+  type StreamingQueryListenerEventsResult,
+  StreamingQueryEventType,
   CommonInlineUserDefinedFunctionSchema,
   JavaUDFSchema,
   DataTypeSchema,
@@ -138,7 +146,13 @@ export interface GrpcTransportOptions {
    * `DefaultPolicy`.
    */
   retryPolicy?: RetryPolicy;
+  /**
+   * Deadline in ms for the initial channel handshake. `0` disables. Default 10_000.
+   */
+  handshakeTimeoutMs?: number;
 }
+
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 10_000;
 
 /**
  * gRPC-based transport for Spark Connect.
@@ -158,7 +172,9 @@ export class GrpcTransport implements Transport {
   private readonly userContext: UserContext;
   private readonly clientType: string;
   private readonly retryPolicy: RetryPolicy;
+  private readonly handshakeTimeoutMs: number;
   private client: grpc.Client | null = null;
+  private handshakePromise: Promise<void> | null = null;
   /**
    * Server-side session IDs observed in responses, keyed by client session ID.
    * Echoed back on subsequent requests so the server can detect a stale
@@ -184,6 +200,7 @@ export class GrpcTransport implements Transport {
     });
     this.clientType = buildClientType(options.userAgent);
     this.retryPolicy = options.retryPolicy ?? DEFAULT_RETRY_POLICY;
+    this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
   }
 
   /** Send a logical plan to Spark Connect and yield Arrow IPC batches. */
@@ -207,6 +224,7 @@ export class GrpcTransport implements Transport {
       this.client.close();
       this.client = null;
     }
+    this.handshakePromise = null;
   }
 
   /** Execute a command (write, createView, etc.) via ExecutePlan RPC. */
@@ -255,6 +273,73 @@ export class GrpcTransport implements Transport {
       // captured above; nothing is yielded from this iterator.
     }
     return responses;
+  }
+
+  /** Execute a command and yield decoded result frames incrementally via ExecutePlan RPC. */
+  async *executeCommandStream(
+    sessionId: string,
+    command: Record<string, unknown>,
+    options?: ExecuteOptions,
+  ): AsyncIterable<Record<string, unknown>> {
+    const operationId = newOperationId();
+    const request = this._buildExecutePlanRequest(sessionId, operationId, options, {
+      case: "command",
+      value: buildCommandProto(command),
+    });
+
+    // Bridge `_streamWithReattach`'s `onResponse` callback (push) into this
+    // generator's pull semantics via a buffer and a wake `signal`.
+    const buffer: Record<string, unknown>[] = [];
+    let resolveSignal: () => void = () => {};
+    let signal: Promise<void> = new Promise((r) => {
+      resolveSignal = r;
+    });
+    let done = false;
+
+    const wake = (): void => {
+      const fire = resolveSignal;
+      signal = new Promise((r) => {
+        resolveSignal = r;
+      });
+      fire();
+    };
+
+    const driver = (async () => {
+      try {
+        for await (const _ of this._streamWithReattach(
+          sessionId,
+          operationId,
+          request,
+          (response) => {
+            const decoded = decodeCommandResponse(response);
+            if (decoded !== undefined) {
+              buffer.push(decoded);
+              wake();
+            }
+          },
+        )) {
+          // discard Arrow bytes (subscriptions never emit them)
+        }
+      } finally {
+        done = true;
+        wake();
+      }
+    })();
+
+    try {
+      while (true) {
+        while (buffer.length > 0) yield buffer.shift()!;
+        if (done) {
+          await driver; // re-throws if the underlying stream failed
+          return;
+        }
+        await signal;
+      }
+    } finally {
+      // Server-close drives the driver to completion. The listener bus always
+      // issues `removeListenerBusListener` first, so this resolves promptly.
+      await driver.catch(() => undefined);
+    }
   }
 
   /** @internal Build an ExecutePlanRequest with reattach enabled. */
@@ -313,14 +398,14 @@ export class GrpcTransport implements Transport {
   }
 
   /** @internal */
-  private _streamWithReattach(
+  private async *_streamWithReattach(
     sessionId: string,
     operationId: string,
     request: ExecutePlanRequest,
     onResponse?: (response: ExecutePlanResponse) => void,
   ): AsyncIterable<Uint8Array> {
-    const client = this._getClient();
-    return iterateWithReattach({
+    const client = await this._ready();
+    yield* iterateWithReattach({
       initial: () => this._openExecutePlanStream(client, request),
       reattach: (lastResponseId: string | undefined) =>
         this._openReattachStream(client, sessionId, operationId, lastResponseId),
@@ -379,8 +464,8 @@ export class GrpcTransport implements Transport {
   }
 
   /** Release the session on the server. */
-  releaseSession(sessionId: string): Promise<void> {
-    const client = this._getClient();
+  async releaseSession(sessionId: string): Promise<void> {
+    const client = await this._ready();
 
     const request = create(ReleaseSessionRequestSchema, {
       sessionId,
@@ -418,11 +503,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Send an AnalyzePlan request (unary RPC). */
-  analyzePlan(
+  async analyzePlan(
     sessionId: string,
     request: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    const client = this._getClient();
+    const client = await this._ready();
 
     const analyzeRequest = buildAnalyzePlanRequest(
       sessionId,
@@ -461,8 +546,8 @@ export class GrpcTransport implements Transport {
   }
 
   /** Interrupt running operations. Returns server-reported interrupted IDs. */
-  interrupt(sessionId: string, request: Record<string, unknown>): Promise<string[]> {
-    const client = this._getClient();
+  async interrupt(sessionId: string, request: Record<string, unknown>): Promise<string[]> {
+    const client = await this._ready();
 
     const interruptRequest = create(InterruptRequestSchema, {
       sessionId,
@@ -501,8 +586,11 @@ export class GrpcTransport implements Transport {
   }
 
   /** Read or write Spark runtime configuration via the Config RPC. */
-  config(sessionId: string, operation: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const client = this._getClient();
+  async config(
+    sessionId: string,
+    operation: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const client = await this._ready();
 
     const configRequest = create(ConfigRequestSchema, {
       sessionId,
@@ -560,11 +648,11 @@ export class GrpcTransport implements Transport {
     }
   }
 
-  private _fetchErrorDetails(
+  private async _fetchErrorDetails(
     sessionId: string,
     errorId: string,
   ): Promise<FetchErrorDetailsResponse> {
-    const client = this._getClient();
+    const client = await this._ready();
     const request = create(FetchErrorDetailsRequestSchema, {
       sessionId,
       userContext: this.userContext,
@@ -599,6 +687,44 @@ export class GrpcTransport implements Transport {
       this.client = new grpc.Client(this.endpoint, this.credentials, this.channelOptions);
     }
     return this.client;
+  }
+
+  /** Return the gRPC client after the initial channel handshake succeeds. */
+  private async _ready(): Promise<grpc.Client> {
+    await this._ensureHandshake();
+    return this._getClient();
+  }
+
+  /**
+   * Await the gRPC channel becoming ready, subject to `handshakeTimeoutMs`.
+   * Called once lazily on the first RPC. Returns a shared promise so
+   * concurrent first callers see the same handshake result.
+   */
+  private _ensureHandshake(): Promise<void> {
+    if (this.handshakeTimeoutMs <= 0) return Promise.resolve();
+    if (this.handshakePromise) return this.handshakePromise;
+    const client = this._getClient();
+    const deadline = Date.now() + this.handshakeTimeoutMs;
+    this.handshakePromise = new Promise<void>((resolve, reject) => {
+      client.waitForReady(deadline, (err) => {
+        if (err) {
+          reject(
+            new SparkConnectError(
+              `Spark Connect channel not ready within ${String(this.handshakeTimeoutMs)}ms. ` +
+                `Verify host, port, and TLS configuration for ${this.endpoint}.`,
+              {
+                code: grpc.status.DEADLINE_EXCEEDED,
+                errorClass: "CONNECTION_TIMEOUT",
+                cause: err,
+              },
+            ),
+          );
+          return;
+        }
+        resolve();
+      });
+    });
+    return this.handshakePromise;
   }
 }
 
@@ -780,6 +906,12 @@ export function decodeCommandResponse(
   if (r.case === "streamingQueryCommandResult") {
     return decodeStreamingQueryCommandResult(r.value);
   }
+  if (r.case === "streamingQueryManagerCommandResult") {
+    return decodeStreamingQueryManagerCommandResult(r.value);
+  }
+  if (r.case === "streamingQueryListenerEventsResult") {
+    return decodeStreamingQueryListenerEventsResult(r.value);
+  }
   return undefined;
 }
 
@@ -854,6 +986,74 @@ function decodeStreamingQueryCommandResult(
       // No result_type set (stop / processAllAvailable acks); just the queryId.
       return { type: "streamingQueryCommandResult", queryId };
   }
+}
+
+function decodeStreamingQueryManagerCommandResult(
+  result: StreamingQueryManagerCommandResult,
+): Record<string, unknown> {
+  const r = result.resultType;
+  switch (r.case) {
+    case "active":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "active",
+        activeQueries: r.value.activeQueries.map((q) => ({
+          id: q.id?.id ?? "",
+          runId: q.id?.runId ?? "",
+          name: q.name,
+        })),
+      };
+    case "query":
+      // Server returns the resolved query, or no `id` at all on a miss.
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "query",
+        query: r.value.id
+          ? { id: r.value.id.id, runId: r.value.id.runId, name: r.value.name }
+          : undefined,
+      };
+    case "awaitAnyTermination":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "awaitAnyTermination",
+        terminated: r.value.terminated,
+      };
+    case "resetTerminated":
+    case "addListener":
+    case "removeListener":
+      // Boolean acks.
+      return { type: "streamingQueryManagerCommandResult", resultType: r.case };
+    case "listListeners":
+      return {
+        type: "streamingQueryManagerCommandResult",
+        resultType: "listListeners",
+        listenerIds: r.value.listenerIds,
+      };
+    default:
+      return { type: "streamingQueryManagerCommandResult" };
+  }
+}
+
+const EVENT_TYPE_NAME: Record<StreamingQueryEventType, string> = {
+  [StreamingQueryEventType.QUERY_PROGRESS_UNSPECIFIED]: "unspecified",
+  [StreamingQueryEventType.QUERY_PROGRESS_EVENT]: "progress",
+  [StreamingQueryEventType.QUERY_TERMINATED_EVENT]: "terminated",
+  [StreamingQueryEventType.QUERY_IDLE_EVENT]: "idle",
+};
+
+function decodeStreamingQueryListenerEventsResult(
+  result: StreamingQueryListenerEventsResult,
+): Record<string, unknown> {
+  return {
+    type: "streamingQueryListenerEventsResult",
+    events: result.events.map((e) => ({
+      eventType: EVENT_TYPE_NAME[e.eventType] ?? "unspecified",
+      eventJson: e.eventJson,
+    })),
+    ...(result.listenerBusListenerAdded !== undefined && {
+      listenerBusListenerAdded: result.listenerBusListenerAdded,
+    }),
+  };
 }
 
 // Error wrapping
@@ -1116,6 +1316,14 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
     return buildStreamingQueryCommand(command);
   }
 
+  if (type === "streamingQueryManagerCommand") {
+    return buildStreamingQueryManagerCommand(command);
+  }
+
+  if (type === "streamingQueryListenerBusCommand") {
+    return buildStreamingQueryListenerBusCommand(command);
+  }
+
   if (type === "registerFunction") {
     const javaUdf = create(JavaUDFSchema, {
       className: command.className as string,
@@ -1228,7 +1436,8 @@ function buildStreamingQueryOpProto(
       };
     case "awaitTermination": {
       const timeoutMs = command.timeoutMs as number | undefined;
-      // buildCommandProto is exported; re-check so a bad float is a typed error.
+      // Revalidate here so direct callers of the exported `buildCommandProto`
+      // get a typed error instead of a `BigInt()` throw on a bad float.
       if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
         throw new UnsupportedOperationError(
           `streamingQueryCommand awaitTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
@@ -1258,6 +1467,78 @@ function buildStreamingQueryCommand(command: Record<string, unknown>): Command {
           runId: queryId.runId,
         }),
         command: buildStreamingQueryOpProto(op, command),
+      }),
+    },
+  });
+}
+
+function buildStreamingQueryManagerOpProto(
+  op: string,
+  command: Record<string, unknown>,
+): StreamingQueryManagerCommand["command"] {
+  switch (op) {
+    case "active":
+      return { case: "active", value: true };
+    case "getQuery":
+      return { case: "getQuery", value: command.id as string };
+    case "resetTerminated":
+      return { case: "resetTerminated", value: true };
+    case "listListeners":
+      return { case: "listListeners", value: true };
+    case "awaitAnyTermination": {
+      const timeoutMs = command.timeoutMs as number | undefined;
+      // Revalidate here so direct callers of the exported `buildCommandProto`
+      // get a typed error instead of a `BigInt()` throw on a bad float.
+      if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs < 0)) {
+        throw new UnsupportedOperationError(
+          `streamingQueryManagerCommand awaitAnyTermination: timeoutMs must be a non-negative integer, got ${String(timeoutMs)}`,
+        );
+      }
+
+      return {
+        case: "awaitAnyTermination",
+        value: create(StreamingQueryManagerCommand_AwaitAnyTerminationCommandSchema, {
+          ...(timeoutMs !== undefined && { timeoutMs: BigInt(timeoutMs) }),
+        }),
+      };
+    }
+    default:
+      throw new UnsupportedOperationError(`Unsupported streamingQueryManagerCommand op: ${op}`);
+  }
+}
+
+function buildStreamingQueryManagerCommand(command: Record<string, unknown>): Command {
+  const op = command.op as string;
+  return create(CommandSchema, {
+    commandType: {
+      case: "streamingQueryManagerCommand",
+      value: create(StreamingQueryManagerCommandSchema, {
+        command: buildStreamingQueryManagerOpProto(op, command),
+      }),
+    },
+  });
+}
+
+function buildStreamingQueryListenerBusOpProto(
+  op: string,
+): StreamingQueryListenerBusCommand["command"] {
+  switch (op) {
+    case "addListenerBusListener":
+      return { case: "addListenerBusListener", value: true };
+    case "removeListenerBusListener":
+      return { case: "removeListenerBusListener", value: true };
+    default:
+      throw new UnsupportedOperationError(`Unsupported streamingQueryListenerBusCommand op: ${op}`);
+  }
+}
+
+function buildStreamingQueryListenerBusCommand(command: Record<string, unknown>): Command {
+  const op = command.op as string;
+  return create(CommandSchema, {
+    commandType: {
+      case: "streamingQueryListenerBusCommand",
+      value: create(StreamingQueryListenerBusCommandSchema, {
+        command: buildStreamingQueryListenerBusOpProto(op),
       }),
     },
   });

@@ -13,7 +13,7 @@
  * | `ByteType` | 1 byte | `number` |
  * | `ShortType` | 2 bytes | `number` |
  * | `IntegerType` | 4 bytes | `number` |
- * | `LongType` | 8 bytes | `bigint` when precision matters |
+ * | `LongType` | 8 bytes | `bigint` |
  * | `FloatType` | 4 bytes | `number` |
  * | `DoubleType` | 8 bytes | `number` |
  * | `DecimalType` | variable | string-like decimal encoding |
