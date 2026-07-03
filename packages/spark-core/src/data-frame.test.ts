@@ -52,7 +52,10 @@ describe("SparkSession.sql()", () => {
   it("returns a DataFrame with a SQL plan", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM users");
-    assert.deepStrictEqual(df._plan, { type: "sql", query: "SELECT * FROM users" });
+    assert.equal(df._plan.type, "sql");
+    if (df._plan.type === "sql") {
+      assert.equal(df._plan.query, "SELECT * FROM users");
+    }
   });
 });
 
@@ -95,6 +98,81 @@ describe("SparkSession.read", () => {
   });
 });
 
+describe("DataFrame.col() per-frame column access", () => {
+  it("attaches a per-DataFrame planId via _fromPlan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.equal(typeof df._plan.planId, "bigint");
+  });
+
+  it("two DataFrames built from the same source get distinct planIds", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    assert.notEqual(a._plan.planId, b._plan.planId);
+  });
+
+  it("df.col(name) builds an unresolvedAttribute carrying the DataFrame's planId", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const c = df.col("id");
+    assert.equal(c._expr.type, "unresolvedAttribute");
+    if (c._expr.type === "unresolvedAttribute") {
+      assert.equal(c._expr.name, "id");
+      assert.equal(c._expr.planId, df._plan.planId);
+    }
+  });
+
+  it("a.col() and b.col() carry different planIds for self-join disambiguation", () => {
+    const { spark } = createSession();
+    const a = spark.sql("SELECT * FROM t");
+    const b = spark.sql("SELECT * FROM t");
+    const ac = a.col("id");
+    const bc = b.col("id");
+    if (ac._expr.type === "unresolvedAttribute" && bc._expr.type === "unresolvedAttribute") {
+      assert.notEqual(ac._expr.planId, bc._expr.planId);
+      assert.equal(ac._expr.planId, a._plan.planId);
+      assert.equal(bc._expr.planId, b._plan.planId);
+    } else {
+      assert.fail("expected unresolvedAttribute expressions");
+    }
+  });
+});
+
+describe("DataFrame.as<R>() typed view", () => {
+  it("is a pure type cast (runtime is unchanged)", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const typed = df.as<{ id: bigint; name: string }>();
+    // Same instance, same plan, same session
+    assert.equal(typed._plan, df._plan);
+    assert.equal(typed._session, df._session);
+  });
+
+  it("preserves the typed view through shape-preserving transforms", () => {
+    type Row = { id: bigint; name: string };
+    const { spark } = createSession();
+    const typed = spark
+      .sql("SELECT * FROM t")
+      .as<Row>()
+      .filter(col("id").gt(0n))
+      .limit(10)
+      .sort(col("id").desc())
+      .distinct();
+    // Compile-time check: typed is DataFrame<Row>. Runtime: just confirm the
+    // plan got built correctly.
+    assert.equal(typed._plan.type, "deduplicate");
+  });
+
+  it("re-narrows after a shape-changing transform", () => {
+    type In = { id: bigint; salary: number };
+    type Out = { total: number };
+    const { spark } = createSession();
+    const typed = spark.sql("SELECT * FROM t").as<In>().agg(col("salary").alias("total")).as<Out>();
+    assert.equal(typed._plan.type, "aggregate");
+  });
+});
+
 describe("DataFrame transformations (lazy)", () => {
   it("filter() wraps plan in a filter node", () => {
     const { spark } = createSession();
@@ -110,6 +188,29 @@ describe("DataFrame transformations (lazy)", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t").where(col("x").gt(lit(10)));
     assert.equal(df._plan.type, "filter");
+  });
+
+  it("filter() with a SQL predicate string wraps it in expr()", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").filter("x >= 10");
+    assert.equal(df._plan.type, "filter");
+    if (df._plan.type === "filter") {
+      // The condition should be an ExpressionString expression, not a raw
+      // string being handed to the plan builder.
+      assert.equal(df._plan.condition.type, "expressionString");
+      if (df._plan.condition.type === "expressionString") {
+        assert.equal(df._plan.condition.expression, "x >= 10");
+      }
+    }
+  });
+
+  it("where() with a SQL predicate string works the same as filter(string)", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").where("x >= 10");
+    assert.equal(df._plan.type, "filter");
+    if (df._plan.type === "filter") {
+      assert.equal(df._plan.condition.type, "expressionString");
+    }
   });
 
   it("select() wraps plan in a project node", () => {
@@ -186,7 +287,10 @@ describe("DataFrame.collect()", () => {
     const rows = await df.collect();
 
     assert.equal(t.calls.length, 1);
-    assert.deepStrictEqual(t.calls[0], { type: "sql", query: "SELECT 1 as id" });
+    const plan = t.calls[0] as { type: string; query: string; planId?: bigint };
+    assert.equal(plan.type, "sql");
+    assert.equal(plan.query, "SELECT 1 as id");
+    assert.equal(typeof plan.planId, "bigint");
     assert.deepStrictEqual(rows, [{ id: 1 }]);
   });
 });
@@ -200,6 +304,19 @@ describe("GroupedData", () => {
     if (df._plan.type === "aggregate") {
       assert.equal(df._plan.groupingExpressions.length, 1);
       assert.equal(df._plan.aggregateExpressions.length, 1);
+    }
+  });
+
+  it("df.agg() is a shorthand for df.groupBy().agg() with no grouping columns", () => {
+    const { spark } = createSession();
+    const df = spark
+      .sql("SELECT * FROM t")
+      .agg(col("salary").alias("total"), col("score").alias("avg_score"));
+
+    assert.equal(df._plan.type, "aggregate");
+    if (df._plan.type === "aggregate") {
+      assert.equal(df._plan.groupingExpressions.length, 0);
+      assert.equal(df._plan.aggregateExpressions.length, 2);
     }
   });
 
@@ -406,12 +523,12 @@ describe("DataFrame.count()", () => {
     const spark = SparkSession.builder()
       .remote("sc://localhost:15002")
       .transport(t)
-      .arrowDecoder(async () => [{ count: 42 }])
+      .arrowDecoder(async () => [{ count: 42n }])
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
 
-    assert.equal(result, 42);
+    assert.equal(result, 42n);
     // Verify the plan sent to transport is an aggregate, not the original SQL
     assert.equal(t.calls.length, 1);
     assert.equal(t.calls[0].type, "aggregate");
@@ -436,7 +553,7 @@ describe("DataFrame.count()", () => {
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
-    assert.equal(result, 0);
+    assert.equal(result, 0n);
   });
 });
 
@@ -589,6 +706,15 @@ describe("DataFrameReader shortcuts", () => {
     }
   });
 
+  it("spark.table() is a session-level shortcut for spark.read.table()", () => {
+    const { spark } = createSession();
+    const df = spark.table("my_db.my_table");
+    assert.equal(df._plan.type, "readTable");
+    if (df._plan.type === "readTable") {
+      assert.equal(df._plan.tableName, "my_db.my_table");
+    }
+  });
+
   it("json() builds a read plan with json format", () => {
     const { spark } = createSession();
     const df = spark.read.json("/data/file.json");
@@ -695,6 +821,38 @@ describe("DataFrame.withColumnsRenamed()", () => {
       assert.equal(df._plan.renames[0].colName, "a");
       assert.equal(df._plan.renames[0].newColName, "x");
     }
+  });
+});
+
+describe("DataFrame.withWatermark()", () => {
+  it("wraps plan in a watermark node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM events").withWatermark("ts", "10 minutes");
+    assert.equal(df._plan.type, "watermark");
+    if (df._plan.type === "watermark") {
+      assert.equal(df._plan.eventTime, "ts");
+      assert.equal(df._plan.delayThreshold, "10 minutes");
+    }
+  });
+
+  it("rejects empty column name", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("", "10 minutes"),
+      InvalidInputError,
+    );
+  });
+
+  it("rejects empty or whitespace-only delay threshold", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", ""),
+      InvalidInputError,
+    );
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", "   "),
+      InvalidInputError,
+    );
   });
 });
 

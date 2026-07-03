@@ -66,6 +66,9 @@ export type GrpcStatusCode = (typeof GrpcStatusCode)[keyof typeof GrpcStatusCode
  * Carries the gRPC `code`, and when available the Spark `errorClass`
  * (for example `"TABLE_OR_VIEW_NOT_FOUND"`) and SQL state code.
  *
+ * `.message` already includes the `[errorClass]` prefix when the class is
+ * known. Print it verbatim instead of re-prefixing.
+ *
  * @example
  * ```ts
  * try {
@@ -176,4 +179,32 @@ export class UnsupportedOperationError extends SparkClientError {
     super(message, options);
     this.name = "UnsupportedOperationError";
   }
+}
+
+// ---------------------------------------------------------------------------
+// Predicates
+// ---------------------------------------------------------------------------
+
+/**
+ * True when `err` indicates the server-side session backing this client is no
+ * longer valid. Happens after a server restart, an explicit session close from
+ * the server, or a mid-session handoff to a different server. Recover by
+ * building a fresh `SparkSession`.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await df.collect();
+ * } catch (err) {
+ *   if (isSessionInvalidated(err)) {
+ *     spark = SparkSessionBuilder.remote(REMOTE).getOrCreate();
+ *     return retry();
+ *   }
+ *   throw err;
+ * }
+ * ```
+ */
+export function isSessionInvalidated(err: unknown): boolean {
+  if (!(err instanceof SparkConnectError)) return false;
+  return err.errorClass?.startsWith("INVALID_HANDLE.") ?? false;
 }

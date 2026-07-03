@@ -51,7 +51,7 @@ describe("expanded aggregates", () => {
 
     assert.equal(rows.length, 2);
     const eng = rows.find((r) => r["department"] === "Engineering");
-    assert.equal(eng?.["n"], 3);
+    assert.equal(eng?.["n"], 3n);
     assert.equal(eng?.["min_sal"], 85000);
     assert.equal(eng?.["max_sal"], 95000);
   });
@@ -81,7 +81,7 @@ describe("expanded aggregates", () => {
 
     assert.equal(rows.length, 2);
     const eng = rows.find((r) => r["department"] === "Engineering");
-    assert.equal(eng?.["distinct_salaries"], 3);
+    assert.equal(eng?.["distinct_salaries"], 3n);
   });
 
   it("sum + round + avg", async () => {
@@ -91,6 +91,6 @@ describe("expanded aggregates", () => {
       .collect();
 
     const eng = rows.find((r) => r["department"] === "Engineering");
-    assert.equal(eng?.["total"], 270000);
+    assert.equal(eng?.["total"], 270000n);
   });
 });

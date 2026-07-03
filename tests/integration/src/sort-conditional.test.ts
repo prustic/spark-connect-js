@@ -98,7 +98,7 @@ describe("conditional / utility functions", () => {
 
     assert.equal(rows.length, 2);
     assert.equal(typeof rows[0]["type_sal"], "string");
-    assert.equal(typeof rows[0]["mono_id"], "number");
+    assert.equal(typeof rows[0]["mono_id"], "bigint");
     assert.equal(rows[0]["expr_calc"], 180000);
   });
 });

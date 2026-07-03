@@ -470,6 +470,15 @@ export class PlanBuilder {
           },
         };
 
+      case "watermark":
+        return {
+          withWatermark: {
+            input: PlanBuilder.toRelation(plan.child),
+            eventTime: plan.eventTime,
+            delayThreshold: plan.delayThreshold,
+          },
+        };
+
       default: {
         const _exhaustive: never = plan;
         throw new UnsupportedOperationError(
@@ -617,7 +626,8 @@ const OPERATOR_FUNCTION_MAP: Record<string, string> = {
 };
 
 /** Convert a JS primitive to a literal object shape for proto serialization. */
-function toLiteral(v: string | number | boolean): Record<string, unknown> {
+function toLiteral(v: string | number | boolean | null): Record<string, unknown> {
+  if (v === null) return { null: {} };
   if (typeof v === "string") return { string: v };
   if (typeof v === "boolean") return { boolean: v };
   return { double: v };
