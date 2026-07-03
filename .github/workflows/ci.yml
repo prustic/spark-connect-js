@@ -40,7 +40,7 @@ jobs:
       - run: pnpm test:coverage
       - run: pnpm test:integration:coverage
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         if: always()
         with:
           files: packages/spark-core/coverage/lcov.info
@@ -48,7 +48,7 @@ jobs:
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         if: always()
         with:
           files: packages/spark-node/coverage/lcov.info
