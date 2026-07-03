@@ -126,6 +126,7 @@ export type LogicalPlan = (
   | StatCrosstabPlan
   | StatFreqItemsPlan
   | StatApproxQuantilePlan
+  | WatermarkPlan
 ) & {
   /**
    * Per-DataFrame identifier set by `DataFrame._fromPlan`. Surfaces as
@@ -639,4 +640,20 @@ export interface StatApproxQuantilePlan {
   cols: string[];
   probabilities: number[];
   relativeError: number;
+}
+
+/**
+ * Attach an event-time watermark to a streaming DataFrame. Bounds late data
+ * for stateful streaming operators (windowed aggregations, joins, dropDuplicates).
+ *
+ * - Spark Connect: Relation.WithWatermark { input, event_time, delay_threshold }
+ * - Catalyst: EventTimeWatermark(eventTime, delayThreshold, child)
+ */
+export interface WatermarkPlan {
+  type: "watermark";
+  child: LogicalPlan;
+  /** Column name carrying the event-time timestamp. */
+  eventTime: string;
+  /** Interval string such as `"10 minutes"` or `"1 hour"`. */
+  delayThreshold: string;
 }

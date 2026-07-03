@@ -53,6 +53,7 @@ export {
   InvalidInputError,
   UnsupportedOperationError,
   GrpcStatusCode,
+  isSessionInvalidated,
   DataFrameWriter,
   DataFrameWriterV2,
   DataStreamReader,
@@ -166,6 +167,8 @@ export {
   trunc,
   extract,
   date_part,
+  window,
+  session_window,
   // Math
   abs,
   round,

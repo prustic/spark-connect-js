@@ -64,6 +64,14 @@ export function parseConnectionString(remote: string): ParsedConnectionString {
   }
 
   if (!remote.startsWith(SCHEME)) {
+    const schemeSep = remote.indexOf("://");
+    if (schemeSep !== -1) {
+      const scheme = remote.slice(0, schemeSep);
+      throw new InvalidConfigError(
+        `Spark Connect URL must use the "sc://" scheme, got "${scheme}://". ` +
+          `Example: sc://host:15002`,
+      );
+    }
     return parseHostPort(remote);
   }
 
@@ -91,6 +99,14 @@ interface ParseState {
 function parseHostPort(input: string): ParsedConnectionString {
   if (input.length === 0) {
     throw new InvalidConfigError("Spark Connect URL is missing host.");
+  }
+
+  const at = input.indexOf("@");
+  if (at !== -1) {
+    throw new InvalidConfigError(
+      `Spark Connect URL contains userinfo "${input.slice(0, at)}@" which is not supported. ` +
+        `Move credentials into ;user_id= and ;token= parameters.`,
+    );
   }
 
   // IPv6 literal: [::1]:15002

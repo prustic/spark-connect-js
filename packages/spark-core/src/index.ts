@@ -157,6 +157,8 @@ export {
   trunc,
   extract,
   date_part,
+  window,
+  session_window,
   // Math
   abs,
   round,
@@ -351,5 +353,6 @@ export {
   InvalidInputError,
   UnsupportedOperationError,
   GrpcStatusCode,
+  isSessionInvalidated,
 } from "./errors.js";
 export type { GrpcStatusCode as GrpcStatusCodeType } from "./errors.js";

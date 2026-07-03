@@ -523,12 +523,12 @@ describe("DataFrame.count()", () => {
     const spark = SparkSession.builder()
       .remote("sc://localhost:15002")
       .transport(t)
-      .arrowDecoder(async () => [{ count: 42 }])
+      .arrowDecoder(async () => [{ count: 42n }])
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
 
-    assert.equal(result, 42);
+    assert.equal(result, 42n);
     // Verify the plan sent to transport is an aggregate, not the original SQL
     assert.equal(t.calls.length, 1);
     assert.equal(t.calls[0].type, "aggregate");
@@ -553,7 +553,7 @@ describe("DataFrame.count()", () => {
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
-    assert.equal(result, 0);
+    assert.equal(result, 0n);
   });
 });
 
@@ -821,6 +821,38 @@ describe("DataFrame.withColumnsRenamed()", () => {
       assert.equal(df._plan.renames[0].colName, "a");
       assert.equal(df._plan.renames[0].newColName, "x");
     }
+  });
+});
+
+describe("DataFrame.withWatermark()", () => {
+  it("wraps plan in a watermark node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM events").withWatermark("ts", "10 minutes");
+    assert.equal(df._plan.type, "watermark");
+    if (df._plan.type === "watermark") {
+      assert.equal(df._plan.eventTime, "ts");
+      assert.equal(df._plan.delayThreshold, "10 minutes");
+    }
+  });
+
+  it("rejects empty column name", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("", "10 minutes"),
+      InvalidInputError,
+    );
+  });
+
+  it("rejects empty or whitespace-only delay threshold", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", ""),
+      InvalidInputError,
+    );
+    assert.throws(
+      () => spark.sql("SELECT * FROM events").withWatermark("ts", "   "),
+      InvalidInputError,
+    );
   });
 });
 
