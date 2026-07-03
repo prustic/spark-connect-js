@@ -21,7 +21,7 @@ describe("read / write", () => {
       .collect();
 
     assert.ok(rows.length >= 2);
-    assert.equal(typeof rows[0]["id"], "number");
+    assert.equal(typeof rows[0]["id"], "bigint");
     assert.equal(typeof rows[0]["name"], "string");
   });
 

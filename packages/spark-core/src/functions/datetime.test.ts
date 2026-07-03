@@ -29,6 +29,8 @@ import {
   trunc,
   extract,
   date_part,
+  window,
+  session_window,
 } from "./datetime.js";
 
 import type { Column } from "../column.js";
@@ -117,5 +119,26 @@ describe("date/timestamp functions", () => {
     assert.equal(r1._expr.type, "unresolvedFunction");
     const r2 = date_part("year", "d");
     assert.equal(r2._expr.type, "unresolvedFunction");
+  });
+
+  it("window: tumbling (windowDuration only)", () => {
+    assertFn(window("ts", "5 minutes"), "window", 2);
+  });
+
+  it("window: sliding (with slide)", () => {
+    assertFn(window("ts", "5 minutes", "1 minute"), "window", 3);
+  });
+
+  it("window: sliding with slide and startTime", () => {
+    assertFn(window("ts", "5 minutes", "1 minute", "15 seconds"), "window", 4);
+  });
+
+  it("window: tumbling with startTime (slide omitted)", () => {
+    // slideDuration defaults to windowDuration when startTime is given without a slide
+    assertFn(window("ts", "5 minutes", undefined, "15 seconds"), "window", 4);
+  });
+
+  it("session_window: fixed gap", () => {
+    assertFn(session_window("ts", "10 minutes"), "session_window", 2);
   });
 });

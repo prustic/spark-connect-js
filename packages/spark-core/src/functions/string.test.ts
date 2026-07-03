@@ -94,6 +94,38 @@ describe("string functions", () => {
     assertFn(endswith("x", "y"), "endswith", 2);
   });
 
+  it("regexp_replace with a Column pattern forwards the expression as-is", () => {
+    const result = regexp_replace("s", col("pat"), "X");
+    if (result._expr.type === "unresolvedFunction") {
+      const patternExpr = result._expr.arguments[1];
+      assert.equal(patternExpr.type, "unresolvedAttribute");
+      if (patternExpr.type === "unresolvedAttribute") {
+        assert.equal(patternExpr.name, "pat");
+      }
+    }
+  });
+
+  it("regexp_replace with a Column replacement forwards the expression as-is", () => {
+    const result = regexp_replace("s", "a", col("repl"));
+    if (result._expr.type === "unresolvedFunction") {
+      const replacementExpr = result._expr.arguments[2];
+      assert.equal(replacementExpr.type, "unresolvedAttribute");
+      if (replacementExpr.type === "unresolvedAttribute") {
+        assert.equal(replacementExpr.name, "repl");
+      }
+    }
+  });
+
+  it("regexp_replace with string pattern/replacement wraps them in lit()", () => {
+    const result = regexp_replace("s", "a", "b");
+    if (result._expr.type === "unresolvedFunction") {
+      const patternExpr = result._expr.arguments[1];
+      const replacementExpr = result._expr.arguments[2];
+      assert.equal(patternExpr.type, "literal");
+      assert.equal(replacementExpr.type, "literal");
+    }
+  });
+
   it("split with limit", () => {
     const r = split("x", ",", 3);
     assert.equal(r._expr.type, "unresolvedFunction");

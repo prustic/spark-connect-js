@@ -16,6 +16,7 @@
     "format:fix": "prettier --write .",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
+    "test:integration:coverage": "turbo run test:integration:coverage",
     "test:coverage": "turbo run test:coverage",
     "blt": "turbo run build lint test",
     "clean": "turbo run clean",
@@ -24,8 +25,8 @@
     "release": "turbo run build && changeset publish"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.7.0",
-    "@changesets/cli": "^2.31.0",
+    "@changesets/changelog-github": "1.0.0-next.5",
+    "@changesets/cli": "3.0.0-next.6",
     "@spark-connect-js/prettier-config": "workspace:*",
     "c8": "^11.0.0",
     "prettier": "catalog:",

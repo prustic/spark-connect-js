@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { col, lit } from "./column.js";
+import { InvalidInputError } from "./errors.js";
 
 describe("col()", () => {
   it("creates an unresolved attribute expression", () => {
@@ -32,6 +33,18 @@ describe("lit()", () => {
 
   it("creates a null literal", () => {
     assert.deepStrictEqual(lit(null)._expr, { type: "literal", value: null });
+  });
+
+  it("throws InvalidInputError on undefined", () => {
+    assert.throws(
+      () => lit(undefined as unknown as null),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /undefined/);
+        assert.match(err.message, /null/);
+        return true;
+      },
+    );
   });
 });
 
@@ -71,6 +84,66 @@ describe("Column comparison operators", () => {
       assert.deepStrictEqual(result.left, { type: "unresolvedAttribute", name: "age" });
       assert.deepStrictEqual(result.right, { type: "literal", value: 30 });
     }
+  });
+});
+
+describe("Column comparison operators auto-wrap primitives via lit()", () => {
+  it("col.gt(number) is equivalent to col.gt(lit(number))", () => {
+    assert.deepStrictEqual(col("age").gt(30)._expr, col("age").gt(lit(30))._expr);
+  });
+
+  it("col.eq(string) wraps the string literal", () => {
+    const expr = col("country").eq("NL")._expr;
+    assert.equal(expr.type, "eq");
+    if (expr.type === "eq") {
+      assert.deepStrictEqual(expr.right, { type: "literal", value: "NL" });
+    }
+  });
+
+  it("col.eq(bigint) wraps the bigint literal", () => {
+    const expr = col("id").eq(42n)._expr;
+    if (expr.type === "eq") {
+      assert.deepStrictEqual(expr.right, { type: "literal", value: 42n });
+    }
+  });
+
+  it("col.eq(boolean) wraps the boolean literal", () => {
+    const expr = col("active").eq(true)._expr;
+    if (expr.type === "eq") {
+      assert.deepStrictEqual(expr.right, { type: "literal", value: true });
+    }
+  });
+
+  it("col.eq(null) wraps null as a literal", () => {
+    const expr = col("x").eq(null)._expr;
+    if (expr.type === "eq") {
+      assert.deepStrictEqual(expr.right, { type: "literal", value: null });
+    }
+  });
+
+  it("passing a Column still works (no double wrapping)", () => {
+    const ref = col("threshold");
+    const expr = col("age").gt(ref)._expr;
+    if (expr.type === "gt") {
+      assert.equal(expr.right, ref._expr);
+    }
+  });
+
+  it("between(lower, upper) accepts primitives", () => {
+    const expr = col("age").between(18, 65)._expr;
+    assert.equal(expr.type, "and");
+  });
+
+  it("arithmetic operators auto-wrap primitives", () => {
+    assert.deepStrictEqual(col("x").plus(5)._expr, col("x").plus(lit(5))._expr);
+    assert.deepStrictEqual(col("x").minus(2.5)._expr, col("x").minus(lit(2.5))._expr);
+    assert.deepStrictEqual(col("x").multiply(3)._expr, col("x").multiply(lit(3))._expr);
+    assert.deepStrictEqual(col("x").divide(2)._expr, col("x").divide(lit(2))._expr);
+  });
+
+  it("eqNullSafe and bitwise methods auto-wrap primitives", () => {
+    assert.deepStrictEqual(col("x").eqNullSafe(0)._expr, col("x").eqNullSafe(lit(0))._expr);
+    assert.deepStrictEqual(col("x").bitwiseAND(0xff)._expr, col("x").bitwiseAND(lit(0xff))._expr);
   });
 });
 

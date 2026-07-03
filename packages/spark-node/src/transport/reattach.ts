@@ -20,7 +20,8 @@
  */
 
 import type { ExecutePlanResponse } from "@spark-connect-js/connect";
-import { computeBackoff, isRetryable, type RetryPolicy } from "./retry.js";
+import { SparkConnectError, GrpcStatusCode } from "@spark-connect-js/core";
+import { computeBackoff, DEFAULT_RETRY_POLICY, isRetryable, type RetryPolicy } from "./retry.js";
 
 export interface ReattachIterationOptions {
   /** Open the initial server-streaming `ExecutePlan` call. */
@@ -57,9 +58,15 @@ export async function* iterateWithReattach(
   const { initial, reattach, retryPolicy, sleep, wrapError = passThrough, onResponse } = opts;
   let lastResponseId: string | undefined;
   let attempt = 0;
+  let consecutiveNoProgress = 0;
   let stream = initial();
+  const noProgressCap =
+    retryPolicy.maxConsecutiveNoProgressReattaches ??
+    DEFAULT_RETRY_POLICY.maxConsecutiveNoProgressReattaches ??
+    3;
 
   while (true) {
+    let yieldedThisStream = false;
     try {
       for await (const response of stream) {
         onResponse?.(response);
@@ -70,6 +77,7 @@ export async function* iterateWithReattach(
           response.responseType.case === "arrowBatch" &&
           response.responseType.value.data.length > 0
         ) {
+          yieldedThisStream = true;
           yield response.responseType.value.data;
         }
         if (response.responseType.case === "resultComplete") {
@@ -80,6 +88,27 @@ export async function* iterateWithReattach(
     } catch (err) {
       if (!isRetryable(err) || attempt >= retryPolicy.maxRetries) {
         throw await wrapError(err);
+      }
+      if (yieldedThisStream) {
+        consecutiveNoProgress = 0;
+        attempt = 0;
+      } else {
+        consecutiveNoProgress++;
+      }
+      if (noProgressCap > 0 && consecutiveNoProgress >= noProgressCap) {
+        throw await wrapError(
+          new SparkConnectError(
+            `Spark Connect made no progress across ${String(consecutiveNoProgress)} ` +
+              `consecutive stream attempts (initial and reattaches). No Arrow batches ` +
+              `or resultComplete were delivered. Check network conditions between the ` +
+              `client and the Connect endpoint.`,
+            {
+              code: GrpcStatusCode.DEADLINE_EXCEEDED,
+              errorClass: "REATTACH_NO_PROGRESS",
+              cause: err,
+            },
+          ),
+        );
       }
       const backoff = computeBackoff(attempt, retryPolicy);
       attempt++;

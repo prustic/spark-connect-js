@@ -19,8 +19,8 @@ describe("DataFrame basics", () => {
       .withColumn("doubled", col("id").multiply(lit(2)))
       .collect();
     assert.equal(rows.length, 5);
-    assert.equal(rows[0]["doubled"], 0);
-    assert.equal(rows[2]["doubled"], 4);
+    assert.equal(rows[0]["doubled"], 0n);
+    assert.equal(rows[2]["doubled"], 4n);
   });
 
   it("filter + select", async () => {
@@ -32,7 +32,7 @@ describe("DataFrame basics", () => {
     assert.equal(rows.length, 2);
     assert.deepEqual(
       rows.map((r) => r["id"]),
-      [8, 9],
+      [8n, 9n],
     );
   });
 
@@ -40,7 +40,7 @@ describe("DataFrame basics", () => {
     const rows = await spark().range(5).sort(col("id").desc()).collect();
     assert.deepEqual(
       rows.map((r) => r["id"]),
-      [4, 3, 2, 1, 0],
+      [4n, 3n, 2n, 1n, 0n],
     );
   });
 
@@ -70,19 +70,19 @@ describe("DataFrame basics", () => {
     const inter = await a.intersect(b).sort(col("id").asc()).collect();
     assert.deepEqual(
       inter.map((r) => r["id"]),
-      [3, 4],
+      [3n, 4n],
     );
 
     const except = await a.except(b).sort(col("id").asc()).collect();
     assert.deepEqual(
       except.map((r) => r["id"]),
-      [0, 1, 2],
+      [0n, 1n, 2n],
     );
   });
 
   it("count", async () => {
     const n = await spark().range(42).count();
-    assert.equal(n, 42);
+    assert.equal(n, 42n);
   });
 
   it("isEmpty", async () => {
@@ -148,7 +148,7 @@ describe("DataFrame basics", () => {
 
   it("selectExpr", async () => {
     const rows = await spark().range(3).selectExpr("id", "id * 2 AS doubled").collect();
-    assert.equal(rows[1]["doubled"], 2);
+    assert.equal(rows[1]["doubled"], 2n);
   });
 
   it("transform", async () => {
@@ -233,7 +233,7 @@ describe("DataFrame basics", () => {
     assert.equal(r2.length, 4);
     assert.deepEqual(
       r2.map((r) => r["id"]),
-      [2, 4, 6, 8],
+      [2n, 4n, 6n, 8n],
     );
   });
 
@@ -276,9 +276,9 @@ describe("DataFrame basics", () => {
       .withColumn("xor_5", col("id").bitwiseXOR(lit(5)))
       .collect();
     assert.equal(rows.length, 8);
-    assert.equal(rows[0]["and_3"], 0 & 3);
-    assert.equal(rows[0]["or_4"], 0 | 4);
-    assert.equal(rows[0]["xor_5"], 0 ^ 5);
+    assert.equal(rows[0]["and_3"], 0n);
+    assert.equal(rows[0]["or_4"], 4n);
+    assert.equal(rows[0]["xor_5"], 5n);
   });
 });
 
@@ -288,8 +288,8 @@ describe("DataFrame repartitioning", () => {
   it("repartition(n) collects correctly", async () => {
     const rows = await spark().range(20).repartition(4).sort(col("id").asc()).collect();
     assert.equal(rows.length, 20);
-    assert.equal(rows[0]["id"], 0);
-    assert.equal(rows[19]["id"], 19);
+    assert.equal(rows[0]["id"], 0n);
+    assert.equal(rows[19]["id"], 19n);
   });
 
   it("repartition(n, cols) partitions by column", async () => {
@@ -300,7 +300,7 @@ describe("DataFrame repartitioning", () => {
   it("coalesce(n) reduces partitions without shuffle", async () => {
     const rows = await spark().range(20).coalesce(1).sort(col("id").asc()).collect();
     assert.equal(rows.length, 20);
-    assert.equal(rows[0]["id"], 0);
+    assert.equal(rows[0]["id"], 0n);
   });
 
   it("repartitionByRange(n, cols) range-partitions data", async () => {
@@ -310,8 +310,8 @@ describe("DataFrame repartitioning", () => {
       .sort(col("id").asc())
       .collect();
     assert.equal(rows.length, 20);
-    assert.equal(rows[0]["id"], 0);
-    assert.equal(rows[19]["id"], 19);
+    assert.equal(rows[0]["id"], 0n);
+    assert.equal(rows[19]["id"], 19n);
   });
 
   it("repartitionByRange respects descending order", async () => {

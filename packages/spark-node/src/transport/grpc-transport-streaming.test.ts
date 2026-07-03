@@ -11,6 +11,13 @@ import {
   StreamingQueryCommandResult_ExplainResultSchema,
   StreamingQueryCommandResult_ExceptionResultSchema,
   StreamingQueryCommandResult_AwaitTerminationResultSchema,
+  StreamingQueryManagerCommandResultSchema,
+  StreamingQueryManagerCommandResult_ActiveResultSchema,
+  StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema,
+  StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema,
+  StreamingQueryListenerEventsResultSchema,
+  StreamingQueryListenerEventSchema,
+  StreamingQueryEventType,
 } from "@spark-connect-js/connect";
 import type { LogicalPlan } from "@spark-connect-js/core";
 import { UnsupportedOperationError } from "@spark-connect-js/core";
@@ -54,7 +61,7 @@ describe("buildCommandProto: writeStreamOperationStart", () => {
     [{ kind: "once" }, "once", true],
     [{ kind: "continuous", interval: "1 second" }, "continuousCheckpointInterval", "1 second"],
   ] as const) {
-    it(`maps trigger ${spec.kind} → ${expectedCase}`, () => {
+    it(`maps trigger ${spec.kind} to ${expectedCase}`, () => {
       const cmd = buildCommandProto({
         type: "writeStreamOperationStart",
         plan: RATE_PLAN,
@@ -346,6 +353,261 @@ describe("decodeCommandResponse", () => {
     assert.deepEqual(decodeCommandResponse(resp), {
       type: "streamingQueryCommandResult",
       queryId: { id: "id-a", runId: "run-b" },
+    });
+  });
+});
+
+describe("buildCommandProto: streamingQueryManagerCommand", () => {
+  for (const op of ["active", "resetTerminated", "listListeners"] as const) {
+    it(`maps op=${op} to a boolean command case`, () => {
+      const cmd = buildCommandProto({ type: "streamingQueryManagerCommand", op });
+      assert.equal(cmd.commandType.case, "streamingQueryManagerCommand");
+      if (cmd.commandType.case !== "streamingQueryManagerCommand") return;
+      const c = cmd.commandType.value.command;
+      assert.equal(c.case, op);
+      assert.equal(c.value, true);
+    });
+  }
+
+  it("maps op=getQuery to the getQuery string case", () => {
+    const cmd = buildCommandProto({
+      type: "streamingQueryManagerCommand",
+      op: "getQuery",
+      id: "id-a",
+    });
+    assert.equal(cmd.commandType.case, "streamingQueryManagerCommand");
+    if (cmd.commandType.case !== "streamingQueryManagerCommand") return;
+    const c = cmd.commandType.value.command;
+    assert.equal(c.case, "getQuery");
+    assert.equal(c.value, "id-a");
+  });
+
+  it("maps op=awaitAnyTermination with timeoutMs as a bigint", () => {
+    const cmd = buildCommandProto({
+      type: "streamingQueryManagerCommand",
+      op: "awaitAnyTermination",
+      timeoutMs: 5000,
+    });
+    assert.equal(cmd.commandType.case, "streamingQueryManagerCommand");
+    if (cmd.commandType.case !== "streamingQueryManagerCommand") return;
+    const c = cmd.commandType.value.command;
+    assert.equal(c.case, "awaitAnyTermination");
+    if (c.case !== "awaitAnyTermination") return;
+    assert.equal(c.value.timeoutMs, 5000n);
+  });
+
+  it("maps op=awaitAnyTermination without timeoutMs (unset bigint)", () => {
+    const cmd = buildCommandProto({
+      type: "streamingQueryManagerCommand",
+      op: "awaitAnyTermination",
+    });
+    assert.equal(cmd.commandType.case, "streamingQueryManagerCommand");
+    if (cmd.commandType.case !== "streamingQueryManagerCommand") return;
+    const c = cmd.commandType.value.command;
+    assert.equal(c.case, "awaitAnyTermination");
+    if (c.case !== "awaitAnyTermination") return;
+    assert.equal(c.value.timeoutMs, undefined);
+  });
+
+  it("rejects a non-integer awaitAnyTermination timeoutMs (defense-in-depth)", () => {
+    assert.throws(
+      () =>
+        buildCommandProto({
+          type: "streamingQueryManagerCommand",
+          op: "awaitAnyTermination",
+          timeoutMs: 1000.5,
+        }),
+      UnsupportedOperationError,
+    );
+  });
+
+  it("throws UnsupportedOperationError on an unknown manager op", () => {
+    assert.throws(
+      () => buildCommandProto({ type: "streamingQueryManagerCommand", op: "bogus" }),
+      UnsupportedOperationError,
+    );
+  });
+});
+
+describe("decodeCommandResponse: streamingQueryManagerCommandResult", () => {
+  const instance = create(StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema, {
+    id: create(StreamingQueryInstanceIdSchema, { id: "id-a", runId: "run-b" }),
+    name: "q1",
+  });
+
+  it("decodes the active result", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryManagerCommandResult",
+        value: create(StreamingQueryManagerCommandResultSchema, {
+          resultType: {
+            case: "active",
+            value: create(StreamingQueryManagerCommandResult_ActiveResultSchema, {
+              activeQueries: [instance],
+            }),
+          },
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryManagerCommandResult",
+      resultType: "active",
+      activeQueries: [{ id: "id-a", runId: "run-b", name: "q1" }],
+    });
+  });
+
+  it("decodes the query (get) result", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryManagerCommandResult",
+        value: create(StreamingQueryManagerCommandResultSchema, {
+          resultType: { case: "query", value: instance },
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryManagerCommandResult",
+      resultType: "query",
+      query: { id: "id-a", runId: "run-b", name: "q1" },
+    });
+  });
+
+  it("decodes a missing query (get-by-id miss) as resultType=query with undefined query", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryManagerCommandResult",
+        value: create(StreamingQueryManagerCommandResultSchema, {
+          resultType: {
+            case: "query",
+            value: create(StreamingQueryManagerCommandResult_StreamingQueryInstanceSchema, {}),
+          },
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryManagerCommandResult",
+      resultType: "query",
+      query: undefined,
+    });
+  });
+
+  it("decodes the awaitAnyTermination result", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryManagerCommandResult",
+        value: create(StreamingQueryManagerCommandResultSchema, {
+          resultType: {
+            case: "awaitAnyTermination",
+            value: create(StreamingQueryManagerCommandResult_AwaitAnyTerminationResultSchema, {
+              terminated: true,
+            }),
+          },
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryManagerCommandResult",
+      resultType: "awaitAnyTermination",
+      terminated: true,
+    });
+  });
+
+  it("decodes the resetTerminated ack", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryManagerCommandResult",
+        value: create(StreamingQueryManagerCommandResultSchema, {
+          resultType: { case: "resetTerminated", value: true },
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryManagerCommandResult",
+      resultType: "resetTerminated",
+    });
+  });
+});
+
+describe("buildCommandProto: streamingQueryListenerBusCommand", () => {
+  it("maps op=addListenerBusListener", () => {
+    const cmd = buildCommandProto({
+      type: "streamingQueryListenerBusCommand",
+      op: "addListenerBusListener",
+    });
+    assert.equal(cmd.commandType.case, "streamingQueryListenerBusCommand");
+    if (cmd.commandType.case !== "streamingQueryListenerBusCommand") return;
+    const c = cmd.commandType.value.command;
+    assert.equal(c.case, "addListenerBusListener");
+    assert.equal(c.value, true);
+  });
+
+  it("maps op=removeListenerBusListener", () => {
+    const cmd = buildCommandProto({
+      type: "streamingQueryListenerBusCommand",
+      op: "removeListenerBusListener",
+    });
+    assert.equal(cmd.commandType.case, "streamingQueryListenerBusCommand");
+    if (cmd.commandType.case !== "streamingQueryListenerBusCommand") return;
+    const c = cmd.commandType.value.command;
+    assert.equal(c.case, "removeListenerBusListener");
+    assert.equal(c.value, true);
+  });
+
+  it("throws UnsupportedOperationError on an unknown bus op", () => {
+    assert.throws(
+      () => buildCommandProto({ type: "streamingQueryListenerBusCommand", op: "bogus" }),
+      UnsupportedOperationError,
+    );
+  });
+});
+
+describe("decodeCommandResponse: streamingQueryListenerEventsResult", () => {
+  it("decodes the registration ack with no events", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryListenerEventsResult",
+        value: create(StreamingQueryListenerEventsResultSchema, {
+          events: [],
+          listenerBusListenerAdded: true,
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryListenerEventsResult",
+      events: [],
+      listenerBusListenerAdded: true,
+    });
+  });
+
+  it("decodes a batch of events with event-type names", () => {
+    const resp = create(ExecutePlanResponseSchema, {
+      responseType: {
+        case: "streamingQueryListenerEventsResult",
+        value: create(StreamingQueryListenerEventsResultSchema, {
+          events: [
+            create(StreamingQueryListenerEventSchema, {
+              eventType: StreamingQueryEventType.QUERY_PROGRESS_EVENT,
+              eventJson: '{"batchId":0}',
+            }),
+            create(StreamingQueryListenerEventSchema, {
+              eventType: StreamingQueryEventType.QUERY_IDLE_EVENT,
+              eventJson: '{"id":"id-a"}',
+            }),
+            create(StreamingQueryListenerEventSchema, {
+              eventType: StreamingQueryEventType.QUERY_TERMINATED_EVENT,
+              eventJson: '{"id":"id-a"}',
+            }),
+          ],
+        }),
+      },
+    });
+    assert.deepEqual(decodeCommandResponse(resp), {
+      type: "streamingQueryListenerEventsResult",
+      events: [
+        { eventType: "progress", eventJson: '{"batchId":0}' },
+        { eventType: "idle", eventJson: '{"id":"id-a"}' },
+        { eventType: "terminated", eventJson: '{"id":"id-a"}' },
+      ],
     });
   });
 });

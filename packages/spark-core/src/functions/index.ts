@@ -109,6 +109,8 @@ export {
   trunc,
   extract,
   date_part,
+  window,
+  session_window,
 } from "./datetime.js";
 
 // Math
