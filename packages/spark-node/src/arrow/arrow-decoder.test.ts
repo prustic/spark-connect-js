@@ -76,26 +76,18 @@ describe("ArrowDecoder.decode() — basic types", () => {
 });
 
 describe("ArrowDecoder.decode() — Long (Int64)", () => {
-  it("returns number for safe-range values", async () => {
+  it("always returns bigint, regardless of magnitude", async () => {
     const chunk = makeIpc(
       [new Field("v", new Int(true, 64), true)],
-      [[100n, BigInt(Number.MAX_SAFE_INTEGER)]],
-    );
-    const rows = await ArrowDecoder.decode([chunk]);
-    assert.equal(typeof rows[0]["v"], "number");
-    assert.equal(rows[0]["v"], 100);
-    assert.equal(typeof rows[1]["v"], "number");
-    assert.equal(rows[1]["v"], Number.MAX_SAFE_INTEGER);
-  });
-
-  it("returns bigint for values above MAX_SAFE_INTEGER", async () => {
-    const chunk = makeIpc(
-      [new Field("v", new Int(true, 64), true)],
-      [[BigInt(Number.MAX_SAFE_INTEGER) + 1n]],
+      [[100n, BigInt(Number.MAX_SAFE_INTEGER), BigInt(Number.MAX_SAFE_INTEGER) + 1n]],
     );
     const rows = await ArrowDecoder.decode([chunk]);
     assert.equal(typeof rows[0]["v"], "bigint");
-    assert.equal(rows[0]["v"], BigInt(Number.MAX_SAFE_INTEGER) + 1n);
+    assert.equal(rows[0]["v"], 100n);
+    assert.equal(typeof rows[1]["v"], "bigint");
+    assert.equal(rows[1]["v"], BigInt(Number.MAX_SAFE_INTEGER));
+    assert.equal(typeof rows[2]["v"], "bigint");
+    assert.equal(rows[2]["v"], BigInt(Number.MAX_SAFE_INTEGER) + 1n);
   });
 
   it("returns null for null values", async () => {
@@ -249,8 +241,8 @@ describe("ArrowDecoder.decode() — Map", () => {
     );
     const rows = await ArrowDecoder.decode([chunk]);
     const m = rows[0]["m"] as Map<unknown, unknown>;
-    assert.equal(typeof [...m.keys()][0], "number");
-    assert.equal(m.get(1), "a");
+    assert.equal(typeof [...m.keys()][0], "bigint");
+    assert.equal(m.get(1n), "a");
   });
 });
 
@@ -276,8 +268,8 @@ describe("ArrowDecoder.decode() — Struct", () => {
     );
     const rows = await ArrowDecoder.decode([chunk]);
     const s = rows[0]["s"] as Record<string, unknown>;
-    assert.equal(typeof s["id"], "number");
-    assert.equal(s["id"], 9_000_000_000);
+    assert.equal(typeof s["id"], "bigint");
+    assert.equal(s["id"], 9_000_000_000n);
   });
 });
 
@@ -294,7 +286,7 @@ describe("ArrowDecoder.decode() — List", () => {
     const chunk = makeIpc([new Field("xs", listType, true)], [[[100n, 9_000_000_000n]]]);
     const rows = await ArrowDecoder.decode([chunk]);
     const xs = rows[0]["xs"] as unknown[];
-    assert.equal(typeof xs[0], "number");
-    assert.equal(xs[1], 9_000_000_000);
+    assert.equal(typeof xs[0], "bigint");
+    assert.equal(xs[1], 9_000_000_000n);
   });
 });

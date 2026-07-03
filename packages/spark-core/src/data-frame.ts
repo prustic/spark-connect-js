@@ -934,9 +934,12 @@ export class DataFrame<R extends Row = Row> {
 
   /**
    * Return the number of rows.
-   * Uses an aggregate count plan. The full dataset is not collected.
+   *
+   * Uses an aggregate count plan. The full dataset is not collected. Returns
+   * a `bigint` because Spark's `count(*)` is `LongType`. Wrap in `Number(...)`
+   * when you know the row count fits in a JS safe integer.
    */
-  async count(): Promise<number> {
+  async count(): Promise<bigint> {
     const countPlan: LogicalPlan = {
       type: "aggregate",
       child: this._plan,
@@ -960,7 +963,7 @@ export class DataFrame<R extends Row = Row> {
       chunks.push(batch);
     }
     const rows = await decoder(chunks);
-    return (rows[0]?.count as number) ?? 0;
+    return (rows[0]?.count as bigint) ?? 0n;
   }
 
   /**

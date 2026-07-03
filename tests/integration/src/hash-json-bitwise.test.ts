@@ -88,10 +88,10 @@ describe("bitwise functions", () => {
 
     assert.equal(rows.length, 4);
     // shiftleft(1, 2) = 4
-    assert.equal(rows[0]["shl_2"], 4);
+    assert.equal(rows[0]["shl_2"], 4n);
     // shiftright(2, 1) = 1
-    assert.equal(rows[1]["shr_1"], 1);
+    assert.equal(rows[1]["shr_1"], 1n);
     // bitwise_not(1) = -2
-    assert.equal(rows[0]["not_id"], -2);
+    assert.equal(rows[0]["not_id"], -2n);
   });
 });

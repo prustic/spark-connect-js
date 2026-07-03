@@ -9,12 +9,16 @@ import { InvalidInputError } from "../errors.js";
  * When Arrow IPC batches are decoded, each row is materialised as a plain
  * object.  This is intentionally kept as a simple Record type because we don't
  * wrap it in a class because:
- *   1. JSON.stringify works out of the box for logging/debugging.
- *   2. Destructuring works naturally: `const { name, age } = row;`
- *   3. No prototype overhead for millions of rows.
+ *   1. Destructuring works naturally: `const { name, age } = row;`
+ *   2. No prototype overhead for millions of rows.
  *
  * Values:
  *   - `number` for `IntegerType`, `ShortType`, `ByteType`, `FloatType`, `DoubleType`
+ *   - `bigint` for `LongType`, so the decoded type is stable per column and
+ *     full 64-bit precision is preserved. Wrap in `Number(row.id)` when you
+ *     know the value fits in a JS safe integer. See
+ *     [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)
+ *     for the language semantics (no float mixing, custom JSON serialisation).
  *   - `string` for `StringType` and `DecimalType` (decimals decode as
  *     fixed-point strings honoring scale, e.g. `"1.50"` for `DECIMAL(10,2)`,
  *     since JS has no native arbitrary-precision decimal)
