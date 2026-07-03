@@ -46,8 +46,7 @@ describe("ArrowEncoder.encode()", () => {
   it("round-trips bigints via Int64", async () => {
     const bytes = ArrowEncoder.encode([{ big: 9_000_000_000n }]);
     const rows = await ArrowDecoder.decode([bytes]);
-    // Long decode policy is parked. Safe-range values return number.
-    assert.equal(rows[0]["big"], 9_000_000_000);
+    assert.equal(rows[0]["big"], 9_000_000_000n);
   });
 
   it("round-trips Dates via TimestampMillisecond", async () => {

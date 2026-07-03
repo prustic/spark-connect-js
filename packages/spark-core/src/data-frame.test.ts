@@ -523,12 +523,12 @@ describe("DataFrame.count()", () => {
     const spark = SparkSession.builder()
       .remote("sc://localhost:15002")
       .transport(t)
-      .arrowDecoder(async () => [{ count: 42 }])
+      .arrowDecoder(async () => [{ count: 42n }])
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
 
-    assert.equal(result, 42);
+    assert.equal(result, 42n);
     // Verify the plan sent to transport is an aggregate, not the original SQL
     assert.equal(t.calls.length, 1);
     assert.equal(t.calls[0].type, "aggregate");
@@ -553,7 +553,7 @@ describe("DataFrame.count()", () => {
       .getOrCreate();
 
     const result = await spark.sql("SELECT * FROM t").count();
-    assert.equal(result, 0);
+    assert.equal(result, 0n);
   });
 });
 

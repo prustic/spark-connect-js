@@ -45,7 +45,7 @@ describe("groupBy + aggregation", () => {
       .collect();
     assert.equal(rows.length, 2);
     const eng = rows.find((r) => r["department"] === "Engineering");
-    assert.equal(eng?.["headcount"], 3);
+    assert.equal(eng?.["headcount"], 3n);
   });
 });
 

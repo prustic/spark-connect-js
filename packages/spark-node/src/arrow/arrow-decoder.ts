@@ -29,9 +29,6 @@ import {
   type FixedSizeList,
 } from "apache-arrow";
 
-const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
-
 export class ArrowDecoder {
   /**
    * Decode Arrow IPC stream chunks into an array of Row objects.
@@ -108,11 +105,8 @@ function coerceInt(val: unknown, type: Int): unknown {
   if (type.bitWidth !== 64) {
     return val;
   }
-  if (typeof val === "bigint") {
-    if (val >= MIN_SAFE_BIGINT && val <= MAX_SAFE_BIGINT) {
-      return Number(val);
-    }
-    return val;
+  if (typeof val === "number") {
+    return BigInt(val);
   }
   return val;
 }
