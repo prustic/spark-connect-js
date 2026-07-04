@@ -183,7 +183,7 @@ See [Error handling](/spark-connect-js/error-handling/) for the full hierarchy.
 
 ## Type coercion at the edges
 
-Some Arrow types don't round-trip cleanly into JavaScript. The full mapping is in [architecture](/spark-connect-js/architecture/#type-mapping); four notable mismatches:
+Some Arrow types don't round-trip cleanly into JavaScript. The full mapping is in [architecture](/spark-connect-js/architecture/#type-mapping). Four notable mismatches:
 
 | Spark type        | PySpark               | spark-connect-js |
 | ----------------- | --------------------- | ---------------- |
@@ -203,7 +203,7 @@ The streaming surface mirrors PySpark's: `spark.readStream`, `df.writeStream`, `
 - `explain()` returns the plan string instead of printing it.
 - `streams.get(id)` returns `null` on a miss, like PySpark. The Scala client throws.
 - `listListeners()` is not exposed. It reports server-side Java listeners only, which a JS client never registers, so the result would always be empty.
-- Listeners are cleared when the event subscription dies non-recoverably; re-add them to resume. PySpark logs a warning through `warnings.warn` instead.
+- Listeners are cleared when the event subscription dies non-recoverably. Re-add them to resume. PySpark logs a warning through `warnings.warn` instead.
 - `foreach` and `foreachBatch` need JS UDF execution and are not yet available.
 
 See the [Structured Streaming guide](/spark-connect-js/streaming/) for the full walkthrough.

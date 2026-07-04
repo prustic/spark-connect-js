@@ -68,7 +68,7 @@ Most analyzer failures come back with a populated `errorClass`. A few paths stil
 
 ### `LONG` values come back as strings / BigInt
 
-They come back as `bigint`, always; the same applies to `df.count()`. JS `number` can't represent the full int64 range. See the [type mapping in architecture](/spark-connect-js/architecture/#type-mapping) and [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) for the language semantics.
+They come back as `bigint`, always, and the same applies to `df.count()`. JS `number` can't represent the full int64 range. See the [type mapping in architecture](/spark-connect-js/architecture/#type-mapping) and [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) for the language semantics.
 
 ```ts
 const row = await df.first();

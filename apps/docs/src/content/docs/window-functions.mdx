@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
   For window syntax and semantics, see [Window clause](https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-window.html) in the Apache Spark SQL reference.
 </Aside>
 
-Window functions compute a value for each row using a window of related rows (rows in the same partition, or rows within a range of the current row). They are the same functions that back SQL's `OVER (PARTITION BY ... ORDER BY ...)` clause. The event-time `window()` and `session_window()` grouping functions are unrelated; those live in [Structured Streaming](/spark-connect-js/streaming/#event-time).
+Window functions compute a value for each row using a window of related rows (rows in the same partition, or rows within a range of the current row). They are the same functions that back SQL's `OVER (PARTITION BY ... ORDER BY ...)` clause. The event-time `window()` and `session_window()` grouping functions are unrelated. Those live in [Structured Streaming](/spark-connect-js/streaming/#event-time).
 
 ```ts
 import { Window, row_number, rank, dense_rank, lag, lead, ntile, sum, avg } from "@spark-connect-js/node";

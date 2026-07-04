@@ -9,11 +9,11 @@ import { Aside } from '@astrojs/starlight/components';
   For the execution model behind these APIs, see the [Structured Streaming Programming Guide](https://spark.apache.org/docs/latest/streaming/index.html) in the Apache Spark documentation.
 </Aside>
 
-A streaming query reads from an unbounded source and continuously writes results to a sink. The client builds it like a batch plan; the server runs it until stopped.
+A streaming query reads from an unbounded source and continuously writes results to a sink. The client builds it like a batch plan. The server runs it until stopped.
 
 ## Starting a query
 
-`spark.readStream` returns a `DataStreamReader`; `df.writeStream` returns a `DataStreamWriter`. `start()` submits the query and resolves to a `StreamingQuery` handle:
+`spark.readStream` returns a `DataStreamReader` and `df.writeStream` a `DataStreamWriter`. `start()` submits the query and resolves to a `StreamingQuery` handle:
 
 ```ts
 import { Trigger } from "@spark-connect-js/node";
@@ -29,7 +29,7 @@ const query = await spark.readStream
   .start();
 ```
 
-The rate source emits `(timestamp, value)` rows at the configured rate and the memory sink keeps batches in an in-process table, which makes the pair a self-contained test rig. Real deployments read Kafka or files and write files, Kafka, or tables; `toTable("events_agg")` replaces `start()` for a table sink.
+The rate source emits `(timestamp, value)` rows at the configured rate and the memory sink keeps batches in an in-process table, which makes the pair a self-contained test rig. Real deployments read Kafka or files and write files, Kafka, or tables. `toTable("events_agg")` replaces `start()` for a table sink.
 
 `Trigger` sets the batch cadence: `Trigger.processingTime("10 seconds")` for fixed intervals, `Trigger.availableNow()` to drain what's available and stop, `Trigger.continuous("1 second")` for continuous processing.
 
@@ -79,7 +79,7 @@ await spark.streams.addListener(listener);
 await spark.streams.removeListener(listener);
 ```
 
-All four callbacks are optional. Dispatch is serial and awaits async callbacks, so events arrive in order. If the event subscription dies non-recoverably, all listeners are cleared; re-add them to resume.
+All four callbacks are optional. Dispatch is serial and awaits async callbacks, so events arrive in order. If the event subscription dies non-recoverably, all listeners are cleared, so re-add them to resume.
 
 ## Event time
 
@@ -102,9 +102,9 @@ await counts.writeStream
   .start();
 ```
 
-`window(timeColumn, windowDuration, slideDuration?, startTime?)` returns a struct column of `{ start, end }`; omitting `slideDuration` makes the windows tumbling. `session_window(timeColumn, gapDuration)` opens a new session whenever the gap between consecutive events exceeds `gapDuration`. Both group by event time and are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
+`window(timeColumn, windowDuration, slideDuration?, startTime?)` returns a struct column of `{ start, end }`, tumbling when `slideDuration` is omitted. `session_window(timeColumn, gapDuration)` opens a new session whenever the gap between consecutive events exceeds `gapDuration`. Both group by event time and are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
 
-In append mode a window's row is emitted only once the watermark passes the window's end, so each result is final; late rows beyond the watermark are dropped.
+In append mode a window's row is emitted only once the watermark passes the window's end, so each result is final, and late rows beyond the watermark are dropped.
 
 ## Failures
 

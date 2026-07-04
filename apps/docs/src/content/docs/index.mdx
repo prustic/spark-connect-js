@@ -90,7 +90,7 @@ const df = spark.read
 await df.show();
 ```
 
-Batch and streaming share the same DataFrame surface; `spark.readStream` and `df.writeStream` run the plan as a continuous query instead. See [Structured Streaming](/spark-connect-js/streaming/).
+Batch and streaming share the same DataFrame surface. `spark.readStream` and `df.writeStream` run the plan as a continuous query instead. See [Structured Streaming](/spark-connect-js/streaming/).
 
 The [Quickstart](/spark-connect-js/quickstart/) covers starting a local Connect server and a longer example. Runnable scripts live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples).
 

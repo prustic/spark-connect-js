@@ -68,10 +68,10 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 - Listener callbacks: `onQueryStarted`, `onQueryProgress`, `onQueryIdle`, `onQueryTerminated`.
 - Event-time aggregation: `withWatermark`, `window()`, `session_window()`.
 - Type-driven Arrow decode: temporals as `Date`, decimals as fixed-point strings, maps as `Map<K, V>`, longs always as `bigint` (`count()` returns `bigint`), applied recursively through structs and arrays. `show()` renders in Spark's display style.
-- `createDataFrame(rows)` from plain JS objects, encoded to Arrow on the client; `arrowEncoder` builder hook for custom runtimes.
+- `createDataFrame(rows)` from plain JS objects, encoded to Arrow on the client, with an `arrowEncoder` builder hook for custom runtimes.
 - Typed access: `df.as<Schema>()` and the `row` accessor namespace. `df.agg(...)` and `df.col(name)`.
-- Column methods wrap raw primitives as literals; `filter`/`where` accept SQL string predicates.
-- `lit(null)` emits a typed NULL literal; `lit(undefined)` rejects.
+- Column methods wrap raw primitives as literals, and `filter`/`where` accept SQL string predicates.
+- `lit(null)` emits a typed NULL literal and `lit(undefined)` rejects.
 - Transport: channel handshake deadline, no-progress reattach ceiling, `isSessionInvalidated` predicate.
 - Connection strings reject non-`sc://` schemes and userinfo in the host.
 - `node-streaming` example.

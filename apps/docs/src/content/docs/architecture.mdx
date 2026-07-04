@@ -125,7 +125,7 @@ The client itself keeps very little:
 
 A transient gRPC drop during a server-streaming `ExecutePlan` is handled in-process: the transport tracks `responseId` on every received response and, on a retryable failure (`UNAVAILABLE`, or `INTERNAL` carrying `INVALID_CURSOR.DISCONNECTED`), opens a `ReattachExecute(operation_id, last_response_id)` to resume the stream from after the last acknowledged batch. The retry budget and backoff are configurable via `RetryPolicy`. Two guards bound the failure modes: the initial channel handshake fails within `handshakeTimeoutMs` instead of hanging on an unreachable endpoint, and a stream that keeps reattaching without delivering data errors out after `maxConsecutiveNoProgressReattaches` attempts.
 
-A whole-session loss (driver restart, idle reap) is recoverable too, by constructing a new session with the same `session_id` while the server's session cache still has the entry. `isSessionInvalidated(err)` detects this case; see [Error handling](/spark-connect-js/error-handling/).
+A whole-session loss (driver restart, idle reap) is recoverable too, by constructing a new session with the same `session_id` while the server's session cache still has the entry. `isSessionInvalidated(err)` detects this case. See [Error handling](/spark-connect-js/error-handling/).
 
 ### Lifecycle
 

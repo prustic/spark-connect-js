@@ -207,7 +207,7 @@ await df.forEach(row => { ... }); // drains the stream server-side and applies f
 Rows decode to plain objects. Column values map to JS types by Spark type:
 
 - Integers, floats, and booleans arrive as `number` and `boolean`.
-- `LongType` arrives as `bigint`. This is why `count()` returns `bigint`; wrap it in `Number(...)` when the count is known to fit a JS safe integer.
+- `LongType` arrives as `bigint`, which is why `count()` returns one. Wrap it in `Number(...)` when the count is known to fit a JS safe integer.
 - `DateType` and `TimestampType` arrive as `Date`. Sub-millisecond precision truncates.
 - `DecimalType` arrives as a fixed-point string like `"1.50"`.
 - `MapType` arrives as `Map<K, V>`.
@@ -222,7 +222,7 @@ const rows = await spark.table("people").as<{ id: bigint; name: string }>().coll
 rows[0].name;  // string
 ```
 
-`as<Schema>()` is an assertion, not a validation; nothing is checked at runtime. The `row` accessors check instead. Each getter verifies the column exists and the value matches the expected type, returning `null` for NULL and throwing on a mismatch:
+`as<Schema>()` is an assertion, not a validation. Nothing is checked at runtime. The `row` accessors check instead. Each getter verifies the column exists and the value matches the expected type, returning `null` for NULL and throwing on a mismatch:
 
 ```ts
 import { row } from "@spark-connect-js/node";
@@ -247,7 +247,7 @@ await df.explain("extended");
 
 ### Writing
 
-`df.write` returns a `DataFrameWriter`. `df.writeTo(table)` returns the v2 writer. See the [I/O guide](/spark-connect-js/io/). For continuous queries, `df.writeStream` starts a streaming write; see the [Structured Streaming guide](/spark-connect-js/streaming/).
+`df.write` returns a `DataFrameWriter`. `df.writeTo(table)` returns the v2 writer. See the [I/O guide](/spark-connect-js/io/). For continuous queries, `df.writeStream` starts a streaming write, covered in the [Structured Streaming guide](/spark-connect-js/streaming/).
 
 ## The Column DSL
 
@@ -310,7 +310,7 @@ df.select(lit(1).alias("one"), col("name"));
 df.withColumn("bucket", col("score").divide(10).cast("int"));
 ```
 
-TypeScript has no operator overloading, so comparisons and arithmetic are methods: `col("x").gt(30)`, `col("a").plus(col("b"))`. `lit(null)` produces a typed NULL literal; refine it with `.cast(...)` when the server needs a concrete type. `lit(undefined)` throws, since an absent value is almost always a bug rather than an intended NULL.
+TypeScript has no operator overloading, so comparisons and arithmetic are methods: `col("x").gt(30)`, `col("a").plus(col("b"))`. `lit(null)` produces a typed NULL literal. Refine it with `.cast(...)` when the server needs a concrete type. `lit(undefined)` throws, since an absent value is almost always a bug rather than an intended NULL.
 
 ## SQL strings and raw expressions
 
@@ -324,7 +324,7 @@ df.filter(expr("age > 18 AND country IN ('US', 'CA')"));
 df.withColumn("age_group", expr("CASE WHEN age < 18 THEN 'minor' ELSE 'adult' END"));
 ```
 
-`filter` and `where` accept the same SQL fragments directly. `expr("...")` lifts one into a `Column` for anywhere else an expression goes; `selectExpr(...)` covers SQL projections.
+`filter` and `where` accept the same SQL fragments directly. `expr("...")` lifts one into a `Column` for anywhere else an expression goes, and `selectExpr(...)` covers SQL projections.
 
 Temp views bridge the two worlds:
 

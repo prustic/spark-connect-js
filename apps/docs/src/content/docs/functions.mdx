@@ -80,7 +80,7 @@ df.select(
 
 Full set: `year`, `month`, `dayofmonth`, `dayofweek`, `dayofyear`, `weekofyear`, `quarter`, `hour`, `minute`, `second`, `current_date`, `current_timestamp`, `datediff`, `date_add`, `date_sub`, `months_between`, `next_day`, `last_day`, `add_months`, `date_format`, `to_date`, `to_timestamp`, `from_unixtime`, `unix_timestamp`, `date_trunc`, `trunc`, `extract`, `date_part`, `window`, `session_window`.
 
-`window(timeColumn, windowDuration)` and `session_window(timeColumn, gapDuration)` bucket rows into event-time windows for grouping, typically in streaming aggregations; see [Structured Streaming](/spark-connect-js/streaming/#event-time). They are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
+`window(timeColumn, windowDuration)` and `session_window(timeColumn, gapDuration)` bucket rows into event-time windows for grouping, typically in streaming aggregations. See [Structured Streaming](/spark-connect-js/streaming/#event-time). They are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
 
 ## Math
 
@@ -134,7 +134,7 @@ df.select(
 df.select(col("id"), explode(col("tags")).alias("tag"));
 ```
 
-`element_at`'s string argument means column name, following the Scala client; a literal map key goes through `lit("key")`.
+`element_at`'s string argument means column name, following the Scala client. Pass a literal map key through `lit("key")`.
 
 Full set includes `array`, `struct`, `map`, `create_map`, `explode`, `explode_outer`, `posexplode`, `posexplode_outer`, `flatten`, `array_contains`, `array_distinct`, `array_intersect`, `array_union`, `array_except`, `array_min`, `array_max`, `array_sort`, `array_position`, `array_remove`, `size`, `map_keys`, `map_values`, `map_entries`, `element_at`, `sequence`, `zip_with`, `transform`, `filter`, `exists`, `forall`.
 
