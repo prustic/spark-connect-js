@@ -1,5 +1,12 @@
 # @spark-connect-js/connect
 
+## 0.5.0
+
+### Minor Changes
+
+- [#98](https://github.com/prustic/spark-connect-js/pull/98) [`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8) Thanks [@prustic](https://github.com/prustic)!
+  - Re-exported proto schemas: `WriteStreamOperationStart`/`WriteStreamOperationStartResult`, `StreamingQueryCommand`/`StreamingQueryCommandResult`, `StreamingQueryManagerCommand`/`StreamingQueryManagerCommandResult`, `StreamingQueryListenerBusCommand`, `StreamingQueryListenerEvent`/`StreamingQueryListenerEventsResult`, `StreamingQueryEventType`, `StreamingQueryInstanceId`, `WithWatermark`, `DataType_NULL`, and `RelationCommon`, with their result and sub-command messages, consumed by `@spark-connect-js/node` for streaming commands, watermarks, and typed NULL literals
+
 ## 0.4.0
 
 ### Minor Changes
