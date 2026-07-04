@@ -14,6 +14,7 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
 
@@ -39,3 +40,9 @@ jobs:
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy docs on publish
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docs.yml --ref main
