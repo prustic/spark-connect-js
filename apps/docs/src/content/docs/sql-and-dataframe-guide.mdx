@@ -237,7 +237,7 @@ row.getDouble(stats, "mean");  // number | null
 Metadata queries are actions too; they round-trip to the server via AnalyzePlan.
 
 ```ts
-await df.schema();          // StructType
+await df.schema();          // schema tree as a plain object
 await df.columns();         // string[]
 await df.dtypes();          // Array<[string, string]>
 await df.printSchema();     // prints to stdout
