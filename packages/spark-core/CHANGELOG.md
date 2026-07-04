@@ -4,7 +4,8 @@
 
 ### Minor Changes
 
-- [#98](https://github.com/prustic/spark-connect-js/pull/98) [`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8) Thanks [@prustic](https://github.com/prustic)! - - Structured Streaming: `spark.readStream` (`DataStreamReader`) and `df.writeStream` (`DataStreamWriter`) with `Trigger` factories (`processingTime`, `availableNow`, `once`, `continuous`); `start()` returns a `StreamingQuery` (`id`, `runId`, `name`, `isActive`, `stop`, `awaitTermination`, `status`, `lastProgress`, `recentProgress`, `processAllAvailable`, `exception`, `explain`)
+- [#98](https://github.com/prustic/spark-connect-js/pull/98) [`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8) Thanks [@prustic](https://github.com/prustic)!
+  - Structured Streaming: `spark.readStream` (`DataStreamReader`) and `df.writeStream` (`DataStreamWriter`) with `Trigger` factories (`processingTime`, `availableNow`, `once`, `continuous`); `start()` returns a `StreamingQuery` (`id`, `runId`, `name`, `isActive`, `stop`, `awaitTermination`, `status`, `lastProgress`, `recentProgress`, `processAllAvailable`, `exception`, `explain`)
   - `spark.streams` (`StreamingQueryManager`): `active`, `get`, `awaitAnyTermination`, `resetTerminated`, `addListener`/`removeListener` with `StreamingQueryListener` callbacks (`onQueryStarted`, `onQueryProgress`, `onQueryIdle`, `onQueryTerminated`) and typed `StreamingQueryProgress`
   - Event-time aggregation: `DataFrame.withWatermark(eventTimeColumn, delayThreshold)`, `window(timeColumn, windowDuration, slideDuration?, startTime?)`, `session_window(timeColumn, gapDuration)`
   - `createDataFrame(rows)` accepts plain row objects, encoded via the new `arrowEncoder` builder hook; `Uint8Array` input is validated as Arrow IPC stream format (file-format and empty input throw `InvalidInputError`)
