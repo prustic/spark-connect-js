@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- [#101](https://github.com/prustic/spark-connect-js/pull/101) [`0a8e2de`](https://github.com/prustic/spark-connect-js/commit/0a8e2dee8f9df0911cbd2962314ac4cf743c6aa5) Thanks [@prustic](https://github.com/prustic)! - - Drop the hardcoded version from the README development-status note. 0.5.0 published with the note still reading v0.4.0, since npm snapshots the README at publish time, and a version-free note cannot go stale.
+- [#101](https://github.com/prustic/spark-connect-js/pull/101) [`0a8e2de`](https://github.com/prustic/spark-connect-js/commit/0a8e2dee8f9df0911cbd2962314ac4cf743c6aa5) Thanks [@prustic](https://github.com/prustic)! - Drop the hardcoded version from the README development-status note. 0.5.0 published with the note still reading v0.4.0, since npm snapshots the README at publish time, and a version-free note cannot go stale.
 
 ## 0.5.0
 
