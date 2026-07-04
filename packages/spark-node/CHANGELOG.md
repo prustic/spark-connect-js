@@ -1,5 +1,22 @@
 # @spark-connect-js/node
 
+## 0.5.0
+
+### Minor Changes
+
+- [#98](https://github.com/prustic/spark-connect-js/pull/98) [`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8) Thanks [@prustic](https://github.com/prustic)! - - Type-driven Arrow decode keyed on the column's Arrow type: `DECIMAL(p, s)` as a fixed-point string honoring scale, `DATE`/`TIMESTAMP` as `Date`, `MAP<K, V>` as `Map<K, V>` with typed keys, `LONG` always as `bigint` (wrap in `Number(...)` for values known to fit a JS safe integer), applied recursively through structs and arrays
+  - `ArrowEncoder` backs `createDataFrame(rows)` with type inference over `string`, `number`, `boolean`, `bigint`, `Date`, and nulls; strings encode as materialized `Utf8` (never dictionary-encoded, which Spark `LocalRelation` misreads)
+  - `GrpcTransportOptions.handshakeTimeoutMs` (default `10_000`, `0` disables): the channel handshake fails with `errorClass: "CONNECTION_TIMEOUT"` instead of hanging on an unreachable or misconfigured endpoint
+  - `RetryPolicy.maxConsecutiveNoProgressReattaches` (default 3, `0` disables): a stream that keeps reattaching without delivering data throws `errorClass: "REATTACH_NO_PROGRESS"` instead of retrying forever
+  - `GrpcTransport` implements the streaming command RPCs (`WriteStreamOperationStart`, `StreamingQueryCommand`, `StreamingQueryManagerCommand`) and the listener event stream
+  - `parseConnectionString` rejects non-`sc://` schemes and userinfo in the host with messages naming the offending segment
+
+### Patch Changes
+
+- Updated dependencies [[`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8), [`a6237a1`](https://github.com/prustic/spark-connect-js/commit/a6237a1e5abd87ab8786d58dc1cd7b390fedd7d8)]:
+  - @spark-connect-js/core@0.5.0
+  - @spark-connect-js/connect@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
