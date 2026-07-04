@@ -40,12 +40,18 @@ function newEntry(): VersionEntry {
   return { bullets: [], prs: new Set(), commits: new Set() };
 }
 
+const CHANGE_SECTIONS = new Set(["Major Changes", "Minor Changes", "Patch Changes"]);
+
+// The credit line changesets emits ends with "...)! - " followed by the first
+// body line. Everything after that marker is user-facing text.
+const CREDIT_JOIN = ")! - ";
+
 // changesets owns the CHANGELOG.md format, so this parser tracks heading state
-// line by line. Only Minor Changes (user-facing bullets) are kept.
+// line by line. User-facing bullets from any change section are kept.
 function parseChangelog(text: string): Map<string, VersionEntry> {
   const versions = new Map<string, VersionEntry>();
   let current: VersionEntry | undefined;
-  let inMinor = false;
+  let inChanges = false;
 
   for (const raw of text.split("\n")) {
     const line = raw.trimEnd();
@@ -55,7 +61,7 @@ function parseChangelog(text: string): Map<string, VersionEntry> {
       if (isSemver(version)) {
         current = newEntry();
         versions.set(version, current);
-        inMinor = false;
+        inChanges = false;
       }
       continue;
     }
@@ -65,28 +71,46 @@ function parseChangelog(text: string): Map<string, VersionEntry> {
     }
 
     if (line.startsWith("### ")) {
-      inMinor = line.slice(4).trim() === "Minor Changes";
+      inChanges = CHANGE_SECTIONS.has(line.slice(4).trim());
       continue;
     }
 
-    if (!inMinor) {
+    if (!inChanges || line.includes("Updated dependencies")) {
       continue;
     }
 
     collectLinks(line, current);
 
     // Nested user-facing bullets are indented with two spaces.
-    if (line.startsWith("  - ") && !line.includes("Updated dependencies")) {
-      const bullet = line.slice(4).trim();
+    if (line.startsWith("  - ")) {
+      pushBullet(current, line.slice(4));
+      continue;
+    }
 
-      // Skip workspace dependency-bump bullets like "@spark-connect-js/core@0.3.0".
-      if (bullet && !bullet.startsWith("@spark-connect-js/")) {
-        current.bullets.push(bullet);
+    // changesets joins the body's first line onto the credit line. Hand-edited
+    // entries move it to an indented bullet instead, so the marker may be
+    // followed by nothing.
+    if (line.startsWith("- [")) {
+      const join = line.indexOf(CREDIT_JOIN);
+      if (join !== -1) {
+        pushBullet(current, line.slice(join + CREDIT_JOIN.length));
       }
     }
   }
 
   return versions;
+}
+
+function pushBullet(entry: VersionEntry, text: string): void {
+  const bullet = text.trim();
+
+  // A joined first line that is itself a bullet starts with its own "- ".
+  const cleaned = bullet.startsWith("- ") ? bullet.slice(2).trim() : bullet;
+
+  // Skip workspace dependency-bump bullets like "@spark-connect-js/core@0.3.0".
+  if (cleaned && !cleaned.startsWith("@spark-connect-js/")) {
+    entry.bullets.push(cleaned);
+  }
 }
 
 function isSemver(value: string): boolean {

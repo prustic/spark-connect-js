@@ -30,7 +30,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # The changelog build reads release dates from git tags.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - uses: pnpm/action-setup@v4
 
