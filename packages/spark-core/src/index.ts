@@ -338,7 +338,6 @@ export {
 // in implementation modules.
 export type { Row } from "./types/row.js";
 export { row } from "./types/row.js";
-export type { Schema, FieldDescriptor } from "./types/schema.js";
 export type {
   SparkSessionConfig,
   Transport,

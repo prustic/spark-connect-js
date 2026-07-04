@@ -75,7 +75,7 @@ describe("StructType", () => {
     const st = StructType.fromProto(proto);
     assert.equal(st.length, 2);
     assert.equal(st.fields[0].name, "id");
-    assert.equal(st.fields[0].dataType, "long");
+    assert.equal(st.fields[0].dataType, "bigint");
     assert.equal(st.fields[0].nullable, false);
     assert.equal(st.fields[1].name, "name");
     assert.equal(st.fields[1].dataType, "string");
@@ -84,6 +84,194 @@ describe("StructType", () => {
   it("fromProto() handles empty/missing struct", () => {
     const st = StructType.fromProto({});
     assert.equal(st.length, 0);
+  });
+
+  it("fromProto() renders DDL names for renamed primitives", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          { name: "a", dataType: { kind: { case: "integer" } } },
+          { name: "b", dataType: { kind: { case: "byte" } } },
+          { name: "c", dataType: { kind: { case: "short" } } },
+          { name: "d", dataType: { kind: { case: "timestampNtz" } } },
+          { name: "e", dataType: { kind: { case: "double" } } },
+        ],
+      },
+    });
+    assert.deepStrictEqual(
+      st.fields.map((f) => f.dataType),
+      ["int", "tinyint", "smallint", "timestamp_ntz", "double"],
+    );
+  });
+
+  it("fromProto() renders decimal precision and scale", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "amount",
+            dataType: { kind: { case: "decimal", value: { precision: 18, scale: 2 } } },
+          },
+        ],
+      },
+    });
+    assert.equal(st.fields[0].dataType, "decimal(18,2)");
+  });
+
+  it("fromProto() recurses into array, map, and struct", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "tags",
+            dataType: {
+              kind: { case: "array", value: { elementType: { kind: { case: "string" } } } },
+            },
+          },
+          {
+            name: "counts",
+            dataType: {
+              kind: {
+                case: "map",
+                value: {
+                  keyType: { kind: { case: "string" } },
+                  valueType: { kind: { case: "long" } },
+                },
+              },
+            },
+          },
+          {
+            name: "point",
+            dataType: {
+              kind: {
+                case: "struct",
+                value: {
+                  fields: [
+                    { name: "x", dataType: { kind: { case: "integer" } } },
+                    {
+                      name: "ys",
+                      dataType: {
+                        kind: {
+                          case: "array",
+                          value: { elementType: { kind: { case: "double" } } },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    assert.deepStrictEqual(
+      st.fields.map((f) => f.dataType),
+      ["array<string>", "map<string,bigint>", "struct<x:int,ys:array<double>>"],
+    );
+  });
+
+  it("fromProto() parses JSON-string field metadata", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "id",
+            dataType: { kind: { case: "long" } },
+            metadata: '{"comment":"primary key"}',
+          },
+        ],
+      },
+    });
+    assert.deepStrictEqual(st.fields[0].metadata, { comment: "primary key" });
+  });
+
+  it("fromProto() renders interval types from their start/end fields", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "a",
+            dataType: {
+              kind: { case: "dayTimeInterval", value: { startField: 1, endField: 1 } },
+            },
+          },
+          {
+            name: "b",
+            dataType: {
+              kind: { case: "dayTimeInterval", value: { startField: 0, endField: 2 } },
+            },
+          },
+          { name: "c", dataType: { kind: { case: "dayTimeInterval", value: {} } } },
+          {
+            name: "d",
+            dataType: {
+              kind: { case: "yearMonthInterval", value: { startField: 0, endField: 0 } },
+            },
+          },
+          { name: "e", dataType: { kind: { case: "yearMonthInterval", value: {} } } },
+        ],
+      },
+    });
+    assert.deepStrictEqual(
+      st.fields.map((f) => f.dataType),
+      [
+        "interval hour",
+        "interval day to minute",
+        "interval day to second",
+        "interval year",
+        "interval year to month",
+      ],
+    );
+  });
+
+  it("fromProto() renders a udt as its sql type", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "vec",
+            dataType: {
+              kind: {
+                case: "udt",
+                value: {
+                  sqlType: {
+                    kind: {
+                      case: "array",
+                      value: { elementType: { kind: { case: "double" } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    assert.equal(st.fields[0].dataType, "array<double>");
+  });
+
+  it("fromProto() renders an unset oneof as unknown", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [{ name: "x", dataType: { kind: { case: undefined } } }],
+      },
+    });
+    assert.equal(st.fields[0].dataType, "unknown");
+  });
+
+  it("fromProto() falls back to the unparsed DDL string", () => {
+    const st = StructType.fromProto({
+      struct: {
+        fields: [
+          {
+            name: "x",
+            dataType: { kind: { case: "unparsed", value: { dataTypeString: "geometry" } } },
+          },
+        ],
+      },
+    });
+    assert.equal(st.fields[0].dataType, "geometry");
   });
 
   it("constructor defensively copies the fields array", () => {
