@@ -3,7 +3,7 @@ title: Examples
 description: Runnable sample apps that demonstrate the client against a local Spark Connect server.
 ---
 
-The repository's [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples) directory contains four self-contained applications. Each has its own `package.json`, a `docker-compose.yml` for a local Spark Connect server, and a single-command run script. Clone the repo, `cd` into one, and follow its README.
+The repository's [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples) directory contains six self-contained applications. Each has its own `package.json`, a `docker-compose.yml` for a local Spark Connect server, and a single-command run script. Clone the repo, `cd` into one, and follow its README.
 
 ### [`node-quickstart`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-quickstart)
 
@@ -29,6 +29,12 @@ Broader workload: aggregation, pivoting, caching, windowed stats. Closer to a re
 
 Covers: `groupBy`, `pivot`, `rollup`, `Window`, `df.cache()`, `unpersist`, statistical functions.
 
+### [`node-streaming`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-streaming)
+
+Runs a rate-to-memory streaming query with a lifecycle listener attached: start, watch progress events, inspect the manager, stop. Mirrors the [Structured Streaming guide](/spark-connect-js/streaming/).
+
+Covers: `readStream`, `writeStream`, `Trigger`, `StreamingQuery`, `spark.streams`, `addListener`.
+
 ### [`node-tls-behind-proxy`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy)
 
 Connects to a Spark Connect server over TLS by terminating TLS at a Caddy reverse proxy in front of `apache/spark:4.0.0`. Covers the production deployment topology, since Spark Connect 4.0 has no native server-side TLS.
@@ -37,7 +43,7 @@ Covers: `use_ssl=true`, self-signed certs via `NODE_EXTRA_CA_CERTS`, Caddy `reve
 
 ## Running an example
 
-Each example has a `docker-compose.yml` that brings up a Spark 3.5 Connect server on `localhost:15002`. From inside an example directory:
+Each example has a `docker-compose.yml` that brings up a Spark 4.0 Connect server on `localhost:15002`. From inside an example directory:
 
 ```bash
 docker compose up -d          # start the Spark Connect server

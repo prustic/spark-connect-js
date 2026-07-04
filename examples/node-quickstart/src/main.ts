@@ -1,4 +1,4 @@
-import { connect, col, lit, avg, count } from "@spark-connect-js/node";
+import { connect, col, avg, count } from "@spark-connect-js/node";
 
 const SPARK_REMOTE = process.env["SPARK_REMOTE"] ?? "sc://localhost:15002";
 
@@ -14,7 +14,7 @@ const employees = session.sql(`
   AS employees(name, department, salary)
 `);
 
-const topEarners = employees.filter(col("salary").gt(lit(75000))).sort(col("salary").desc());
+const topEarners = employees.filter(col("salary").gt(75000)).sort(col("salary").desc());
 
 console.log("Top earners:");
 console.table(await topEarners.collect());

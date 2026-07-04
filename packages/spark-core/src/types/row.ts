@@ -18,7 +18,7 @@ import { InvalidInputError } from "../errors.js";
  *     full 64-bit precision is preserved. Wrap in `Number(row.id)` when you
  *     know the value fits in a JS safe integer. See
  *     [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)
- *     for the language semantics (no float mixing, custom JSON serialisation).
+ *     for the language semantics (no float mixing, custom JSON serialization).
  *   - `string` for `StringType` and `DecimalType` (decimals decode as
  *     fixed-point strings honoring scale, e.g. `"1.50"` for `DECIMAL(10,2)`,
  *     since JS has no native arbitrary-precision decimal)

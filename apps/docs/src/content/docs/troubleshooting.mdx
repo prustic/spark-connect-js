@@ -9,13 +9,14 @@ When a server-side error is opaque, `df.explain("extended")` prints the resolved
 
 ## Cannot connect at all
 
-### `UNAVAILABLE` immediately on `connect(...)`
+### `UNAVAILABLE` or `CONNECTION_TIMEOUT` immediately on `connect(...)`
 
-The client doesn't open the channel until the first RPC, so a bad URL fails on your first `.collect()` or `.sql(...)`. If the first action errors with `SparkConnectError` and `code === GrpcStatusCode.UNAVAILABLE`, one of:
+The client doesn't open the channel until the first RPC, so a bad URL fails on your first `.collect()` or `.sql(...)`. An endpoint that can't complete the channel handshake (unreachable host, wrong port, TLS mismatch) fails within `handshakeTimeoutMs` (default 10 seconds) with `errorClass: "CONNECTION_TIMEOUT"`. Either way, one of:
 
 - The server isn't running. Check with `lsof -i :15002` or `curl http://<host>:15002`.
 - The server is running but bound to localhost and you're connecting from another host. Start it with `--host 0.0.0.0` if you meant to.
 - A firewall or security group is dropping the connection. Try `nc -zv <host> 15002` from the client machine to confirm the port is reachable.
+- TLS on one side only: `use_ssl=true` against a plaintext port, or plaintext against a TLS proxy. Match the scheme to the endpoint.
 
 ### `DEADLINE_EXCEEDED` on every RPC
 
@@ -67,12 +68,26 @@ Most analyzer failures come back with a populated `errorClass`. A few paths stil
 
 ### `LONG` values come back as strings / BigInt
 
-They come back as `bigint`. JS `number` can't represent the full int64 range. See the [type mapping in architecture](/spark-connect-js/architecture/#type-mapping).
+They come back as `bigint`, always, and the same applies to `df.count()`. JS `number` can't represent the full int64 range. See the [type mapping in architecture](/spark-connect-js/architecture/#type-mapping) and [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) for the language semantics.
 
 ```ts
 const row = await df.first();
 const count = Number(row!.n);  // if you know it fits in a JS number
 ```
+
+### `JSON.stringify` throws `TypeError: Do not know how to serialize a BigInt`
+
+Any row with a `LONG` column trips this because JS has no built-in bigint serialization. Pass a replacer:
+
+```ts
+JSON.stringify(rows, (_, v) => (typeof v === "bigint" ? v.toString() : v));
+```
+
+This is one-way: the values parse back as strings. When the JSON needs to round-trip as `bigint`, use the tagged replacer and reviver pair from [MDN's BigInt reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json).
+
+### Maps serialize as `{}`
+
+`MAP` columns decode to `Map<K, V>`, which `JSON.stringify` renders as `{}`. Convert first: `Object.fromEntries(map)` for string keys, or `[...map.entries()]` to keep typed keys.
 
 ### Decimals come back as strings
 

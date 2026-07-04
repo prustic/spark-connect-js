@@ -23,9 +23,10 @@ timeline TD
               : RuntimeConfig (spark.conf)
               : Error trailer decode + FetchErrorDetails
               : Java UDF / UDAF registration via spark.udf
-  0.5.0 : Structured Streaming
-        : StreamingQuery & Manager
-        : Listener callbacks
+  0.5.0 · 4 Jul 2026 : Structured Streaming
+        : Watermarks & event-time windows
+        : Type-driven Arrow decode
+        : createDataFrame from local rows
   0.6.0 : MERGE INTO builder
         : Session controls & artifacts
         : ~120 more functions
@@ -44,6 +45,7 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 - **[0.2.0](/spark-connect-js/changelog/#020)** · 15 March 2026 · caching, repartitioning, `cube`/`rollup`/`pivot`/`unpivot`, `DataFrameStat`
 - **[0.3.0](/spark-connect-js/changelog/#030)** · 29 March 2026 · reader/writer shortcuts, `DataFrameWriterV2`, typed error hierarchy
 - **[0.4.0](/spark-connect-js/changelog/#040)** · 14 May 2026 · catalog parity, docs site, transport (TLS, bearer, retry, reattach, interrupts), `RuntimeConfig`, error-trailer decoding, Java UDF registration
+- **[0.5.0](/spark-connect-js/changelog/#050)** · 4 July 2026 · Structured Streaming, watermarks and event-time windows, type-driven Arrow decode, `createDataFrame` from local rows, typed row access
 
 ### 0.4.0 · Catalog parity, docs site, transport
 
@@ -58,20 +60,29 @@ See the [Changelog](/spark-connect-js/changelog/) for full details on each relea
 - `client_observed_server_side_session_id` echo for stale-session detection.
 - `node-tls-behind-proxy` example.
 
-## Planned
-
 ### 0.5.0 · Structured Streaming
 
-- `readStream` and `writeStream` builders.
+- `readStream` and `writeStream` builders, with `Trigger` factories and output modes.
 - `StreamingQuery`: `id`, `runId`, `name`, `isActive`, `stop`, `awaitTermination`, `status`, `lastProgress`, `recentProgress`, `processAllAvailable`, `exception`, `explain`.
-- `StreamingQueryManager`: `active`, `get`, `awaitAnyTermination`, `resetTerminated`, `addListener`/`removeListener`.
+- `StreamingQueryManager` on `spark.streams`: `active`, `get`, `awaitAnyTermination`, `resetTerminated`, `addListener`/`removeListener`.
 - Listener callbacks: `onQueryStarted`, `onQueryProgress`, `onQueryIdle`, `onQueryTerminated`.
+- Event-time aggregation: `withWatermark`, `window()`, `session_window()`.
+- Type-driven Arrow decode: temporals as `Date`, decimals as fixed-point strings, maps as `Map<K, V>`, longs always as `bigint` (`count()` returns `bigint`), applied recursively through structs and arrays. `show()` renders in Spark's display style.
+- `createDataFrame(rows)` from plain JS objects, encoded to Arrow on the client, with an `arrowEncoder` builder hook for custom runtimes.
+- Typed access: `df.as<Schema>()` and the `row` accessor namespace. `df.agg(...)` and `df.col(name)`.
+- Column methods wrap raw primitives as literals, and `filter`/`where` accept SQL string predicates.
+- `lit(null)` emits a typed NULL literal and `lit(undefined)` rejects.
+- Transport: channel handshake deadline, no-progress reattach ceiling, `isSessionInvalidated` predicate.
+- Connection strings reject non-`sc://` schemes and userinfo in the host.
+- `node-streaming` example.
+
+## Planned
 
 ### 0.6.0 · Advanced Features
 
 - **`DataFrameWriterV2.mergeInto`**: fluent `MERGE INTO` builder with `whenMatched`/`whenNotMatched`/`whenNotMatchedBySource` and schema evolution.
 - **SparkSession enhancements**: `newSession`, `active()`/`getActiveSession()`, `addArtifact`/`addArtifacts`, `copyFromLocalToFs`, progress handlers, `executionInfo`.
-- **`DataFrame` long-tail**: `checkpoint`, `localCheckpoint`, `observe`, `withWatermark`, `withMetadata`, `inputFiles`, `isLocal`, `transpose`, `sampleBy`, `colRegex`, `to(schema)`, `lateralJoin`, `toArrow()`, `toJSON()`.
+- **`DataFrame` long-tail**: `checkpoint`, `localCheckpoint`, `observe`, `withMetadata`, `inputFiles`, `isLocal`, `transpose`, `sampleBy`, `colRegex`, `to(schema)`, `lateralJoin`, `toArrow()`, `toJSON()`.
 - **~120 additional built-in functions**: Variant, XML, URL, geospatial, partition transforms, bitmap and sketch aggregates, extra time helpers, regex variants, `try_*` variants.
 - **Integration coverage for the remaining file formats**: extend `tests/integration/` to round-trip Avro, XML, JDBC, and Hive via the generic `.format()` path. Currently only CSV / JSON / Parquet / ORC / text are exercised end-to-end; the I/O guide carries an "untested" caveat that this item lifts.
 

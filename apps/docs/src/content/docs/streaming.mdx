@@ -1,0 +1,119 @@
+---
+title: Structured Streaming
+description: Start, monitor, and stop streaming queries, with watermarks and event-time windows.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside>
+  For the execution model behind these APIs, see the [Structured Streaming Programming Guide](https://spark.apache.org/docs/latest/streaming/index.html) in the Apache Spark documentation.
+</Aside>
+
+A streaming query reads from an unbounded source and continuously writes results to a sink. The client builds it like a batch plan. The server runs it until stopped.
+
+## Starting a query
+
+`spark.readStream` returns a `DataStreamReader` and `df.writeStream` a `DataStreamWriter`. `start()` submits the query and resolves to a `StreamingQuery` handle:
+
+```ts
+import { Trigger } from "@spark-connect-js/node";
+
+const query = await spark.readStream
+  .format("rate")
+  .option("rowsPerSecond", "5")
+  .load()
+  .writeStream.format("memory")
+  .queryName("rate_to_memory")
+  .outputMode("append")
+  .trigger(Trigger.processingTime("1 second"))
+  .start();
+```
+
+The rate source emits `(timestamp, value)` rows at the configured rate and the memory sink keeps batches in an in-process table, which makes the pair a self-contained test rig. Real deployments read Kafka or files and write files, Kafka, or tables. `toTable("events_agg")` replaces `start()` for a table sink.
+
+`Trigger` sets the batch cadence: `Trigger.processingTime("10 seconds")` for fixed intervals, `Trigger.availableNow()` to drain what's available and stop, `Trigger.continuous("1 second")` for continuous processing.
+
+## Monitoring and stopping
+
+Every method on the handle crosses the wire, so all of them are async:
+
+```ts
+await query.isActive();        // true while running
+await query.status();          // { message, isDataAvailable, isTriggerActive, isActive }
+await query.lastProgress();    // most recent batch metrics; null before the first batch
+await query.recentProgress();  // retained history of progress reports
+
+await query.awaitTermination(5_000);  // false on timeout, true on termination
+await query.stop();
+```
+
+`awaitTermination(timeoutMs)` takes milliseconds, matching the Scala client and the wire field. PySpark takes seconds, so `awaitTermination(10)` ported verbatim waits 10ms. Without a timeout it blocks until the query ends.
+
+## The manager
+
+`spark.streams` tracks every query on the session:
+
+```ts
+const running = await spark.streams.active();
+const q = await spark.streams.get(id);           // null when no such query
+await spark.streams.awaitAnyTermination(5_000);  // resolves when any query terminates
+await spark.streams.resetTerminated();
+```
+
+## Listeners
+
+Listeners are the push-style alternative to polling `lastProgress()`. One event subscription per session opens lazily on the first `addListener` and tears down on the last `removeListener`:
+
+```ts
+import { type StreamingQueryListener } from "@spark-connect-js/node";
+
+const listener: StreamingQueryListener = {
+  onQueryStarted: (e) => console.log(`started ${e.id}`),
+  onQueryProgress: (p) => console.log(`batch ${p.batchId}`),
+  onQueryIdle: (e) => console.log(`idle ${e.id}`),
+  onQueryTerminated: (e) => console.log(e.exception ?? "(clean)"),
+};
+
+await spark.streams.addListener(listener);
+// ...
+await spark.streams.removeListener(listener);
+```
+
+All four callbacks are optional. Dispatch is serial and awaits async callbacks, so events arrive in order. If the event subscription dies non-recoverably, all listeners are cleared, so re-add them to resume.
+
+## Event time
+
+A watermark tells Spark how late data may arrive relative to the newest event seen. With one attached, `window()` buckets rows by event time instead of arrival time:
+
+```ts
+import { col, count, window } from "@spark-connect-js/node";
+
+const counts = spark.readStream
+  .format("rate")
+  .load()
+  .withWatermark("timestamp", "10 minutes")
+  .groupBy(window(col("timestamp"), "5 minutes"))
+  .agg(count("*").alias("events"));
+
+await counts.writeStream
+  .format("memory")
+  .queryName("windowed")
+  .outputMode("append")
+  .start();
+```
+
+`window(timeColumn, windowDuration, slideDuration?, startTime?)` returns a struct column of `{ start, end }`, tumbling when `slideDuration` is omitted. `session_window(timeColumn, gapDuration)` opens a new session whenever the gap between consecutive events exceeds `gapDuration`. Both group by event time and are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
+
+In append mode a window's row is emitted only once the watermark passes the window's end, so each result is final, and late rows beyond the watermark are dropped.
+
+## Failures
+
+`start()` rejects with a `SparkConnectError` carrying the server's `errorClass` when the query can't begin (unknown source, bad options). A query that fails after starting reports through `exception()`:
+
+```ts
+const err = await query.exception();  // { message?, errorClass?, stackTrace? } | null
+```
+
+`foreach` and `foreachBatch` need JS UDF execution and are not yet available.
+
+The full runnable version is in [`examples/node-streaming`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-streaming).

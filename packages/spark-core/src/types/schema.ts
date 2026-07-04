@@ -13,8 +13,7 @@ import type { DataType } from "./data-type.js";
  * Metadata for a single column: its name, type, nullability, and any
  * free-form key/value annotations.
  *
- * Mirrors Spark's `StructField`. Used inside {@link Schema} and returned by
- * `DataFrame.schema()`.
+ * Mirrors Spark's `StructField`. Used inside {@link Schema}.
  */
 export interface FieldDescriptor {
   /** Column name. */
@@ -30,8 +29,7 @@ export interface FieldDescriptor {
 /**
  * The schema of a DataFrame: an ordered list of {@link FieldDescriptor}s.
  *
- * Mirrors Spark's `StructType`. Returned by `DataFrame.schema()` and accepted
- * by readers that take an explicit schema (see `DataFrameReader.schema()`).
+ * Mirrors Spark's `StructType`.
  */
 export interface Schema {
   /** Columns of the DataFrame, in declaration order. */

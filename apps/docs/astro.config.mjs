@@ -77,6 +77,7 @@ export default defineConfig({
             { label: "Catalog", slug: "catalog" },
             { label: "I/O", slug: "io" },
             { label: "Window functions", slug: "window-functions" },
+            { label: "Structured Streaming", slug: "streaming" },
             { label: "Error handling", slug: "error-handling" },
           ],
         },

@@ -87,9 +87,11 @@ Expressions stay unresolved on the client. The server's analyzer binds `unresolv
 
 Result batches travel as [Apache Arrow IPC](https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc), wrapped in `spark.connect.ExecutePlanResponse.arrow_batch` messages. `apache-arrow` decodes them into plain objects. For large results, use `toLocalIterator()` to walk batches instead of buffering.
 
+The same format runs in the other direction. `createDataFrame(rows)` encodes plain row objects to Arrow IPC stream bytes on the client (the `arrowEncoder` hook, wired automatically by `connect()`) and ships them in a `LocalRelation`, so local data never passes through SQL literals.
+
 ### Type mapping
 
-Not every Arrow type round-trips cleanly into JavaScript. A `Row` from `collect()` is typed as `Record<string, unknown>` because the right TypeScript type for some columns (notably `bigint` versus `number`) depends on the value range.
+Not every Arrow type round-trips cleanly into JavaScript. A `Row` from `collect()` is typed as `Record<string, unknown>` because the value type depends on the column's Spark type, which the compiler can't see. `df.as<Schema>()` narrows the rows when you know the schema.
 
 | Spark / Arrow type                | TypeScript                 | Notes                                                                                                 |
 | --------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -104,7 +106,7 @@ Not every Arrow type round-trips cleanly into JavaScript. A `Row` from `collect(
 | `TIMESTAMP`                       | `Date`                     | Spark stores microseconds; `Date` is millisecond-resolution. Sub-millisecond precision is truncated.  |
 | `TIMESTAMP_NTZ`                   | `Date`                     | No timezone offset applied; the wall-clock value is preserved.                                        |
 | `ARRAY<T>`                        | `T[]`                      | Recursively mapped.                                                                                   |
-| `MAP<K, V>`                       | `Record<string, V>`        | Keys are stringified.                                                                                 |
+| `MAP<K, V>`                       | `Map<K, V>`                | Keys keep their decoded type. `JSON.stringify` renders a `Map` as `{}`.                               |
 | `STRUCT<...>`                     | `Record<string, unknown>`  | Field names preserved.                                                                                |
 | `NULL`                            | `null`                     |                                                                                                       |
 
@@ -121,9 +123,9 @@ The client itself keeps very little:
 - the Arrow decoder,
 - connection parameters, for reconnect.
 
-A transient gRPC drop during a server-streaming `ExecutePlan` is handled in-process: the transport tracks `responseId` on every received response and, on a retryable failure (`UNAVAILABLE`, or `INTERNAL` carrying `INVALID_CURSOR.DISCONNECTED`), opens a `ReattachExecute(operation_id, last_response_id)` to resume the stream from after the last acknowledged batch. The retry budget and backoff are configurable via `RetryPolicy`.
+A transient gRPC drop during a server-streaming `ExecutePlan` is handled in-process: the transport tracks `responseId` on every received response and, on a retryable failure (`UNAVAILABLE`, or `INTERNAL` carrying `INVALID_CURSOR.DISCONNECTED`), opens a `ReattachExecute(operation_id, last_response_id)` to resume the stream from after the last acknowledged batch. The retry budget and backoff are configurable via `RetryPolicy`. Two guards bound the failure modes: the initial channel handshake fails within `handshakeTimeoutMs` instead of hanging on an unreachable endpoint, and a stream that keeps reattaching without delivering data errors out after `maxConsecutiveNoProgressReattaches` attempts.
 
-A whole-session loss (driver restart, idle reap) is recoverable too, by constructing a new session with the same `session_id` while the server's session cache still has the entry.
+A whole-session loss (driver restart, idle reap) is recoverable too, by constructing a new session with the same `session_id` while the server's session cache still has the entry. `isSessionInvalidated(err)` detects this case. See [Error handling](/spark-connect-js/error-handling/).
 
 ### Lifecycle
 

@@ -20,7 +20,7 @@
 </p>
 
 > [!NOTE]
-> This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> This project is in early development (v0.5.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## About
 
@@ -66,6 +66,7 @@ Full docs at [prustic.github.io/spark-connect-js](https://prustic.github.io/spar
 
 - [Quickstart](https://prustic.github.io/spark-connect-js/quickstart/)
 - [SQL and DataFrame guide](https://prustic.github.io/spark-connect-js/sql-and-dataframe-guide/)
+- [Structured Streaming](https://prustic.github.io/spark-connect-js/streaming/)
 - [Comparison to PySpark](https://prustic.github.io/spark-connect-js/pyspark-comparison/)
 - [Roadmap](https://prustic.github.io/spark-connect-js/roadmap/)
 

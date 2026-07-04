@@ -78,7 +78,9 @@ df.select(
 );
 ```
 
-Full set: `year`, `month`, `dayofmonth`, `dayofweek`, `dayofyear`, `weekofyear`, `quarter`, `hour`, `minute`, `second`, `current_date`, `current_timestamp`, `datediff`, `date_add`, `date_sub`, `months_between`, `next_day`, `last_day`, `add_months`, `date_format`, `to_date`, `to_timestamp`, `from_unixtime`, `unix_timestamp`, `date_trunc`, `trunc`, `extract`, `date_part`.
+Full set: `year`, `month`, `dayofmonth`, `dayofweek`, `dayofyear`, `weekofyear`, `quarter`, `hour`, `minute`, `second`, `current_date`, `current_timestamp`, `datediff`, `date_add`, `date_sub`, `months_between`, `next_day`, `last_day`, `add_months`, `date_format`, `to_date`, `to_timestamp`, `from_unixtime`, `unix_timestamp`, `date_trunc`, `trunc`, `extract`, `date_part`, `window`, `session_window`.
+
+`window(timeColumn, windowDuration)` and `session_window(timeColumn, gapDuration)` bucket rows into event-time windows for grouping, typically in streaming aggregations. See [Structured Streaming](/spark-connect-js/streaming/#event-time). They are unrelated to the OVER-clause specs in [Window functions](/spark-connect-js/window-functions/).
 
 ## Math
 
@@ -89,7 +91,7 @@ df.select(
   abs(col("delta")).alias("abs_delta"),
   round(col("price"), 2).alias("rounded"),
   sqrt(col("variance")).alias("stddev"),
-  pow(col("base"), lit(2)).alias("sq"),
+  pow(col("base"), 2).alias("sq"),
   greatest(col("a"), col("b"), col("c")).alias("max_val"),
   rand(42).alias("noise"),
 );
@@ -103,8 +105,8 @@ Full set covers the usual arithmetic, trigonometry, logarithms, and `ceil` / `fl
 import { when, coalesce, isnull, isnotnull, nvl, nullif, cast, expr } from "@spark-connect-js/node";
 
 df.select(
-  when(col("score").gt(lit(90)), lit("A"))
-    .when(col("score").gt(lit(80)), lit("B"))
+  when(col("score").gt(90), lit("A"))
+    .when(col("score").gt(80), lit("B"))
     .otherwise(lit("C"))
     .alias("grade"),
   coalesce(col("preferred_name"), col("full_name"), lit("unknown")).alias("name"),
@@ -132,6 +134,8 @@ df.select(
 df.select(col("id"), explode(col("tags")).alias("tag"));
 ```
 
+`element_at`'s string argument means column name, following the Scala client. Pass a literal map key through `lit("key")`.
+
 Full set includes `array`, `struct`, `map`, `create_map`, `explode`, `explode_outer`, `posexplode`, `posexplode_outer`, `flatten`, `array_contains`, `array_distinct`, `array_intersect`, `array_union`, `array_except`, `array_min`, `array_max`, `array_sort`, `array_position`, `array_remove`, `size`, `map_keys`, `map_values`, `map_entries`, `element_at`, `sequence`, `zip_with`, `transform`, `filter`, `exists`, `forall`.
 
 ## Hash, JSON, CSV, bitwise
@@ -147,7 +151,7 @@ import { from_csv, to_csv } from "@spark-connect-js/node";
 df.withColumn("csv_row", to_csv(struct(col("a"), col("b"))));
 
 import { shiftleft, shiftright, bitwise_not } from "@spark-connect-js/node";
-df.withColumn("flags", shiftleft(col("mask"), lit(2)));
+df.withColumn("flags", shiftleft(col("mask"), 2));
 ```
 
 ## Window

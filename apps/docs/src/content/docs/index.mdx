@@ -79,16 +79,18 @@ await spark.stop();
 `connect(url)` returns a `SparkSession`. DataFrame methods are lazy; the plan leaves the client only on an action such as `collect`, `count`, `show`, or a `DataFrameWriter` save method.
 
 ```ts
-import { col, lit, sum } from "@spark-connect-js/node";
+import { col, sum } from "@spark-connect-js/node";
 
 const df = spark.read
   .parquet("s3a://events/2026/")
-  .filter(col("status").eq(lit("active")))
+  .filter(col("status").eq("active"))
   .groupBy("region")
   .agg(sum("revenue").alias("revenue"));
 
 await df.show();
 ```
+
+Batch and streaming share the same DataFrame surface. `spark.readStream` and `df.writeStream` run the plan as a continuous query instead. See [Structured Streaming](/spark-connect-js/streaming/).
 
 The [Quickstart](/spark-connect-js/quickstart/) covers starting a local Connect server and a longer example. Runnable scripts live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples).
 
@@ -97,6 +99,6 @@ The [Quickstart](/spark-connect-js/quickstart/) covers starting a local Connect 
 <CardGrid>
   <LinkCard title="Quickstart" description="Start a local Spark Connect server and run your first query." href="/spark-connect-js/quickstart/" />
   <LinkCard title="SQL and DataFrame guide" description="Transformations, actions, and lazy evaluation." href="/spark-connect-js/sql-and-dataframe-guide/" />
+  <LinkCard title="Structured Streaming" description="Continuous queries, watermarks, and event-time windows." href="/spark-connect-js/streaming/" />
   <LinkCard title="API reference" description="Generated from source." href="/spark-connect-js/api/" />
-  <LinkCard title="Architecture" description="What happens on the wire." href="/spark-connect-js/architecture/" />
 </CardGrid>
