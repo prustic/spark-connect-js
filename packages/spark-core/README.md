@@ -7,7 +7,7 @@
 
 DataFrame API and logical plan builder for [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), in pure TypeScript with zero runtime dependencies.
 
-> **Note:** This project is in early development (v0.5.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> **Note:** This project is in early development and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## Install
 
