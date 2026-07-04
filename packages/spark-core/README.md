@@ -7,7 +7,7 @@
 
 DataFrame API and logical plan builder for [Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html), in pure TypeScript with zero runtime dependencies.
 
-> **Note:** This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> **Note:** This project is in early development (v0.5.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## Install
 
@@ -20,13 +20,16 @@ Most applications install [`@spark-connect-js/node`](https://www.npmjs.com/packa
 ## Quick example
 
 ```typescript
-import { SparkSession, col, lit, sum, desc, type Transport } from "@spark-connect-js/core";
+import { SparkSession, col, sum, desc, type Transport } from "@spark-connect-js/core";
 
-const spark = new SparkSession(transport);
+const spark = SparkSession.builder()
+  .remote("sc://localhost:15002")
+  .transport(transport)
+  .getOrCreate();
 
 const df = spark
   .table("events")
-  .filter(col("ts").gt(lit("2025-01-01")))
+  .filter(col("ts").gt("2025-01-01"))
   .groupBy("category")
   .agg(sum("amount").alias("total"))
   .sort(desc("total"));

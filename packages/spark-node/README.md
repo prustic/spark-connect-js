@@ -7,7 +7,7 @@
 
 TypeScript client for [Apache Spark Connect](https://spark.apache.org/docs/latest/spark-connect-overview.html). Talks to Spark over gRPC and decodes results with Apache Arrow. No JVM in your Node process.
 
-> **Note:** This project is in early development (v0.4.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
+> **Note:** This project is in early development (v0.5.0) and is not recommended for production usage, but feedback is very welcome on [GitHub](https://github.com/prustic/spark-connect-js/issues).
 
 ## Install
 
@@ -53,6 +53,7 @@ Full docs at [prustic.github.io/spark-connect-js](https://prustic.github.io/spar
 
 - [Quickstart](https://prustic.github.io/spark-connect-js/quickstart/): start a local Spark Connect server, run a query
 - [SQL and DataFrame guide](https://prustic.github.io/spark-connect-js/sql-and-dataframe-guide/): transformations, actions, the Column DSL
+- [Structured Streaming](https://prustic.github.io/spark-connect-js/streaming/): continuous queries, watermarks, event-time windows
 - [Comparison to PySpark](https://prustic.github.io/spark-connect-js/pyspark-comparison/): differences between PySpark and this client
 - [I/O](https://prustic.github.io/spark-connect-js/io/): reading and writing Parquet, ORC, CSV, JSON
 - [Error handling](https://prustic.github.io/spark-connect-js/error-handling/): typed error hierarchy and gRPC status codes
