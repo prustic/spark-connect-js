@@ -30,13 +30,13 @@ spark.stop()
 
 ```ts
 // spark-connect-js
-import { connect, col, lit, sum, desc } from "@spark-connect-js/node";
+import { connect, col, sum, desc } from "@spark-connect-js/node";
 
 const spark = connect("sc://localhost:15002");
 
 const result = await spark
   .table("events")
-  .filter(col("status").eq(lit("active")))
+  .filter(col("status").eq("active"))
   .groupBy("region")
   .agg(sum("revenue").alias("total"))
   .sort(desc("total"))
@@ -85,7 +85,7 @@ df.createOrReplaceTempView("events");
 
 ## Column operators are methods
 
-TypeScript has no operator overloading, so comparisons and arithmetic on `Column` are methods. Literals go through `lit(...)`.
+TypeScript has no operator overloading, so comparisons and arithmetic on `Column` are methods. The methods accept raw JS primitives and wrap them as literals, matching PySpark's implicit coercion.
 
 ```python
 # PySpark
@@ -96,28 +96,28 @@ df.sort(col("salary").desc())
 
 ```ts
 // spark-connect-js
-df.filter(col("age").gt(lit(30)).and(col("country").eq(lit("US"))));
+df.filter(col("age").gt(30).and(col("country").eq("US")));
 df.withColumn("total", col("price").multiply(col("qty")));
 df.sort(col("salary").desc());
 ```
 
 | PySpark                 | spark-connect-js                                            |
 | ----------------------- | ----------------------------------------------------------- |
-| `==` / `!=`             | `.eq()` / `.notEqual()` (also `.eqNullSafe()` for `<=>`)    |
+| `==` / `!=`             | `.eq()` / `.neq()` (also `.eqNullSafe()` for `<=>`)         |
 | `>` / `>=`              | `.gt()` / `.gte()`                                          |
 | `<` / `<=`              | `.lt()` / `.lte()`                                          |
-| `&` / `\|` / `~`         | `.and()` / `.or()` / `.not()`                               |
+| `&` / `\|`               | `.and()` / `.or()`                                          |
 | `+` / `-` / `*` / `/`   | `.plus()` / `.minus()` / `.multiply()` / `.divide()`        |
 
-Passing a raw JS value where a `Column` is expected is a compile-time error. PySpark surfaces the same mistake only at runtime.
+`filter` and `where` also take SQL string predicates, so `df.filter("age > 21")` ports from PySpark unchanged.
 
 ## `when()` returns a builder, not a Column
 
 PySpark's `F.when(...)` returns a `Column`. Ours returns a `WhenBuilder`, terminated with `.otherwise(default)` or `.toColumn()` for a `NULL` default. The separate type means the compiler stops a half-built chain from passing as a column.
 
 ```ts
-when(col("age").gt(lit(18)), lit("adult"))
-  .when(col("age").gt(lit(12)), lit("teen"))
+when(col("age").gt(18), lit("adult"))
+  .when(col("age").gt(12), lit("teen"))
   .otherwise(lit("child"));
 ```
 
@@ -183,15 +183,30 @@ See [Error handling](/spark-connect-js/error-handling/) for the full hierarchy.
 
 ## Type coercion at the edges
 
-Some Arrow types don't round-trip cleanly into JavaScript. The full mapping is in [architecture](/spark-connect-js/architecture/#type-mapping); three notable mismatches:
+Some Arrow types don't round-trip cleanly into JavaScript. The full mapping is in [architecture](/spark-connect-js/architecture/#type-mapping); four notable mismatches:
 
 | Spark type        | PySpark               | spark-connect-js |
 | ----------------- | --------------------- | ---------------- |
 | `LONG` / `BIGINT` | `int`                 | `bigint`         |
 | `DECIMAL(p, s)`   | `Decimal`             | `string`         |
 | `TIMESTAMP`       | `datetime` (μs)       | `Date` (ms)      |
+| `MAP<K, V>`       | `dict`                | `Map<K, V>`      |
 
-Cast on the server (`CAST(amount AS DOUBLE)`, `CAST(ts AS STRING)`) when you need different representations.
+The Long rule extends to `count()`, which returns `bigint` where PySpark returns `int`. Cast on the server (`CAST(amount AS DOUBLE)`, `CAST(ts AS STRING)`) when you need different representations.
+
+## Structured Streaming
+
+The streaming surface mirrors PySpark's: `spark.readStream`, `df.writeStream`, `StreamingQuery`, `spark.streams`, listeners, `withWatermark`, and the `window()`/`session_window()` grouping functions. The differences:
+
+- `awaitTermination(timeoutMs)` and `awaitAnyTermination(timeoutMs)` take milliseconds, matching the Scala client and the wire field. PySpark takes seconds, so `awaitTermination(10)` ported verbatim waits 10ms, not 10s.
+- `isActive()` is async. Every other inspection method on the query crosses the wire, and a sync getter would lie about its source of truth.
+- `explain()` returns the plan string instead of printing it.
+- `streams.get(id)` returns `null` on a miss, like PySpark. The Scala client throws.
+- `listListeners()` is not exposed. It reports server-side Java listeners only, which a JS client never registers, so the result would always be empty.
+- Listeners are cleared when the event subscription dies non-recoverably; re-add them to resume. PySpark logs a warning through `warnings.warn` instead.
+- `foreach` and `foreachBatch` need JS UDF execution and are not yet available.
+
+See the [Structured Streaming guide](/spark-connect-js/streaming/) for the full walkthrough.
 
 ## Not in spark-connect-js
 

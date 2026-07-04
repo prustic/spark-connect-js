@@ -3,7 +3,7 @@ title: Examples
 description: Runnable sample apps that demonstrate the client against a local Spark Connect server.
 ---
 
-The repository's [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples) directory contains four self-contained applications. Each has its own `package.json`, a `docker-compose.yml` for a local Spark Connect server, and a single-command run script. Clone the repo, `cd` into one, and follow its README.
+The repository's [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples) directory contains six self-contained applications. Each has its own `package.json`, a `docker-compose.yml` for a local Spark Connect server, and a single-command run script. Clone the repo, `cd` into one, and follow its README.
 
 ### [`node-quickstart`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-quickstart)
 
@@ -28,6 +28,12 @@ Covers: `spark.read`, `spark.write`, save modes, schema-on-read, `partitionBy`.
 Broader workload: aggregation, pivoting, caching, windowed stats. Closer to a real analytics pipeline, and useful for benchmarking small-to-medium queries.
 
 Covers: `groupBy`, `pivot`, `rollup`, `Window`, `df.cache()`, `unpersist`, statistical functions.
+
+### [`node-streaming`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-streaming)
+
+Runs a rate-to-memory streaming query with a lifecycle listener attached: start, watch progress events, inspect the manager, stop. Mirrors the [Structured Streaming guide](/spark-connect-js/streaming/).
+
+Covers: `readStream`, `writeStream`, `Trigger`, `StreamingQuery`, `spark.streams`, `addListener`.
 
 ### [`node-tls-behind-proxy`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-tls-behind-proxy)
 

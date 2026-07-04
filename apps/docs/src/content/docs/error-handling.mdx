@@ -30,7 +30,7 @@ Match on `errorClass` first, fall back to `code` for transport-layer failures (`
 | `code`             | What it means                                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `INVALID_ARGUMENT` | The analyzer or parser rejected the plan (unknown column, unknown table, bad SQL, type mismatch). The error `message` points at the offending node. |
-| `INTERNAL`         | The server session is gone, usually because the driver restarted or the operation was garbage-collected before a reattach. Build a new session and retry. |
+| `INTERNAL`         | The server session is gone, usually because the driver restarted or the operation was garbage-collected before a reattach. `isSessionInvalidated(err)` detects this; build a new session and retry. |
 | `CANCELLED`        | The query was cancelled via `interruptAll`, `interruptTag`, or an RPC deadline. Not a bug.                                                             |
 | `UNAVAILABLE`      | Transport-level failure: driver crashed, load balancer draining, network partition. Idempotent reads are safe to retry.                                |
 | `UNAUTHENTICATED`  | The bearer token is missing, rejected, or expired. Refresh it and rebuild the session.                                                                 |
@@ -78,6 +78,23 @@ function classify(err: unknown) {
 
 return runQuery().catch(classify);
 ```
+
+A server restart invalidates the session permanently: every later query fails with an `INVALID_HANDLE.*` error class. `isSessionInvalidated(err)` matches that family, so recovery is a rebuild:
+
+```ts
+import { isSessionInvalidated } from "@spark-connect-js/node";
+
+try {
+  return await df.collect();
+} catch (err) {
+  if (isSessionInvalidated(err)) {
+    spark = connect(SPARK_REMOTE);  // fresh session, then retry the query
+  }
+  throw err;
+}
+```
+
+Streaming commands fail the same way as batch actions: `start()` rejects with a `SparkConnectError` carrying the server's `errorClass`.
 
 ## Reference
 

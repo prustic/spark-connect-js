@@ -73,6 +73,7 @@ export default defineConfig({
           label: "Programming guides",
           items: [
             { label: "SQL and DataFrame", slug: "sql-and-dataframe-guide" },
+            { label: "Structured Streaming", slug: "streaming" },
             { label: "Functions", slug: "functions" },
             { label: "Catalog", slug: "catalog" },
             { label: "I/O", slug: "io" },

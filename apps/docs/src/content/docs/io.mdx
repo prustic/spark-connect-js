@@ -11,6 +11,8 @@ import { Aside } from '@astrojs/starlight/components';
 
 Reads and writes in Spark go through builder objects: `DataFrameReader` and `DataFrameWriter` respectively. You can configure a format and the options it needs, then point the builder at a file path or a catalog table. The reading and writing itself runs on the cluster, not on the client.
 
+This page covers batch I/O. Unbounded sources and sinks go through `readStream` and `writeStream`; see [Structured Streaming](/spark-connect-js/streaming/). Local data already in the process goes through `spark.createDataFrame(rows)`; see the [SQL and DataFrame guide](/spark-connect-js/sql-and-dataframe-guide/#creating-a-dataframe).
+
 ## Reading
 
 `spark.read` returns a `DataFrameReader`. Configure it with `.format(...)`, `.option(...)`, `.schema(...)`, then terminate with a format shortcut or `.load(...)`.
@@ -157,7 +159,7 @@ await df.writeTo("analytics.events")
   .createOrReplace();
 
 await df.writeTo("analytics.events").append();
-await df.writeTo("analytics.events").overwrite(col("year").eq(lit(2025)));
+await df.writeTo("analytics.events").overwrite(col("year").eq(2025));
 await df.writeTo("analytics.events").overwritePartitions();
 ```
 

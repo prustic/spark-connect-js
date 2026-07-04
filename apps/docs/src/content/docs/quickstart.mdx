@@ -104,7 +104,7 @@ try {
 The snippet below builds an in-memory table, finds the top earners, and computes per-department aggregates. The same program lives in [`examples/node-quickstart`](https://github.com/prustic/spark-connect-js/tree/main/examples/node-quickstart).
 
 ```ts
-import { connect, col, lit, avg, count } from "@spark-connect-js/node";
+import { connect, col, avg, count } from "@spark-connect-js/node";
 
 const spark = connect("sc://localhost:15002");
 
@@ -120,7 +120,7 @@ try {
   `);
 
   const topEarners = employees
-    .filter(col("salary").gt(lit(75_000)))
+    .filter(col("salary").gt(75_000))
     .sort(col("salary").desc());
   console.table(await topEarners.collect());
 
@@ -136,7 +136,7 @@ try {
 }
 ```
 
-Three more scripts covering streaming, writes, and Arrow-batch iteration live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples).
+Five more runnable apps covering the catalog, reads and writes, caching and pivots, streaming, and TLS live in [`examples/`](https://github.com/prustic/spark-connect-js/tree/main/examples). For continuous queries against unbounded sources, start with the [Structured Streaming guide](/spark-connect-js/streaming/).
 
 ## Connecting to a remote cluster
 

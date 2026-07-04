@@ -52,12 +52,13 @@ SparkSession.builder()
   .sessionId("550e8400-e29b-41d4-a716-446655440000") // optional, reuse a server-side session
   .transport(customTransport)       // optional, plug in a custom transport
   .arrowDecoder(customDecoder)      // optional, plug in a custom Arrow decoder
+  .arrowEncoder(customEncoder)      // optional, needed for createDataFrame with plain rows
   .getOrCreate();                   // return the session
 ```
 
-`getOrCreate()` constructs the session without opening the channel. The channel opens lazily on the first RPC.
+`getOrCreate()` constructs the session without opening the channel. The channel opens lazily on the first RPC, gated by a handshake deadline: if the channel isn't ready within `handshakeTimeoutMs` (default 10 seconds, `0` disables), the RPC rejects with `errorClass: "CONNECTION_TIMEOUT"` instead of hanging on an unreachable or misconfigured endpoint.
 
-For low-level transport tuning (custom `ChannelCredentials`, retry policy override, max-message-size override) construct a `GrpcTransport` directly and inject it via `.transport(...)`. The `GrpcTransportOptions` shape is documented in the [API reference](/spark-connect-js/api/).
+For low-level transport tuning (custom `ChannelCredentials`, retry policy override, max-message-size override, `handshakeTimeoutMs`) construct a `GrpcTransport` directly and inject it via `.transport(...)`. The retry policy also carries `maxConsecutiveNoProgressReattaches` (default 3), the ceiling on stream reattaches that deliver no data. The `GrpcTransportOptions` shape is documented in the [API reference](/spark-connect-js/api/).
 
 ## Data-source options
 

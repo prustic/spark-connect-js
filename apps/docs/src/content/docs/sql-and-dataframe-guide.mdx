@@ -13,21 +13,24 @@ Spark has two ways to express a query: SQL strings and the DataFrame API. Both c
 
 ## Creating a DataFrame
 
-A `DataFrame` comes from an SQL query, a table name, a numeric range, or a file read. All of these are lazy. The server is untouched until an action runs.
+A `DataFrame` comes from an SQL query, a table name, a numeric range, a file read, or local data. All of these are lazy. The server is untouched until an action runs.
 
 ```ts
 const a = spark.sql("SELECT * FROM my_table WHERE x > 10");
 const b = spark.table("my_table");
 const c = spark.range(0, 1_000_000);
 const d = spark.read.parquet("s3://bucket/events/");
+const e = spark.createDataFrame([{ id: 1n, name: "alice" }, { id: 2n, name: "bob" }]);
 ```
+
+`createDataFrame` encodes plain row objects to Arrow on the client, inferring each column's type from its first non-null value: `string`, `number`, `boolean`, `bigint`, and `Date` are covered. For richer types (decimal, struct, array, map, binary), build Arrow IPC stream bytes yourself and pass the `Uint8Array` instead.
 
 ## Lazy evaluation
 
 DataFrames are immutable. Each transformation returns a new `DataFrame` with an extended plan:
 
 ```ts
-const young = employees.filter(col("age").lt(lit(30)));
+const young = employees.filter(col("age").lt(30));
 const named = young.select("name", "age");
 // Neither `young` nor `named` has touched the server yet.
 
@@ -54,12 +57,13 @@ df.toDF("a", "b", "c");  // positional rename of all columns
 
 ### Filtering
 
-`filter` and `where` are aliases.
+`filter` and `where` are aliases. Both take a `Column` predicate or a SQL string, parsed server-side:
 
 ```ts
-df.filter(col("age").gt(lit(18)));
+df.filter(col("age").gt(18));
+df.filter("age > 18 AND country IN ('US', 'CA')");
 df.filter(col("name").rlike("^A"));
-df.where(col("age").between(lit(18), lit(65)));
+df.where(col("age").between(18, 65));
 df.filter(col("country").isin("US", "CA", "UK"));
 ```
 
@@ -82,6 +86,9 @@ df.groupBy("department").sum("salary");
 // Multi-dimensional aggregation:
 df.cube("department", "role").count();
 df.rollup("year", "month").agg(sum("revenue"));
+
+// Whole-frame aggregation, no grouping:
+df.agg(count("*").alias("rows"), avg("salary").alias("mean"));
 ```
 
 ### Sorting and limits
@@ -104,6 +111,14 @@ df1.crossJoin(df2);
 ```
 
 `join` takes a `Column` condition, not a column-name string or an array of names. Build equi-joins with `col(...).eq(col(...))`.
+
+In a self-join both sides share every column name, so a plain `col("id")` is ambiguous. `df.col(name)` binds the reference to that specific DataFrame:
+
+```ts
+const employees = spark.table("employees");
+const managers = spark.table("employees");
+employees.join(managers, employees.col("manager_id").eq(managers.col("id")));
+```
 
 ### Set operations
 
@@ -175,8 +190,8 @@ Actions trigger execution and return a `Promise`.
 
 ```ts
 await df.collect();              // Row[]
-await df.count();                // number
-await df.first();                // Row | undefined
+await df.count();                // bigint
+await df.first();                // Row | null
 await df.head(10);               // Row[]
 await df.take(5);                // alias for head
 await df.show(20, false);        // print to stdout; returns void. Args: numRows, truncate.
@@ -187,6 +202,34 @@ for await (const row of df.toLocalIterator()) {
 }
 
 await df.forEach(row => { ... }); // drains the stream server-side and applies fn client-side
+```
+
+Rows decode to plain objects. Column values map to JS types by Spark type:
+
+- Integers, floats, and booleans arrive as `number` and `boolean`.
+- `LongType` arrives as `bigint`. This is why `count()` returns `bigint`; wrap it in `Number(...)` when the count is known to fit a JS safe integer.
+- `DateType` and `TimestampType` arrive as `Date`. Sub-millisecond precision truncates.
+- `DecimalType` arrives as a fixed-point string like `"1.50"`.
+- `MapType` arrives as `Map<K, V>`.
+- Structs arrive as nested objects and arrays as JS arrays, with the same rules applied recursively.
+
+### Typed access
+
+`collect()` returns rows as `Record<string, unknown>`. `df.as<Schema>()` narrows them at compile time:
+
+```ts
+const rows = await spark.table("people").as<{ id: bigint; name: string }>().collect();
+rows[0].name;  // string
+```
+
+`as<Schema>()` is an assertion, not a validation; nothing is checked at runtime. The `row` accessors check instead. Each getter verifies the column exists and the value matches the expected type, returning `null` for NULL and throwing on a mismatch:
+
+```ts
+import { row } from "@spark-connect-js/node";
+
+const [stats] = await df.agg(count("*").alias("n"), avg("salary").alias("mean")).collect();
+row.getLong(stats, "n");       // bigint | null
+row.getDouble(stats, "mean");  // number | null
 ```
 
 ### Schema and metadata
@@ -204,7 +247,7 @@ await df.explain("extended");
 
 ### Writing
 
-`df.write` returns a `DataFrameWriter`. `df.writeTo(table)` returns the v2 writer. See the [I/O guide](/spark-connect-js/io/).
+`df.write` returns a `DataFrameWriter`. `df.writeTo(table)` returns the v2 writer. See the [I/O guide](/spark-connect-js/io/). For continuous queries, `df.writeStream` starts a streaming write; see the [Structured Streaming guide](/spark-connect-js/streaming/).
 
 ## The Column DSL
 
@@ -214,20 +257,20 @@ await df.explain("extended");
 import { col, lit } from "@spark-connect-js/node";
 
 // Comparisons
-col("age").eq(lit(30));
-col("age").gt(lit(30));
-col("age").lte(lit(65));
-col("name").notEqual(lit("admin"));
+col("age").eq(30);
+col("age").gt(30);
+col("age").lte(65);
+col("name").neq("admin");
 
 // Arithmetic
-col("price").multiply(lit(1.08));
+col("price").multiply(1.08);
 col("a").plus(col("b"));
 col("total").divide(col("count"));
 
 // Logical
 col("a").and(col("b"));
-col("status").eq(lit("active")).or(col("priority").gt(lit(5)));
-col("deleted").not();
+col("status").eq("active").or(col("priority").gt(5));
+col("deleted").eq(false);
 
 // Null and NaN handling
 col("email").isNull();
@@ -236,7 +279,7 @@ col("score").isNaN();
 
 // Membership and ranges
 col("country").isin("US", "CA", "UK");
-col("age").between(lit(18), lit(65));
+col("age").between(18, 65);
 
 // String matching
 col("name").like("A%");
@@ -259,15 +302,15 @@ col("x").plus(col("y")).alias("sum");
 
 ### Literals
 
-`lit(value)` wraps a JavaScript value as a `Column`. Useful for any constant in an expression.
+`lit(value)` wraps a JavaScript value as a `Column`. Comparison, arithmetic, and bitwise methods wrap primitives automatically, so `lit(...)` is for the places a constant stands alone as a `Column`:
 
 ```ts
-df.filter(col("country").eq(lit("US")));
 df.withColumn("is_vip", lit(true));
-df.withColumn("bucket", col("score").divide(lit(10)).cast("int"));
+df.select(lit(1).alias("one"), col("name"));
+df.withColumn("bucket", col("score").divide(10).cast("int"));
 ```
 
-TypeScript has no operator overloading, so comparisons and arithmetic are methods: `col("x").gt(lit(30))`, `col("a").plus(col("b"))`. Literals must go through `lit(...)`; passing a raw JS value where a `Column` is expected is a type error.
+TypeScript has no operator overloading, so comparisons and arithmetic are methods: `col("x").gt(30)`, `col("a").plus(col("b"))`. `lit(null)` produces a typed NULL literal; refine it with `.cast(...)` when the server needs a concrete type. `lit(undefined)` throws, since an absent value is almost always a bug rather than an intended NULL.
 
 ## SQL strings and raw expressions
 
@@ -281,7 +324,7 @@ df.filter(expr("age > 18 AND country IN ('US', 'CA')"));
 df.withColumn("age_group", expr("CASE WHEN age < 18 THEN 'minor' ELSE 'adult' END"));
 ```
 
-`filter` doesn't accept raw SQL strings. Wrap a SQL fragment in `expr("...")` to lift it into a `Column`, or use `selectExpr(...)` for SQL projections.
+`filter` and `where` accept the same SQL fragments directly. `expr("...")` lifts one into a `Column` for anywhere else an expression goes; `selectExpr(...)` covers SQL projections.
 
 Temp views bridge the two worlds:
 
@@ -301,8 +344,8 @@ import { when, coalesce, isnull } from "@spark-connect-js/node";
 
 df.withColumn(
   "tier",
-  when(col("spend").gt(lit(1000)), lit("gold"))
-    .when(col("spend").gt(lit(100)), lit("silver"))
+  when(col("spend").gt(1000), lit("gold"))
+    .when(col("spend").gt(100), lit("silver"))
     .otherwise(lit("bronze")),
 );
 
