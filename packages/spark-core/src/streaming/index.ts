@@ -10,9 +10,13 @@ export type {
   QueryTerminatedEvent,
 } from "./streaming-query-listener.js";
 export { Trigger } from "./trigger.js";
+export { totalInputRows } from "./types.js";
 export type {
   StreamingOutputMode,
   StreamingQueryStatus,
   StreamingQueryProgress,
+  SourceProgress,
+  SinkProgress,
+  StateOperatorProgress,
   StreamingQueryException,
 } from "./types.js";
