@@ -6,6 +6,8 @@ import type { LogicalPlan } from "./plan/logical-plan.js";
 import { col, lit } from "./column.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { StructType } from "./types/struct.js";
+import { Observation } from "./observation.js";
+import type { ExecuteOptions } from "./spark-session.js";
 
 /** Minimal mock transport that records calls without doing I/O. */
 function mockTransport(_rows?: Record<string, unknown>[]): Transport & { calls: LogicalPlan[] } {
@@ -822,6 +824,68 @@ describe("DataFrame.withColumnsRenamed()", () => {
       assert.equal(df._plan.renames[0].colName, "a");
       assert.equal(df._plan.renames[0].newColName, "x");
     }
+  });
+});
+
+describe("DataFrame.observe()", () => {
+  it("wraps plan in a collectMetrics node", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t").observe("stats", col("n").alias("total"));
+    assert.equal(df._plan.type, "collectMetrics");
+    if (df._plan.type === "collectMetrics") {
+      assert.equal(df._plan.name, "stats");
+      assert.equal(df._plan.metrics.length, 1);
+      assert.equal(df._plan.metrics[0].type, "alias");
+    }
+  });
+
+  it("rejects an empty metrics list and an empty name", () => {
+    const { spark } = createSession();
+    assert.throws(() => spark.sql("SELECT * FROM t").observe("stats"), InvalidInputError);
+    assert.throws(() => spark.sql("SELECT * FROM t").observe("", col("n")), InvalidInputError);
+  });
+
+  it("routes delivered metrics to a registered Observation", async () => {
+    const transport: Transport = {
+      async *executePlan(
+        _sid: string,
+        _plan: LogicalPlan,
+        options?: ExecuteOptions,
+      ): AsyncIterable<Uint8Array> {
+        options?.onObservedMetrics?.([{ name: "stats", metrics: { total: 42n } }]);
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .arrowDecoder(async () => [])
+      .getOrCreate();
+
+    const obs = new Observation("stats");
+    await spark.sql("SELECT * FROM t").observe(obs, col("n").alias("total")).collect();
+
+    assert.deepStrictEqual(obs.get, { total: 42n });
+  });
+
+  it("Observation.get throws before any action has run", () => {
+    const obs = new Observation("empty");
+    assert.throws(() => obs.get, InvalidInputError);
+  });
+
+  it("rejects reusing one Observation across two observe calls", () => {
+    const { spark } = createSession();
+    const obs = new Observation("reused");
+    spark.sql("SELECT * FROM a").observe(obs, col("n"));
+    assert.throws(() => spark.sql("SELECT * FROM b").observe(obs, col("n")), InvalidInputError);
+  });
+
+  it("rejects two different Observations sharing a name on one session", () => {
+    const { spark } = createSession();
+    spark.sql("SELECT * FROM a").observe(new Observation("shared"), col("n"));
+    assert.throws(
+      () => spark.sql("SELECT * FROM b").observe(new Observation("shared"), col("n")),
+      InvalidInputError,
+    );
   });
 });
 

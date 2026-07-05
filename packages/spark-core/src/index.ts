@@ -39,6 +39,7 @@ export type {
   StateOperatorProgress,
   StreamingQueryException,
 } from "./streaming/index.js";
+export { Observation } from "./observation.js";
 export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
@@ -354,6 +355,7 @@ export type {
   ArrowDecoderFn,
   ArrowEncoderFn,
   ExecuteOptions,
+  ObservedMetrics,
 } from "./spark-session.js";
 export {
   SparkConnectError,

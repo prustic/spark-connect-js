@@ -1,4 +1,5 @@
 import { DataFrame } from "./data-frame.js";
+import { Observation } from "./observation.js";
 import { Catalog } from "./catalog.js";
 import { UDFRegistration } from "./udf-registration.js";
 import { RuntimeConfig } from "./runtime-config.js";
@@ -23,6 +24,19 @@ declare const crypto: { randomUUID(): string };
 export interface ExecuteOptions {
   /** Tags attached to this operation; surface for {@link Transport.interrupt}. */
   tags?: readonly string[];
+  /**
+   * Called once per `ExecutePlanResponse` that carries observed metrics
+   * (attached via `DataFrame.observe`). Values arrive decoded to JS.
+   */
+  onObservedMetrics?: (observed: ObservedMetrics[]) => void;
+}
+
+/** One observation's metrics, delivered during an action's response stream. */
+export interface ObservedMetrics {
+  /** The observation name given to `DataFrame.observe`. */
+  name: string;
+  /** Metric values keyed by their aggregate expression alias. */
+  metrics: Row;
 }
 
 /**
@@ -172,6 +186,8 @@ export class SparkSession {
   private readonly transport: Transport;
   private readonly remote: string;
   private readonly _tagSet: Set<string> = new Set();
+  /** Observations registered via `DataFrame.observe`, routed by name. */
+  private readonly _observations = new Map<string, Observation>();
   /** @internal */
   readonly _arrowDecoder: ArrowDecoderFn | undefined;
   /** @internal */
@@ -384,7 +400,28 @@ export class SparkSession {
 
   /** @internal Snapshot of per-call options at the time of dispatch. */
   private _executeOptions(): ExecuteOptions {
-    return this._tagSet.size === 0 ? {} : { tags: Array.from(this._tagSet) };
+    const options: ExecuteOptions =
+      this._tagSet.size === 0 ? {} : { tags: Array.from(this._tagSet) };
+    if (this._observations.size > 0) {
+      options.onObservedMetrics = (observed) => {
+        for (const { name, metrics } of observed) {
+          this._observations.get(name)?._record(metrics);
+        }
+      };
+    }
+    return options;
+  }
+
+  /** @internal Registered by `DataFrame.observe(observation, ...)`. */
+  _registerObservation(observation: Observation): void {
+    const existing = this._observations.get(observation.name);
+    if (existing !== undefined && existing !== observation) {
+      throw new InvalidInputError(
+        `An Observation named "${observation.name}" is already registered on this session. ` +
+          "Observation names route delivered metrics, so they must be unique.",
+      );
+    }
+    this._observations.set(observation.name, observation);
   }
 
   /** @internal Used by DataFrame.schema()/explain() via the injected transport */

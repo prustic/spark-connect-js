@@ -479,6 +479,15 @@ export class PlanBuilder {
           },
         };
 
+      case "collectMetrics":
+        return {
+          collectMetrics: {
+            input: PlanBuilder.toRelation(plan.child),
+            name: plan.name,
+            metrics: plan.metrics.map((m) => PlanBuilder.toExpression(m)),
+          },
+        };
+
       default: {
         const _exhaustive: never = plan;
         throw new UnsupportedOperationError(

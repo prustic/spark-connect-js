@@ -62,6 +62,7 @@ export {
   StreamingQueryManager,
   StreamingQueryListenerBase,
   Trigger,
+  Observation,
   totalInputRows,
   StructType,
   StructField,
@@ -354,6 +355,7 @@ export {
 export type {
   Row,
   Transport,
+  ObservedMetrics,
   ArrowDecoderFn,
   ArrowEncoderFn,
   SaveMode,

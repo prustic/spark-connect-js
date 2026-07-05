@@ -4,6 +4,8 @@
  * @see [Spark source: StreamingQueryStatus.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/streaming/StreamingQueryStatus.scala)
  */
 
+import type { Row } from "../types/row.js";
+
 /**
  * Output mode of a streaming write.
  *
@@ -140,9 +142,11 @@ export interface StreamingQueryProgress {
   sink?: SinkProgress;
   /**
    * Observed metrics keyed by `df.observe(name, ...)` name. Empty until an
-   * observation is attached to the query.
+   * observation is attached to the query. Values arrive JSON-decoded here
+   * (longs as plain numbers), unlike batch `Observation.get`, which decodes
+   * with the Arrow policy.
    */
-  observedMetrics?: Record<string, unknown>;
+  observedMetrics?: Record<string, Row>;
   /** Forward-compat for fields Spark adds in newer versions. */
   [key: string]: unknown;
 }

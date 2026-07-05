@@ -114,6 +114,7 @@ import {
   Unpivot_ValuesSchema,
   Aggregate_PivotSchema,
   WithWatermarkSchema,
+  CollectMetricsSchema,
 } from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -848,6 +849,18 @@ function buildRelationInner(plan: LogicalPlan): Relation {
             input: buildRelation(plan.child),
             eventTime: plan.eventTime,
             delayThreshold: plan.delayThreshold,
+          }),
+        },
+      });
+
+    case "collectMetrics":
+      return create(RelationSchema, {
+        relType: {
+          case: "collectMetrics",
+          value: create(CollectMetricsSchema, {
+            input: buildRelation(plan.child),
+            name: plan.name,
+            metrics: plan.metrics.map(buildExpression),
           }),
         },
       });

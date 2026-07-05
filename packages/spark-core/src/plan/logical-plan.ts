@@ -127,6 +127,7 @@ export type LogicalPlan = (
   | StatFreqItemsPlan
   | StatApproxQuantilePlan
   | WatermarkPlan
+  | CollectMetricsPlan
 ) & {
   /**
    * Per-DataFrame identifier set by `DataFrame._fromPlan`. Surfaces as
@@ -656,4 +657,20 @@ export interface WatermarkPlan {
   eventTime: string;
   /** Interval string such as `"10 minutes"` or `"1 hour"`. */
   delayThreshold: string;
+}
+
+/**
+ * Attach named aggregate metrics to a plan, computed alongside the query
+ * without a second pass.
+ *
+ * - Spark Connect: Relation.CollectMetrics { input, name, metrics }
+ * - Catalyst: CollectMetrics(name, metrics, child)
+ */
+export interface CollectMetricsPlan {
+  type: "collectMetrics";
+  child: LogicalPlan;
+  /** Observation name; metrics come back keyed by it. */
+  name: string;
+  /** Aggregate expressions to observe. */
+  metrics: Expression[];
 }

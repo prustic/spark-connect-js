@@ -92,6 +92,8 @@ import {
   type WriteOperation,
   type ExecutePlanRequest,
   type ExecutePlanResponse,
+  type ExecutePlanResponse_ObservedMetrics,
+  type Expression_Literal,
   type ReattachExecuteRequest,
   type ReleaseSessionRequest,
   type ReleaseSessionResponse,
@@ -103,7 +105,7 @@ import {
   type InterruptRequest,
   type InterruptResponse,
 } from "@spark-connect-js/connect";
-import type { ExecuteOptions, Transport } from "@spark-connect-js/core";
+import type { ExecuteOptions, ObservedMetrics, Transport } from "@spark-connect-js/core";
 import type { LogicalPlan } from "@spark-connect-js/core";
 import { SparkConnectError } from "@spark-connect-js/core";
 import { buildRelation, buildExpression } from "../proto/proto-builder.js";
@@ -215,7 +217,7 @@ export class GrpcTransport implements Transport {
       case: "root",
       value: relation,
     });
-    yield* this._streamWithReattach(sessionId, operationId, request);
+    yield* this._streamWithReattach(sessionId, operationId, request, observedCapture(options));
   }
 
   /** Close the gRPC channel. */
@@ -241,7 +243,12 @@ export class GrpcTransport implements Transport {
     });
     // Drain the stream; commands don't yield Arrow batches but reattach
     // still applies if the connection drops mid-execution.
-    for await (const _ of this._streamWithReattach(sessionId, operationId, request)) {
+    for await (const _ of this._streamWithReattach(
+      sessionId,
+      operationId,
+      request,
+      observedCapture(options),
+    )) {
       // discard
     }
   }
@@ -263,7 +270,9 @@ export class GrpcTransport implements Transport {
       value: commandProto,
     });
     const responses: Record<string, unknown>[] = [];
+    const observed = observedCapture(options);
     const capture = (response: ExecutePlanResponse): void => {
+      observed?.(response);
       const decoded = decodeCommandResponse(response);
       if (decoded !== undefined) responses.push(decoded);
     };
@@ -304,6 +313,7 @@ export class GrpcTransport implements Transport {
       fire();
     };
 
+    const observed = observedCapture(options);
     const driver = (async () => {
       try {
         for await (const _ of this._streamWithReattach(
@@ -311,6 +321,7 @@ export class GrpcTransport implements Transport {
           operationId,
           request,
           (response) => {
+            observed?.(response);
             const decoded = decodeCommandResponse(response);
             if (decoded !== undefined) {
               buffer.push(decoded);
@@ -780,6 +791,76 @@ function buildMetadata(headers: Record<string, string> | undefined): grpc.Metada
 /** UUIDv4 attached to every ExecutePlanRequest as `operation_id`. */
 function newOperationId(): string {
   return randomUUID();
+}
+
+/**
+ * Build the `onResponse` hook that decodes observed-metrics frames and hands
+ * them to the caller's `onObservedMetrics`. Shared by the plan and command
+ * execution paths, so `observe` metrics also arrive on write actions.
+ */
+function observedCapture(
+  options: ExecuteOptions | undefined,
+): ((response: ExecutePlanResponse) => void) | undefined {
+  const onObservedMetrics = options?.onObservedMetrics;
+  if (!onObservedMetrics) {
+    return undefined;
+  }
+  return (response) => {
+    if (response.observedMetrics.length > 0) {
+      onObservedMetrics(response.observedMetrics.map(decodeObservedMetrics));
+    }
+  };
+}
+
+/**
+ * Decode one observed-metrics frame into `{ name, metrics }`, pairing `keys`
+ * with decoded literal `values`. Value decode follows the Arrow decode
+ * policy: longs as `bigint`, decimals as strings, temporals as `Date`, and
+ * intervals as their wire scalars (months as `number`, microseconds as
+ * `bigint`).
+ */
+function decodeObservedMetrics(observed: ExecutePlanResponse_ObservedMetrics): ObservedMetrics {
+  const metrics: Record<string, unknown> = {};
+  observed.keys.forEach((key, i) => {
+    const literal = observed.values[i];
+    metrics[key] = literal === undefined ? null : decodeLiteral(literal);
+  });
+  return { name: observed.name, metrics };
+}
+
+function decodeLiteral(literal: Expression_Literal): unknown {
+  const lt = literal.literalType;
+  switch (lt.case) {
+    case "boolean":
+    case "byte":
+    case "short":
+    case "integer":
+    case "float":
+    case "double":
+    case "string":
+      return lt.value;
+    case "long":
+      return lt.value;
+    case "binary":
+      return lt.value;
+    case "decimal":
+      return lt.value.value;
+    case "date":
+      return new Date(lt.value * 86_400_000);
+    case "timestamp":
+    case "timestampNtz":
+      return new Date(Number(lt.value / 1000n));
+    case "yearMonthInterval":
+      return lt.value;
+    case "dayTimeInterval":
+      return lt.value;
+    case "null":
+      return null;
+    default:
+      throw new UnsupportedOperationError(
+        `Observed metric literal type "${lt.case ?? "unset"}" is not supported yet.`,
+      );
+  }
 }
 
 function sleep(ms: number): Promise<void> {

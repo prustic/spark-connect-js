@@ -1179,6 +1179,27 @@ describe("buildRelation() - stat functions", () => {
       assert.equal(result.relType.value.input?.relType.case, "sql");
     }
   });
+
+  it("builds a CollectMetrics relation", () => {
+    const result = buildRelation({
+      type: "collectMetrics",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      name: "stats",
+      metrics: [
+        {
+          type: "alias",
+          name: "total",
+          inner: { type: "unresolvedAttribute", name: "n" },
+        },
+      ],
+    });
+    assert.equal(result.relType.case, "collectMetrics");
+    if (result.relType.case === "collectMetrics") {
+      assert.equal(result.relType.value.name, "stats");
+      assert.equal(result.relType.value.metrics.length, 1);
+      assert.equal(result.relType.value.input?.relType.case, "sql");
+    }
+  });
 });
 
 describe("buildRelation() - aggregate groupTypes", () => {

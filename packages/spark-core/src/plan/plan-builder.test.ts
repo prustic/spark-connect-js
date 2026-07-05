@@ -737,4 +737,17 @@ describe("PlanBuilder toRelation", () => {
     assert.equal(withWatermark.delayThreshold, "10 minutes");
     assert.ok(withWatermark.input);
   });
+
+  it("collectMetrics", () => {
+    const result = PlanBuilder.toRelation({
+      type: "collectMetrics",
+      child: { type: "sql", query: "SELECT * FROM t" },
+      name: "stats",
+      metrics: [{ type: "unresolvedAttribute", name: "total" }],
+    });
+    const collectMetrics = (result as { collectMetrics: Record<string, unknown> }).collectMetrics;
+    assert.equal(collectMetrics.name, "stats");
+    assert.equal((collectMetrics.metrics as unknown[]).length, 1);
+    assert.ok(collectMetrics.input);
+  });
 });
