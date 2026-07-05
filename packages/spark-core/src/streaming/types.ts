@@ -33,12 +33,73 @@ export interface StreamingQueryStatus {
 }
 
 /**
- * One progress report from a streaming query. Spark Connect sends progress
- * as a JSON string. This is the parsed shape.
+ * Per-source progress within one batch: offsets consumed, row counts, and
+ * rates for a single input source.
+ */
+export interface SourceProgress {
+  /** Source description, e.g. `RateStreamV2[rowsPerSecond=50, ...]`. */
+  description: string;
+  /**
+   * Offset at the start of the batch. Opaque and source-specific: a string
+   * on `lastProgress()`, parsed (number or object) on bus events, `null` at
+   * batch 0.
+   */
+  startOffset: string | number | Record<string, unknown> | null;
+  /** Offset at the end of the batch. Same shape as `startOffset`. */
+  endOffset: string | number | Record<string, unknown> | null;
+  /** Latest offset available at the source. Same shape as `startOffset`. */
+  latestOffset: string | number | Record<string, unknown> | null;
+  /** Rows read from this source in this batch. */
+  numInputRows: number;
+  /**
+   * Average input rate over this batch. Absent on listener-bus events when
+   * the server computes NaN or Infinity (division by a zero-length window).
+   */
+  inputRowsPerSecond?: number;
+  /** Average processing rate over this batch. Absent like `inputRowsPerSecond`. */
+  processedRowsPerSecond?: number;
+  /** Source-specific metrics. Omitted on listener-bus events when empty. */
+  metrics?: Record<string, string>;
+}
+
+/** Sink-side progress within one batch. */
+export interface SinkProgress {
+  /** Sink description, e.g. `MemorySink`. */
+  description: string;
+  /** Rows written to the sink in this batch. */
+  numOutputRows: number;
+  /** Sink-specific metrics. Omitted on listener-bus events when empty. */
+  metrics?: Record<string, string>;
+}
+
+/**
+ * Metrics for one stateful operator (windowed aggregation, stream-stream
+ * join, deduplication) within one batch.
+ */
+export interface StateOperatorProgress {
+  /** Operator name, e.g. `stateStoreSave`. */
+  operatorName: string;
+  numRowsTotal: number;
+  numRowsUpdated: number;
+  allUpdatesTimeMs: number;
+  numRowsRemoved: number;
+  allRemovalsTimeMs: number;
+  commitTimeMs: number;
+  memoryUsedBytes: number;
+  numRowsDroppedByWatermark: number;
+  numShufflePartitions: number;
+  numStateStoreInstances: number;
+  /** State-store implementation metrics. */
+  customMetrics: Record<string, number>;
+}
+
+/**
+ * One progress report from a streaming query, parsed from the server's JSON.
+ * The server serializes `lastProgress()` and listener-bus events differently,
+ * so field presence varies per path (noted per field).
  *
- * The named fields below cover the values Spark sets on nearly every report.
- * The index signature lets newer Spark versions or third-party
- * `StreamingQueryListener` events add fields without breaking compilation.
+ * The index signature admits fields from newer Spark versions without
+ * weakening the named ones; do not remove it to "tighten" the interface.
  */
 export interface StreamingQueryProgress {
   /** Spark-internal query identifier (the `StreamingQuery.id`). */
@@ -55,20 +116,44 @@ export interface StreamingQueryProgress {
   batchDuration?: number;
   /** Per-phase durations (e.g. `addBatch`, `getOffset`, `triggerExecution`). */
   durationMs?: Record<string, number>;
-  /** Total input rows processed in this batch. Long on the server. */
-  numInputRows?: number | bigint;
-  /** Average input rate over this batch. */
+  /**
+   * Event-time watermark state for watermarked queries: ISO-8601 strings
+   * under the keys `min`, `avg`, `watermark`, `max`.
+   */
+  eventTime?: Record<string, string>;
+  /**
+   * Total input rows in this batch. Absent from `lastProgress()` and
+   * `recentProgress()`, where the per-source values in
+   * `sources[].numInputRows` are authoritative; present on listener-bus
+   * events. See {@link totalInputRows} for a path-independent total.
+   */
+  numInputRows?: number;
+  /** Average input rate. Same per-path presence as `numInputRows`. */
   inputRowsPerSecond?: number;
-  /** Average processed rate over this batch. */
+  /** Average processing rate. Same per-path presence as `numInputRows`. */
   processedRowsPerSecond?: number;
-  /** Per-state-operator metrics. */
-  stateOperators?: unknown[];
+  /** Per-state-operator metrics for stateful queries. */
+  stateOperators?: StateOperatorProgress[];
   /** Per-source progress (offsets, rows, rates). */
-  sources?: unknown[];
-  /** Sink description. */
-  sink?: unknown;
+  sources?: SourceProgress[];
+  /** Sink-side progress. */
+  sink?: SinkProgress;
+  /**
+   * Observed metrics keyed by `df.observe(name, ...)` name. Empty until an
+   * observation is attached to the query.
+   */
+  observedMetrics?: Record<string, unknown>;
   /** Forward-compat for fields Spark adds in newer versions. */
   [key: string]: unknown;
+}
+
+/**
+ * Sum of `sources[].numInputRows`. Spark Connect reports row counts
+ * per-source rather than top-level, so this is the Connect equivalent of
+ * classic Spark's `progress.numInputRows`.
+ */
+export function totalInputRows(progress: StreamingQueryProgress): number {
+  return (progress.sources ?? []).reduce((sum, s) => sum + (s.numInputRows ?? 0), 0);
 }
 
 /**
