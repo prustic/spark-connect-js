@@ -1053,9 +1053,7 @@ export class DataFrame<R extends Row = Row> {
    * Uses the AnalyzePlan.Schema RPC to resolve the schema without executing.
    */
   async columns(): Promise<string[]> {
-    const raw = await this.schema();
-    const structType = StructType.fromProto(raw);
-    return structType.fieldNames;
+    return (await this.schema()).fieldNames;
   }
 
   /**
@@ -1063,9 +1061,8 @@ export class DataFrame<R extends Row = Row> {
    * Uses the AnalyzePlan.Schema RPC.
    */
   async dtypes(): Promise<[string, string][]> {
-    const raw = await this.schema();
-    const structType = StructType.fromProto(raw);
-    return structType.fields.map((f) => [f.name, f.dataType]);
+    const schema = await this.schema();
+    return schema.fields.map((f) => [f.name, f.dataType]);
   }
 
   /**
@@ -1078,16 +1075,19 @@ export class DataFrame<R extends Row = Row> {
   }
 
   /**
-   * Return the schema of the DataFrame as a plain object.
+   * Return the schema of the DataFrame as a {@link StructType}. Nested types
+   * render as DDL simple strings on each field, e.g. `decimal(10,2)`,
+   * `array<string>`, `struct<a:int,b:string>`.
+   *
    * Uses the AnalyzePlan.Schema RPC to resolve column names and types
    * without executing the query.
    */
-  async schema(): Promise<Record<string, unknown>> {
+  async schema(): Promise<StructType> {
     const result = await this._session._analyzePlan({
       type: "schema",
       plan: this._plan,
     });
-    return (result.schema as Record<string, unknown>) ?? {};
+    return StructType.fromProto((result.schema as Record<string, unknown>) ?? {});
   }
 
   /**
@@ -1111,9 +1111,7 @@ export class DataFrame<R extends Row = Row> {
    * Convenience method that calls schema() and formats the output.
    */
   async printSchema(): Promise<void> {
-    const raw = await this.schema();
-    const structType = StructType.fromProto(raw);
-    console.log(structType.treeString());
+    console.log((await this.schema()).treeString());
   }
 
   /**

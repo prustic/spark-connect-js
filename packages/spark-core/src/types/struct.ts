@@ -28,7 +28,9 @@ export class StructField {
 }
 
 /**
- * Mirrors Spark's StructType and StructField for schema inspection.
+ * Mirrors Spark's StructType and StructField for schema inspection. Returned
+ * by `DataFrame.schema()`; accepted anywhere a DDL schema string goes via
+ * {@link StructType.toDDL}.
  *
  * @see [Spark source: StructType.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructType.scala)
  * @see [Spark source: StructField.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/types/StructField.scala)
@@ -116,7 +118,7 @@ interface ProtoField {
   name?: string;
   dataType?: Record<string, unknown>;
   nullable?: boolean;
-  metadata?: Record<string, unknown>;
+  metadata?: string | Record<string, unknown>;
 }
 
 function parseProtoField(field: ProtoField): StructField {
@@ -124,27 +126,141 @@ function parseProtoField(field: ProtoField): StructField {
     field.name ?? "",
     resolveProtoDataType(field.dataType),
     field.nullable ?? true,
-    field.metadata ?? {},
+    parseFieldMetadata(field.metadata),
   );
 }
 
+// The wire carries StructField.metadata as a JSON string.
+function parseFieldMetadata(metadata: string | Record<string, unknown> | undefined) {
+  if (typeof metadata !== "string") {
+    return metadata ?? {};
+  }
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Proto case names whose DDL spelling differs from the case name itself. */
+const DDL_NAMES: Record<string, string> = {
+  integer: "int",
+  long: "bigint",
+  byte: "tinyint",
+  short: "smallint",
+  timestampNtz: "timestamp_ntz",
+  calendarInterval: "interval",
+  null: "void",
+};
+
+const DAY_TIME_UNITS = ["day", "hour", "minute", "second"];
+const YEAR_MONTH_UNITS = ["year", "month"];
+
+interface ProtoIntervalValue {
+  startField?: number;
+  endField?: number;
+}
+
+/**
+ * Render an interval type honoring its start/end fields, like PySpark's
+ * `simpleString()`: `interval hour`, `interval day to minute`. Both fields
+ * unset means the type's full range.
+ */
+function resolveInterval(units: string[], value: ProtoIntervalValue | undefined): string {
+  const fullRange = `interval ${units[0]} to ${units[units.length - 1]}`;
+
+  if (value?.startField === undefined) {
+    return fullRange;
+  }
+
+  const start = units[value.startField];
+  const end = units[value.endField ?? value.startField];
+  if (start === undefined || end === undefined) {
+    return fullRange;
+  }
+
+  return start === end ? `interval ${start}` : `interval ${start} to ${end}`;
+}
+
+/**
+ * Render a Spark Connect `DataType` proto as its DDL simple string, recursing
+ * into nested types: `decimal(10,2)`, `array<string>`, `map<string,int>`,
+ * `struct<a:int,b:array<string>>`.
+ */
 function resolveProtoDataType(dt: Record<string, unknown> | undefined): string {
-  if (!dt) return "unknown";
-  const kind = dt.kind ?? dt;
-  if (typeof kind === "object" && kind !== null) {
-    const obj = kind as { case?: string; value?: unknown };
-    if (obj.case) {
-      // Handle nested struct/array/map
-      if (obj.case === "struct") return "struct";
-      if (obj.case === "array") return "array";
-      if (obj.case === "map") return "map";
-      // Primitive types: the case name IS the type
-      return obj.case;
+  const resolved = unwrapKind(dt);
+  if (!resolved) return "unknown";
+  const { name, value } = resolved;
+
+  switch (name) {
+    case "decimal": {
+      const v = value as { precision?: number; scale?: number };
+      return `decimal(${String(v?.precision ?? 10)},${String(v?.scale ?? 0)})`;
     }
-    // Fallback: look at keys
-    for (const key of Object.keys(kind)) {
-      if (key !== "$typeName" && key !== "$unknown") return key;
+    case "char":
+    case "varchar": {
+      const v = value as { length?: number };
+      return v?.length !== undefined ? `${name}(${String(v.length)})` : name;
+    }
+    case "array": {
+      const v = value as { elementType?: Record<string, unknown> };
+      return `array<${resolveProtoDataType(v?.elementType)}>`;
+    }
+    case "map": {
+      const v = value as {
+        keyType?: Record<string, unknown>;
+        valueType?: Record<string, unknown>;
+      };
+      return `map<${resolveProtoDataType(v?.keyType)},${resolveProtoDataType(v?.valueType)}>`;
+    }
+    case "struct": {
+      const v = value as { fields?: ProtoField[] };
+      const inner = (v?.fields ?? [])
+        .map((f) => `${f.name ?? ""}:${resolveProtoDataType(f.dataType)}`)
+        .join(",");
+      return `struct<${inner}>`;
+    }
+    case "dayTimeInterval":
+      return resolveInterval(DAY_TIME_UNITS, value as ProtoIntervalValue);
+    case "yearMonthInterval":
+      return resolveInterval(YEAR_MONTH_UNITS, value as ProtoIntervalValue);
+    case "udt": {
+      const v = value as { sqlType?: Record<string, unknown> };
+      return v?.sqlType ? resolveProtoDataType(v.sqlType) : "udt";
+    }
+    case "unparsed": {
+      const v = value as { dataTypeString?: string };
+      return v?.dataTypeString ?? "unknown";
+    }
+    default:
+      return DDL_NAMES[name] ?? name;
+  }
+}
+
+/**
+ * Accept both the protobuf-oneof wire shape `{ kind: { case, value } }` and a
+ * plain-JSON shape `{ decimal: {...} }` from non-protobuf transports.
+ */
+function unwrapKind(
+  dt: Record<string, unknown> | undefined,
+): { name: string; value: unknown } | undefined {
+  if (!dt) return undefined;
+
+  const kind = (dt.kind ?? dt) as Record<string, unknown>;
+  if (typeof kind !== "object" || kind === null) return undefined;
+
+  // An unset oneof arrives as `{ case: undefined }`; the `case` key must not
+  // fall through to the plain-JSON loop below.
+  if ("case" in kind) {
+    const oneof = kind as { case?: string; value?: unknown };
+    return typeof oneof.case === "string" ? { name: oneof.case, value: oneof.value } : undefined;
+  }
+
+  for (const key of Object.keys(kind)) {
+    if (key !== "$typeName" && key !== "$unknown") {
+      return { name: key, value: kind[key] };
     }
   }
-  return "unknown";
+  return undefined;
 }
