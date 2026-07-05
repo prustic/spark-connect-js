@@ -17,6 +17,12 @@ import {
   concat_ws,
   substring,
   regexp_replace,
+  regexp_extract,
+  regexp_extract_all,
+  regexp_like,
+  regexp_count,
+  regexp_substr,
+  regexp_instr,
   contains,
   startswith,
   endswith,
@@ -92,6 +98,33 @@ describe("string functions", () => {
     assertFn(contains("x", "y"), "contains", 2);
     assertFn(startswith("x", "y"), "startswith", 2);
     assertFn(endswith("x", "y"), "endswith", 2);
+  });
+
+  it("regexp extraction and matching family", () => {
+    assertFn(regexp_extract("x", "(a)(b)", 1), "regexp_extract", 3);
+    assertFn(regexp_extract_all("x", "(a)"), "regexp_extract_all", 2);
+    assertFn(regexp_extract_all("x", "(a)", 2), "regexp_extract_all", 3);
+    assertFn(regexp_like("x", "a+"), "regexp_like", 2);
+    assertFn(regexp_count("x", "a"), "regexp_count", 2);
+    assertFn(regexp_substr("x", "a+"), "regexp_substr", 2);
+    assertFn(regexp_instr("x", "a+"), "regexp_instr", 2);
+    assertFn(regexp_instr("x", "(a)", 1), "regexp_instr", 3);
+  });
+
+  it("regexp family accepts a Column pattern", () => {
+    for (const result of [
+      regexp_extract_all("s", col("pat")),
+      regexp_like("s", col("pat")),
+      regexp_count("s", col("pat")),
+      regexp_substr("s", col("pat")),
+      regexp_instr("s", col("pat")),
+    ]) {
+      assert.equal(result._expr.type, "unresolvedFunction");
+      if (result._expr.type === "unresolvedFunction") {
+        const patternExpr = result._expr.arguments[1];
+        assert.equal(patternExpr.type, "unresolvedAttribute");
+      }
+    }
   });
 
   it("regexp_replace with a Column pattern forwards the expression as-is", () => {

@@ -15,6 +15,12 @@ import {
   instr,
   translate,
   regexp_replace,
+  regexp_extract,
+  regexp_extract_all,
+  regexp_like,
+  regexp_count,
+  regexp_substr,
+  regexp_instr,
   soundex,
   base64,
   repeat,
@@ -92,5 +98,60 @@ describe("string functions", () => {
       .withColumn("rep", repeat(col("s"), 3))
       .collect();
     assert.equal(rows[0]["rep"], "ababab");
+  });
+
+  it("regexp extraction and matching family", async () => {
+    const rows = await spark()
+      .sql("SELECT 'user-42, user-7' AS s")
+      .withColumn("first_id", regexp_extract(col("s"), "user-(\\d+)", 1))
+      .withColumn("all_ids", regexp_extract_all(col("s"), "user-(\\d+)"))
+      .withColumn("is_match", regexp_like(col("s"), "user-\\d+"))
+      .withColumn("matches", regexp_count(col("s"), "user-\\d+"))
+      .withColumn("first_sub", regexp_substr(col("s"), "user-\\d+"))
+      .withColumn("pos", regexp_instr(col("s"), "user-\\d+"))
+      .collect();
+
+    assert.equal(rows[0]["first_id"], "42");
+    assert.deepStrictEqual(rows[0]["all_ids"], ["42", "7"]);
+    assert.equal(rows[0]["is_match"], true);
+    assert.equal(rows[0]["matches"], 2);
+    assert.equal(rows[0]["first_sub"], "user-42");
+    assert.equal(rows[0]["pos"], 1);
+  });
+
+  it("regexp family no-match behavior", async () => {
+    const rows = await spark()
+      .sql("SELECT 'nothing here' AS s")
+      .withColumn("extracted", regexp_extract(col("s"), "user-(\\d+)", 1))
+      .withColumn("is_match", regexp_like(col("s"), "user-\\d+"))
+      .withColumn("matches", regexp_count(col("s"), "user-\\d+"))
+      .withColumn("first_sub", regexp_substr(col("s"), "user-\\d+"))
+      .withColumn("pos", regexp_instr(col("s"), "user-\\d+"))
+      .collect();
+
+    assert.equal(rows[0]["extracted"], "");
+    assert.equal(rows[0]["is_match"], false);
+    assert.equal(rows[0]["matches"], 0);
+    assert.equal(rows[0]["first_sub"], null);
+    assert.equal(rows[0]["pos"], 0);
+  });
+
+  it("regexp family accepts a per-row Column pattern", async () => {
+    const rows = await spark()
+      .sql("SELECT 'abc-123' AS s, '\\\\d+' AS pat")
+      .withColumn("matched", regexp_substr(col("s"), col("pat")))
+      .collect();
+    assert.equal(rows[0]["matched"], "123");
+  });
+
+  it("regexp_extract_all and regexp_instr take an explicit group index", async () => {
+    const rows = await spark()
+      .sql("SELECT '12-34, 56-78' AS s")
+      .withColumn("second_groups", regexp_extract_all(col("s"), "(\\d+)-(\\d+)", 2))
+      .withColumn("pos", regexp_instr(col("s"), "(\\d+)-(\\d+)", 1))
+      .collect();
+
+    assert.deepStrictEqual(rows[0]["second_groups"], ["34", "78"]);
+    assert.equal(rows[0]["pos"], 1);
   });
 });

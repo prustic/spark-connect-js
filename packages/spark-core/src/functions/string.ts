@@ -87,6 +87,71 @@ export function regexp_replace(
   );
 }
 
+/**
+ * Extracts the group matched by the regex pattern, or the empty string when
+ * the pattern does not match. `groupIdx` 0 is the whole match.
+ */
+export function regexp_extract(column: ColOrName, pattern: string, groupIdx: number): Column {
+  return new Column(
+    fnExpr("regexp_extract", toExpr(column), _lit(pattern)._expr, _lit(groupIdx)._expr),
+  );
+}
+
+/**
+ * Extracts all occurrences of the group matched by the regex pattern as an
+ * array. `pattern` accepts a `Column` (per-row values) or a string literal.
+ * `groupIdx` defaults to 1 on the server.
+ */
+export function regexp_extract_all(
+  column: ColOrName,
+  pattern: Column | string,
+  groupIdx?: Column | number,
+): Column {
+  const args = [toExpr(column), _liftCol(pattern)._expr];
+  if (groupIdx !== undefined) args.push(_liftCol(groupIdx)._expr);
+  return new Column(fnExpr("regexp_extract_all", ...args));
+}
+
+/**
+ * Returns true when the string matches the regex pattern. `pattern` accepts
+ * a `Column` (per-row values) or a string literal.
+ */
+export function regexp_like(column: ColOrName, pattern: Column | string): Column {
+  return new Column(fnExpr("regexp_like", toExpr(column), _liftCol(pattern)._expr));
+}
+
+/**
+ * Counts how many times the regex pattern matches in the string. `pattern`
+ * accepts a `Column` (per-row values) or a string literal.
+ */
+export function regexp_count(column: ColOrName, pattern: Column | string): Column {
+  return new Column(fnExpr("regexp_count", toExpr(column), _liftCol(pattern)._expr));
+}
+
+/**
+ * Returns the first substring matching the regex pattern, or NULL when the
+ * pattern does not match. `pattern` accepts a `Column` (per-row values) or a
+ * string literal.
+ */
+export function regexp_substr(column: ColOrName, pattern: Column | string): Column {
+  return new Column(fnExpr("regexp_substr", toExpr(column), _liftCol(pattern)._expr));
+}
+
+/**
+ * Returns the 1-based position of the first match of the regex pattern, or 0
+ * when the pattern does not match. `pattern` accepts a `Column` (per-row
+ * values) or a string literal. `groupIdx` selects a match group.
+ */
+export function regexp_instr(
+  column: ColOrName,
+  pattern: Column | string,
+  groupIdx?: Column | number,
+): Column {
+  const args = [toExpr(column), _liftCol(pattern)._expr];
+  if (groupIdx !== undefined) args.push(_liftCol(groupIdx)._expr);
+  return new Column(fnExpr("regexp_instr", ...args));
+}
+
 /** Returns true if the string column contains the specified string. */
 export function contains(column: ColOrName, value: string): Column {
   return new Column(fnExpr("contains", toExpr(column), _lit(value)._expr));
