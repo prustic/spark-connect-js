@@ -22,6 +22,7 @@ export {
   StreamingQueryManager,
   StreamingQueryListenerBase,
   Trigger,
+  totalInputRows,
 } from "./streaming/index.js";
 export type {
   StreamingQueryListener,
@@ -33,6 +34,9 @@ export type {
   StreamingOutputMode,
   StreamingQueryStatus,
   StreamingQueryProgress,
+  SourceProgress,
+  SinkProgress,
+  StateOperatorProgress,
   StreamingQueryException,
 } from "./streaming/index.js";
 export { Column, col, lit } from "./column.js";
