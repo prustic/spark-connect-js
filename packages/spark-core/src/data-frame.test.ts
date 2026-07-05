@@ -5,6 +5,7 @@ import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import { col, lit } from "./column.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
+import { StructType } from "./types/struct.js";
 
 /** Minimal mock transport that records calls without doing I/O. */
 function mockTransport(_rows?: Record<string, unknown>[]): Transport & { calls: LogicalPlan[] } {
@@ -969,8 +970,8 @@ describe("DataFrame.columns() / dtypes()", () => {
           schema: {
             struct: {
               fields: [
-                { name: "id", type: { kind: { case: "integer", value: {} } }, nullable: true },
-                { name: "name", type: { kind: { case: "string", value: {} } }, nullable: true },
+                { name: "id", dataType: { kind: { case: "integer", value: {} } }, nullable: true },
+                { name: "name", dataType: { kind: { case: "string", value: {} } }, nullable: true },
               ],
             },
           },
@@ -998,8 +999,8 @@ describe("DataFrame.columns() / dtypes()", () => {
           schema: {
             struct: {
               fields: [
-                { name: "id", type: { kind: { case: "integer", value: {} } }, nullable: true },
-                { name: "name", type: { kind: { case: "string", value: {} } }, nullable: true },
+                { name: "id", dataType: { kind: { case: "integer", value: {} } }, nullable: true },
+                { name: "name", dataType: { kind: { case: "string", value: {} } }, nullable: true },
               ],
             },
           },
@@ -1012,9 +1013,49 @@ describe("DataFrame.columns() / dtypes()", () => {
       .getOrCreate();
     const df = spark.sql("SELECT * FROM t");
     const dtypes = await df.dtypes();
-    assert.equal(dtypes.length, 2);
-    assert.equal(dtypes[0][0], "id");
-    assert.equal(dtypes[1][0], "name");
+    assert.deepStrictEqual(dtypes, [
+      ["id", "int"],
+      ["name", "string"],
+    ]);
+  });
+
+  it("schema() returns a StructType with DDL type names", async () => {
+    const transport: Transport = {
+      async *executePlan(): AsyncIterable<Uint8Array> {},
+      async analyzePlan(): Promise<Record<string, unknown>> {
+        return {
+          type: "schema",
+          schema: {
+            struct: {
+              fields: [
+                { name: "id", dataType: { kind: { case: "long", value: {} } }, nullable: false },
+                {
+                  name: "amount",
+                  dataType: { kind: { case: "decimal", value: { precision: 10, scale: 2 } } },
+                  nullable: true,
+                },
+              ],
+            },
+          },
+        };
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost:15002")
+      .transport(transport)
+      .getOrCreate();
+
+    const schema = await spark.sql("SELECT * FROM t").schema();
+
+    assert.ok(schema instanceof StructType);
+    assert.deepStrictEqual(
+      schema.fields.map((f) => [f.name, f.dataType, f.nullable]),
+      [
+        ["id", "bigint", false],
+        ["amount", "decimal(10,2)", true],
+      ],
+    );
+    assert.equal(schema.toDDL(), "id bigint NOT NULL, amount decimal(10,2)");
   });
 });
 

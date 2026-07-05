@@ -346,8 +346,6 @@ export {
 
 export type {
   Row,
-  Schema,
-  FieldDescriptor,
   Transport,
   ArrowDecoderFn,
   ArrowEncoderFn,
