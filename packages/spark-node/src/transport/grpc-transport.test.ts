@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { InvalidConfigError } from "@spark-connect-js/core";
-import { GrpcTransport } from "./grpc-transport.js";
+import { readFileSync } from "node:fs";
+import { GrpcTransport, SPARK_JS_VERSION } from "./grpc-transport.js";
 import type { ExecutePlanRequest } from "@spark-connect-js/connect";
 
 describe("GrpcTransport: credentials selection", () => {
@@ -131,5 +132,14 @@ describe("GrpcTransport: ExecutePlanRequest shape", () => {
     if (opt.case === "reattachOptions") {
       assert.equal(opt.value.reattachable, true);
     }
+  });
+});
+
+describe("SPARK_JS_VERSION", () => {
+  it("matches package.json, the version the server sees in clientType", () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { version: string };
+    assert.equal(SPARK_JS_VERSION, manifest.version);
   });
 });

@@ -6,6 +6,7 @@ import { RuntimeConfig } from "./runtime-config.js";
 import { InvalidConfigError, InvalidInputError, UnsupportedOperationError } from "./errors.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
+import { StructType } from "./types/struct.js";
 import { DataStreamReader } from "./streaming/data-stream-reader.js";
 import { StreamingQueryManager } from "./streaming/streaming-query-manager.js";
 import { StreamingQueryListenerBus } from "./streaming/streaming-query-listener.js";
@@ -123,8 +124,10 @@ export type ArrowDecoderFn = (chunks: Uint8Array[]) => Promise<Row[]>;
 /**
  * Encodes plain JavaScript {@link Row} objects into Arrow IPC streaming bytes
  * for `SparkSession.createDataFrame([...])`. Injected by the runtime adapter.
+ * When a {@link StructType} is provided, the encoder applies its per-field
+ * nullability to the emitted Arrow schema.
  */
-export type ArrowEncoderFn = (rows: Row[]) => Uint8Array;
+export type ArrowEncoderFn = (rows: Row[], schema?: StructType) => Uint8Array;
 
 /**
  * Construction parameters for a {@link SparkSession}. Most users build a session
@@ -310,24 +313,44 @@ export class SparkSession {
    *
    * For richer types (Decimal, Struct, Array, Map, Binary), build the Arrow
    * IPC bytes yourself and pass a `Uint8Array` to the other overload.
+   *
+   * @param schema - Optional schema. A {@link StructType} must name exactly
+   * the row keys and carries nullability into the encoded data, so `NOT NULL`
+   * schemas round-trip. Field types never influence encoding, the server
+   * casts instead. A DDL string is sent as-is, so its `NOT NULL` is rejected
+   * server-side against the nullable encoded data.
    */
-  createDataFrame(rows: Row[], schema?: string): DataFrame;
+  createDataFrame(rows: Row[], schema?: string | StructType): DataFrame;
   /**
    * Create a DataFrame from pre-built Arrow IPC streaming bytes.
    *
    * @param data - Arrow IPC **streaming** format bytes. File-format input
    * (magic prefix `ARROW1\0\0`) is rejected.
-   * @param schema - Optional DDL-formatted schema string (e.g. `"id INT, name STRING"`).
+   * @param schema - Optional DDL string (e.g. `"id INT, name STRING"`) or
+   * {@link StructType}. A `NOT NULL` field requires the embedded Arrow field
+   * to be non-nullable too, or the server rejects the mismatch.
    * @throws `InvalidInputError` on empty input or file-format bytes.
    */
-  createDataFrame(data: Uint8Array, schema?: string): DataFrame;
-  createDataFrame(input: Uint8Array | Row[], schema?: string): DataFrame {
+  createDataFrame(data: Uint8Array, schema?: string | StructType): DataFrame;
+  createDataFrame(input: Uint8Array | Row[], schema?: string | StructType): DataFrame {
+    const structSchema = typeof schema === "string" ? undefined : schema;
+    if (structSchema !== undefined && !(structSchema instanceof StructType)) {
+      throw new InvalidInputError(
+        "createDataFrame schema must be a DDL string or a StructType instance.",
+      );
+    }
+    const schemaDdl = typeof schema === "string" ? schema : structSchema?.toDDL();
+    if (schemaDdl !== undefined && schemaDdl.trim().length === 0) {
+      throw new InvalidInputError(
+        "createDataFrame received an empty schema. Omit the schema to infer it from the data.",
+      );
+    }
     if (input instanceof Uint8Array) {
       validateArrowIpcStream(input);
       return DataFrame._fromPlan(this, {
         type: "localRelation",
         data: input,
-        schema,
+        schema: schemaDdl,
       });
     }
     if (Array.isArray(input)) {
@@ -338,11 +361,14 @@ export class SparkSession {
             "or pass `arrowEncoder` in SparkSessionConfig.",
         );
       }
-      const data = this._arrowEncoder(input);
+      if (structSchema !== undefined && input.length > 0) {
+        validateRowsAgainstSchema(input, structSchema);
+      }
+      const data = this._arrowEncoder(input, structSchema);
       return DataFrame._fromPlan(this, {
         type: "localRelation",
         data,
-        schema,
+        schema: schemaDdl,
       });
     }
     throw new InvalidInputError(
@@ -634,6 +660,42 @@ function validateArrowIpcStream(data: Uint8Array): void {
           "Only the streaming format is supported. If you built the payload with apache-arrow's " +
           "tableToIPC, pass 'stream' as the second argument.",
       );
+    }
+  }
+}
+
+// Name mismatches and NOT NULL violations fail remotely with nothing pointing
+// at the schema. Checked here rather than in the encoder so the guarantee
+// holds for any injected encoder.
+function validateRowsAgainstSchema(rows: Row[], schema: StructType): void {
+  const rowNames = Object.keys(rows[0]);
+  const rowNameSet = new Set(rowNames);
+  const schemaNameSet = new Set(schema.fieldNames);
+  const extra = schema.fieldNames.filter((n) => !rowNameSet.has(n));
+  const missing = rowNames.filter((n) => !schemaNameSet.has(n));
+  if (extra.length > 0 || missing.length > 0) {
+    const parts = [
+      extra.length > 0 ? `schema fields absent from the rows: ${extra.join(", ")}` : "",
+      missing.length > 0 ? `row fields absent from the schema: ${missing.join(", ")}` : "",
+    ].filter((p) => p.length > 0);
+    throw new InvalidInputError(
+      `createDataFrame schema does not match the rows (names are case-sensitive). ` +
+        `Found ${parts.join(" and ")}.`,
+    );
+  }
+
+  for (const field of schema.fields) {
+    if (field.nullable) {
+      continue;
+    }
+    for (let i = 0; i < rows.length; i++) {
+      const v = rows[i][field.name];
+      if (v === null || v === undefined) {
+        throw new InvalidInputError(
+          `createDataFrame: column "${field.name}" is NOT NULL in the schema ` +
+            `but row ${String(i)} contains ${v === null ? "null" : "undefined"}.`,
+        );
+      }
     }
   }
 }

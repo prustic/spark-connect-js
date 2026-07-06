@@ -31,9 +31,7 @@ describe("DataFrame.schema()", () => {
     assert.equal(byName["dur"], "interval hour");
   });
 
-  it("round-trips through toDDL and createDataFrame", async () => {
-    // The NULL row makes both columns nullable; the Arrow encoder emits
-    // nullable columns, and the server rejects them against a NOT NULL schema.
+  it("round-trips a schema through createDataFrame, nullability included", async () => {
     const source = await spark()
       .sql(
         `
@@ -45,13 +43,40 @@ describe("DataFrame.schema()", () => {
       )
       .schema();
 
-    const df = spark().createDataFrame([{ id: 1n, name: "a" }], source.toDDL());
+    const df = spark().createDataFrame([{ id: 1n, name: "a" }], source);
     const roundTripped = await df.schema();
 
     assert.deepStrictEqual(
-      roundTripped.fields.map((f) => [f.name, f.dataType]),
-      source.fields.map((f) => [f.name, f.dataType]),
+      roundTripped.fields.map((f) => [f.name, f.dataType, f.nullable]),
+      source.fields.map((f) => [f.name, f.dataType, f.nullable]),
     );
+  });
+
+  it("accepts a plain DDL string schema on createDataFrame", async () => {
+    const df = spark().createDataFrame([{ id: 1n, name: "a" }], "id BIGINT, name STRING");
+    const schema = await df.schema();
+    assert.deepStrictEqual(
+      schema.fields.map((f) => [f.name, f.dataType, f.nullable]),
+      [
+        ["id", "bigint", true],
+        ["name", "string", true],
+      ],
+    );
+  });
+
+  it("round-trips a NOT NULL schema through createDataFrame", async () => {
+    // range() yields a non-nullable id, the case the encoder used to lose.
+    const source = await spark().range(1).schema();
+    assert.equal(source.fields[0].nullable, false);
+
+    const df = spark().createDataFrame([{ id: 1n }, { id: 2n }], source);
+    const roundTripped = await df.schema();
+
+    assert.deepStrictEqual(
+      roundTripped.fields.map((f) => [f.name, f.dataType, f.nullable]),
+      source.fields.map((f) => [f.name, f.dataType, f.nullable]),
+    );
+    assert.equal(await df.count(), 2n);
   });
 
   it("columns() and dtypes() agree with schema()", async () => {

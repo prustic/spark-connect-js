@@ -117,12 +117,10 @@ const DEFAULT_MAX_MESSAGE_SIZE = 128 * 1024 * 1024;
 
 /**
  * Version string used in `clientType` (server-side User-Agent equivalent).
- * Must be kept in lockstep with `package.json#version`; changesets bumps
- * the manifest at release, this constant gets bumped in the same commit.
- * Hardcoded rather than imported from package.json to avoid
- * `resolveJsonModule` gymnastics across the workspace.
+ * Kept in lockstep with `package.json#version` by a drift test, and hardcoded
+ * to avoid `resolveJsonModule` gymnastics across the workspace.
  */
-const SPARK_JS_VERSION = "0.3.0";
+export const SPARK_JS_VERSION = "0.5.1";
 
 export interface GrpcTransportOptions {
   host: string;

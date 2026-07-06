@@ -2,8 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ArrowEncoder } from "./arrow-encoder.js";
 import { ArrowDecoder } from "./arrow-decoder.js";
-import { RecordBatchReader, Type, type DataType } from "apache-arrow";
-import { InvalidInputError } from "@spark-connect-js/core";
+import { RecordBatchReader, tableFromIPC, Type, type DataType } from "apache-arrow";
+import { InvalidInputError, StructType } from "@spark-connect-js/core";
 
 describe("ArrowEncoder.encode()", () => {
   it("round-trips a simple string column via the decoder", async () => {
@@ -108,5 +108,56 @@ describe("ArrowEncoder.encode()", () => {
         return true;
       },
     );
+  });
+
+  it("marks fields non-nullable per the StructType schema", () => {
+    const schema = new StructType().add("id", "bigint", false).add("name", "string");
+    const bytes = ArrowEncoder.encode(
+      [
+        { id: 1n, name: "a" },
+        { id: 2n, name: null },
+      ],
+      schema,
+    );
+    const fields = tableFromIPC(bytes).schema.fields;
+    assert.deepEqual(
+      fields.map((f) => [f.name, f.nullable]),
+      [
+        ["id", false],
+        ["name", true],
+      ],
+    );
+  });
+
+  it("emits nullable fields when no schema is given", () => {
+    const bytes = ArrowEncoder.encode([{ id: 1n }]);
+    assert.equal(tableFromIPC(bytes).schema.fields[0].nullable, true);
+  });
+
+  it("values still round-trip under a non-nullable schema", async () => {
+    const schema = new StructType().add("id", "bigint", false);
+    const bytes = ArrowEncoder.encode([{ id: 1n }, { id: 2n }], schema);
+    const rows = await ArrowDecoder.decode([bytes]);
+    assert.deepEqual(rows, [{ id: 1n }, { id: 2n }]);
+  });
+
+  it("throws naming the column and row when a NOT NULL column has a null", () => {
+    const schema = new StructType().add("id", "bigint", false);
+    assert.throws(
+      () => ArrowEncoder.encode([{ id: 1n }, { id: null }], schema),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /column "id"/);
+        assert.match(err.message, /NOT NULL/);
+        assert.match(err.message, /row 1/);
+        return true;
+      },
+    );
+  });
+
+  it("ignores schema fields that are absent from the rows", () => {
+    const schema = new StructType().add("missing", "int", false);
+    const bytes = ArrowEncoder.encode([{ id: 1n }], schema);
+    assert.equal(tableFromIPC(bytes).schema.fields[0].nullable, true);
   });
 });
