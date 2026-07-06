@@ -10,6 +10,7 @@ import { DataStreamWriter } from "./streaming/data-stream-writer.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
+import type { Observation } from "./observation.js";
 import type { StorageLevel } from "./storage-level.js";
 import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
 
@@ -387,6 +388,37 @@ export class DataFrame<R extends Row = Row> {
       child: this._plan,
       eventTime: eventTimeColumn,
       delayThreshold,
+    });
+  }
+
+  /**
+   * Attach named aggregate metrics, computed alongside the query without a
+   * second pass. Pass an {@link Observation} to read the metrics back after
+   * an action, or a string name when the metrics are consumed elsewhere
+   * (e.g. `StreamingQueryProgress.observedMetrics` on a streaming query).
+   *
+   * @example
+   *   const obs = new Observation("stats");
+   *   await df.observe(obs, count("*").alias("rows")).collect();
+   *   obs.get; // { rows: 42n }
+   */
+  observe(observation: Observation | string, ...metrics: Column[]): DataFrame<R> {
+    if (metrics.length === 0) {
+      throw new InvalidInputError("observe requires at least one aggregate metric column.");
+    }
+    const name = typeof observation === "string" ? observation : observation.name;
+    if (name.length === 0) {
+      throw new InvalidInputError("observe requires a non-empty observation name.");
+    }
+    if (typeof observation !== "string") {
+      observation._register();
+      this._session._registerObservation(observation);
+    }
+    return DataFrame._fromPlan<R>(this._session, {
+      type: "collectMetrics",
+      child: this._plan,
+      name,
+      metrics: metrics.map((m) => m._expr),
     });
   }
 
