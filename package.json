@@ -30,7 +30,7 @@
     "@spark-connect-js/prettier-config": "workspace:*",
     "c8": "^11.0.0",
     "prettier": "catalog:",
-    "turbo": "^2.10.3",
+    "turbo": "^2.10.4",
     "typescript": "catalog:"
   },
   "prettier": "@spark-connect-js/prettier-config"
