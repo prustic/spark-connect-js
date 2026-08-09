@@ -24,11 +24,11 @@ importers:
   .:
     devDependencies:
       '@changesets/changelog-github':
-        specifier: 1.0.0-next.8
-        version: 1.0.0-next.8
+        specifier: 1.0.0-next.9
+        version: 1.0.0-next.9
       '@changesets/cli':
-        specifier: 3.0.0-next.10
-        version: 3.0.0-next.10
+        specifier: 3.0.0-next.11
+        version: 3.0.0-next.11
       '@spark-connect-js/prettier-config':
         specifier: workspace:*
         version: link:tooling/prettier
@@ -533,12 +533,12 @@ packages:
     resolution: {integrity: sha512-v9YatKMVoljRPRPzI9PoxDHxBsLXZs+ndKBts6nOJlRpGHoGyzScOyC2YYce0krYhFxhn+lOiIto/7AOlTFuwA==}
     engines: {node: ^22.11 || ^24 || >=26}
 
-  '@changesets/changelog-github@1.0.0-next.8':
-    resolution: {integrity: sha512-YazS6eMC6+Bf4tVvqgJgmg7L3z4hZQ1RgTHw73waNJ/NLiHCsynNhxJXWxMXRdurCbJoyRkQySVbRLzx7PURZw==}
+  '@changesets/changelog-github@1.0.0-next.9':
+    resolution: {integrity: sha512-xGtpDLiJeQdyoOGNfKIKp09+o41J7KTNJ+QXWq8OqrzFbOCuI+KZC1AlyIDAsjZce3tBYLhu9sQtAMkmRnGOew==}
     engines: {node: ^22.11 || ^24 || >=26}
 
-  '@changesets/cli@3.0.0-next.10':
-    resolution: {integrity: sha512-8FXpcTI+QElN04xHY3/J2jrrhMuwiuXv2B2Xq5Am9SUcCyvEtgZEQ0tLYzQxm+qzTyY/MWCcwwiaFnRAHqzCAA==}
+  '@changesets/cli@3.0.0-next.11':
+    resolution: {integrity: sha512-yH79OtoLPruqx0BTO0eKE1rxupgk7Qf1SzmVhwdDqikkOoFlPD5/QEAN3zvRXLoGcT0VN0Wuq2zCFTi8CyJgLA==}
     engines: {node: ^22.11 || ^24 || >=26, npm: '>=10.9.0', pnpm: '>=10.0.0', yarn: '>=4.5.2'}
     hasBin: true
 
@@ -3938,12 +3938,12 @@ snapshots:
     dependencies:
       '@changesets/types': 7.0.0-next.9
 
-  '@changesets/changelog-github@1.0.0-next.8':
+  '@changesets/changelog-github@1.0.0-next.9':
     dependencies:
       '@changesets/get-github-info': 1.0.0-next.4
       '@changesets/types': 7.0.0-next.9
 
-  '@changesets/cli@3.0.0-next.10':
+  '@changesets/cli@3.0.0-next.11':
     dependencies:
       '@changesets/apply-release-plan': 8.0.0-next.10
       '@changesets/assemble-release-plan': 7.0.0-next.10
