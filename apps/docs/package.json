@@ -14,9 +14,9 @@
     "clean": "git clean -xdf .astro .turbo dist node_modules"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.6",
-    "astro": "^7.1.6",
-    "mermaid": "^11.16.0",
+    "@astrojs/starlight": "^0.41.7",
+    "astro": "^7.2.0",
+    "mermaid": "^11.16.1",
     "sharp": "^0.35.3",
     "starlight-typedoc": "^0.23.0",
     "typedoc": "^0.28.20",
