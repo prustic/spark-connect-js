@@ -34,12 +34,11 @@ jobs:
         id: changesets
         uses: changesets/action@v2
         with:
-          title: "chore: version packages"
-          version: pnpm version-packages
-          publish: pnpm release
-          createGithubReleases: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-title: "chore: version packages"
+          version-script: pnpm version-packages
+          publish-script: pnpm release
+          create-github-releases: true
 
       - name: Deploy docs on publish
         if: steps.changesets.outputs.published == 'true'
