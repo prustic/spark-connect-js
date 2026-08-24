@@ -265,6 +265,29 @@ describe("SparkSession.createDataFrame schema forwarding", () => {
     assert.equal(calls.length, 0);
   });
 
+  it("rejects a later row whose keys do not match the schema", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const schema = new StructType().add("id", "bigint", false).add("name", "string");
+    assert.throws(
+      () =>
+        spark.createDataFrame(
+          [
+            { id: 1n, name: "a" },
+            { id: 2n, nmae: "b" },
+          ],
+          schema,
+        ),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /row 1/);
+        assert.match(err.message, /nmae/);
+        assert.match(err.message, /name/);
+        return true;
+      },
+    );
+    assert.equal(calls.length, 0);
+  });
+
   it("rejects a null in a NOT NULL column before the encoder runs", () => {
     const { spark, calls } = sessionWithEncoder();
     const schema = new StructType().add("id", "bigint", false);

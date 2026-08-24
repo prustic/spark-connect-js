@@ -668,19 +668,29 @@ function validateArrowIpcStream(data: Uint8Array): void {
 // at the schema. Checked here rather than in the encoder so the guarantee
 // holds for any injected encoder.
 function validateRowsAgainstSchema(rows: Row[], schema: StructType): void {
-  const rowNames = Object.keys(rows[0]);
-  const rowNameSet = new Set(rowNames);
-  const schemaNameSet = new Set(schema.fieldNames);
-  const extra = schema.fieldNames.filter((n) => !rowNameSet.has(n));
-  const missing = rowNames.filter((n) => !schemaNameSet.has(n));
-  if (extra.length > 0 || missing.length > 0) {
+  const schemaNames = schema.fieldNames;
+  const schemaNameSet = new Set(schemaNames);
+  for (let i = 0; i < rows.length; i++) {
+    const rowNames = Object.keys(rows[i]);
+    if (rowNames.length === schemaNames.length && rowNames.every((n) => schemaNameSet.has(n))) {
+      continue;
+    }
+
+    const rowNameSet = new Set(rowNames);
+    const extra = schemaNames.filter((n) => !rowNameSet.has(n));
+    const missing = rowNames.filter((n) => !schemaNameSet.has(n));
     const parts = [
-      extra.length > 0 ? `schema fields absent from the rows: ${extra.join(", ")}` : "",
+      extra.length > 0 ? `schema fields absent from the row: ${extra.join(", ")}` : "",
       missing.length > 0 ? `row fields absent from the schema: ${missing.join(", ")}` : "",
     ].filter((p) => p.length > 0);
+    // Empty parts means the name sets agree but the counts differ, which only
+    // happens when the schema declares the same field name twice.
+    const detail =
+      parts.length > 0
+        ? `Found ${parts.join(" and ")}.`
+        : "The schema declares duplicate field names.";
     throw new InvalidInputError(
-      `createDataFrame schema does not match the rows (names are case-sensitive). ` +
-        `Found ${parts.join(" and ")}.`,
+      `createDataFrame schema does not match row ${String(i)} (names are case-sensitive). ${detail}`,
     );
   }
 
