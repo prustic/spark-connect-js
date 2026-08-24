@@ -44,12 +44,12 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.1",
+    "@bufbuild/protobuf": "^2.14.0",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
     "@spark-connect-js/connect": "workspace:*",
     "@spark-connect-js/core": "workspace:*",
-    "apache-arrow": "^21.1.0"
+    "apache-arrow": "^21.2.0"
   },
   "devDependencies": {
     "@spark-connect-js/eslint-config": "workspace:*",

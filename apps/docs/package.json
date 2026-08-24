@@ -14,12 +14,12 @@
     "clean": "git clean -xdf .astro .turbo dist node_modules"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.3",
-    "astro": "^7.1.0",
-    "mermaid": "^11.16.0",
+    "@astrojs/starlight": "^0.41.7",
+    "astro": "^7.2.4",
+    "mermaid": "^11.17.0",
     "sharp": "^0.35.3",
-    "starlight-typedoc": "^0.23.0",
-    "typedoc": "^0.28.19",
+    "starlight-typedoc": "^0.23.1",
+    "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0"
   },
   "devDependencies": {
