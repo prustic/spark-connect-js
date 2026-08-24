@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
 import { InvalidInputError } from "./errors.js";
+import { StructType } from "./types/struct.js";
+import type { Row } from "./types/row.js";
 
 function makeSession(analyzeResponse: Record<string, unknown>): {
   spark: SparkSession;
@@ -203,5 +205,118 @@ describe("SparkSession.createDataFrame input validation", () => {
     // should reach the plan builder (which does not execute here).
     const notFile = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00]);
     assert.doesNotThrow(() => newSession().createDataFrame(notFile));
+  });
+});
+
+describe("SparkSession.createDataFrame schema forwarding", () => {
+  function sessionWithEncoder() {
+    const calls: { rows: Row[]; schema: StructType | undefined }[] = [];
+    const spark = SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      })
+      .arrowEncoder((rows, schema) => {
+        calls.push({ rows, schema });
+        return new Uint8Array([1]);
+      })
+      .getOrCreate();
+    return { spark, calls };
+  }
+
+  it("passes a StructType through to the encoder and DDL to the plan", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const schema = new StructType().add("id", "bigint", false);
+    const df = spark.createDataFrame([{ id: 1n }], schema);
+    assert.equal(calls[0].schema, schema);
+    assert.equal((df._plan as { schema?: string }).schema, "id bigint NOT NULL");
+  });
+
+  it("passes a DDL string to the plan but not the encoder", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const df = spark.createDataFrame([{ id: 1n }], "id BIGINT");
+    assert.equal(calls[0].schema, undefined);
+    assert.equal((df._plan as { schema?: string }).schema, "id BIGINT");
+  });
+
+  it("serializes a StructType to DDL on the Uint8Array overload", () => {
+    const { spark } = sessionWithEncoder();
+    const notFile = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    const schema = new StructType().add("id", "bigint", false);
+    const df = spark.createDataFrame(notFile, schema);
+    assert.equal((df._plan as { schema?: string }).schema, "id bigint NOT NULL");
+  });
+
+  it("rejects a schema whose field names do not match the row keys", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const schema = new StructType().add("ID", "bigint", false);
+    assert.throws(
+      () => spark.createDataFrame([{ id: 1n }], schema),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /case-sensitive/);
+        assert.match(err.message, /ID/);
+        assert.match(err.message, /id/);
+        return true;
+      },
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("rejects a later row whose keys do not match the schema", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const schema = new StructType().add("id", "bigint", false).add("name", "string");
+    assert.throws(
+      () =>
+        spark.createDataFrame(
+          [
+            { id: 1n, name: "a" },
+            { id: 2n, nmae: "b" },
+          ],
+          schema,
+        ),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /row 1/);
+        assert.match(err.message, /nmae/);
+        assert.match(err.message, /name/);
+        return true;
+      },
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("rejects a null in a NOT NULL column before the encoder runs", () => {
+    const { spark, calls } = sessionWithEncoder();
+    const schema = new StructType().add("id", "bigint", false);
+    assert.throws(
+      () => spark.createDataFrame([{ id: 1n }, { id: null }], schema),
+      (err: unknown) => {
+        if (!(err instanceof InvalidInputError)) return false;
+        assert.match(err.message, /column "id"/);
+        assert.match(err.message, /NOT NULL/);
+        assert.match(err.message, /row 1/);
+        return true;
+      },
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  it("rejects an empty StructType instead of sending an empty DDL string", () => {
+    const { spark } = sessionWithEncoder();
+    assert.throws(() => spark.createDataFrame([{ id: 1n }], new StructType()), InvalidInputError);
+  });
+
+  it("rejects an empty DDL string like the readers do", () => {
+    const { spark } = sessionWithEncoder();
+    assert.throws(() => spark.createDataFrame([{ id: 1n }], "  "), InvalidInputError);
+  });
+
+  it("rejects a non-StructType schema object with a domain error", () => {
+    const { spark } = sessionWithEncoder();
+    const ducked = { toDDL: () => "id BIGINT" } as unknown as StructType;
+    assert.throws(() => spark.createDataFrame([{ id: 1n }], ducked), InvalidInputError);
   });
 });

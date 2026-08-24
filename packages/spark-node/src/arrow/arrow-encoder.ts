@@ -1,6 +1,8 @@
-import { InvalidInputError, type Row } from "@spark-connect-js/core";
+import { InvalidInputError, type Row, type StructType } from "@spark-connect-js/core";
 import {
   Table,
+  Schema,
+  Field,
   Utf8,
   Int32,
   Int64,
@@ -17,9 +19,12 @@ import {
  * `SparkSession.createDataFrame([...])`. Strings emit as `Utf8`, never
  * `Dictionary<Int32, Utf8>`, because Spark's LocalRelation reader ignores
  * the dictionary batch and would see bare integer indices.
+ *
+ * Arrow types are always inferred from the values. A provided schema only
+ * contributes per-field nullability.
  */
 export class ArrowEncoder {
-  static encode(rows: Row[]): Uint8Array {
+  static encode(rows: Row[], schema?: StructType): Uint8Array {
     if (rows.length === 0) {
       throw new InvalidInputError(
         "createDataFrame([...]) requires a non-empty array of rows. " +
@@ -32,13 +37,33 @@ export class ArrowEncoder {
       throw new InvalidInputError("createDataFrame([...]) rows must have at least one field.");
     }
 
+    const nonNullable = new Set(
+      (schema?.fields ?? []).filter((f) => !f.nullable).map((f) => f.name),
+    );
+
     const columns: Record<string, Vector> = {};
     for (const name of fieldNames) {
       const values = rows.map((r) => r[name]);
-      columns[name] = buildColumnVector(name, values);
+      const vector = buildColumnVector(name, values);
+      if (nonNullable.has(name) && vector.nullCount > 0) {
+        const nullAt = values.findIndex((v) => v === null || v === undefined);
+        throw new InvalidInputError(
+          `createDataFrame([...]): column "${name}" is NOT NULL in the schema ` +
+            `but row ${String(nullAt)} contains a null.`,
+        );
+      }
+      columns[name] = vector;
     }
 
-    return tableToIPC(new Table(columns), "stream");
+    if (nonNullable.size === 0) {
+      return tableToIPC(new Table(columns), "stream");
+    }
+
+    // Table offers no per-field nullability input, so hand it a prebuilt schema.
+    const fields = fieldNames.map(
+      (name) => new Field(name, columns[name].type, !nonNullable.has(name)),
+    );
+    return tableToIPC(new Table(new Schema(fields), columns), "stream");
   }
 }
 

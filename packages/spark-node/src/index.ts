@@ -420,7 +420,7 @@ export function connect(remote: string): SparkSession {
     .remote(remote)
     .transport(transport)
     .arrowDecoder((chunks) => ArrowDecoder.decode(chunks))
-    .arrowEncoder((rows) => ArrowEncoder.encode(rows));
+    .arrowEncoder((rows, schema) => ArrowEncoder.encode(rows, schema));
 
   if (parsed.sessionId !== undefined) {
     builder.sessionId(parsed.sessionId);
