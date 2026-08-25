@@ -836,7 +836,7 @@ export class DataFrame<R extends Row = Row> {
    *
    * @see [Spark source: MergeIntoWriter.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/MergeIntoWriter.scala)
    */
-  mergeInto(table: string, condition: Column): MergeIntoWriter {
+  mergeInto(table: string, condition: Column | string): MergeIntoWriter {
     return new MergeIntoWriter(this, table, condition);
   }
 

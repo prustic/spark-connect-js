@@ -166,6 +166,38 @@ describe("MergeIntoWriter validation", () => {
     );
   });
 
+  it("accepts SQL strings for the merge and clause conditions", async () => {
+    const { transport, df } = makeWriter();
+    await df.mergeInto("target", "s.id = target.id").whenMatched("s.val = 'x'").delete().merge();
+
+    const cmd = transport.commandCalls[0];
+    assert.deepEqual(cmd.mergeCondition, {
+      type: "expressionString",
+      expression: "s.id = target.id",
+    });
+    const actions = cmd.matchActions as MergeAction[];
+    assert.deepEqual(actions[0].condition, { type: "expressionString", expression: "s.val = 'x'" });
+  });
+
+  it("rejects non-Column, non-string conditions up front", () => {
+    const { df, writer } = makeWriter();
+    assert.throws(
+      () => df.mergeInto("target", 42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /mergeInto\(\) condition/.test(err.message),
+    );
+    assert.throws(
+      () => df.mergeInto("target", undefined as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /requires a merge condition/.test(err.message),
+    );
+    assert.throws(
+      () => writer.whenMatched(42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /whenMatched\(\) condition/.test(err.message),
+    );
+  });
+
   it("update({}) and insert({}) throw synchronously naming the *All alternative", () => {
     const { writer } = makeWriter();
     assert.throws(

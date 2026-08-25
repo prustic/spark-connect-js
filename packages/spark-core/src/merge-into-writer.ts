@@ -1,9 +1,27 @@
 import type { DataFrame } from "./data-frame.js";
-import type { Column } from "./column.js";
+import { Column } from "./column.js";
+import { expr } from "./functions/conditional.js";
 import type { Expression } from "./plan/logical-plan.js";
 import { InvalidInputError } from "./errors.js";
 
 type MergeActionType = "delete" | "insert" | "insertStar" | "update" | "updateStar";
+
+// Fail fast on anything that is not a Column or SQL string: a bad condition
+// would otherwise surface as an opaque TypeError (or worse, a clause
+// condition silently dropped) during serialization in merge().
+function toCondition(condition: Column | string | undefined, where: string): Column | undefined {
+  if (condition === undefined) {
+    return undefined;
+  }
+  if (typeof condition === "string") {
+    return expr(condition);
+  }
+  if (condition instanceof Column) {
+    return condition;
+  }
+
+  throw new InvalidInputError(`${where} condition must be a Column or a SQL string.`);
+}
 
 // Built eagerly at clause-method call time so a later mutation of the caller's
 // assignments record cannot change the queued action. Keys are parsed as SQL
@@ -75,37 +93,47 @@ export class MergeIntoWriter {
   readonly _notMatchedBySourceActions: Expression[] = [];
 
   /** @internal Obtained via `DataFrame.mergeInto`. */
-  constructor(df: DataFrame, tableName: string, condition: Column) {
+  constructor(df: DataFrame, tableName: string, condition: Column | string) {
     this._df = df;
     this._tableName = tableName;
-    this._condition = condition;
+    const cond = toCondition(condition, "mergeInto()");
+    if (cond === undefined) {
+      throw new InvalidInputError("mergeInto() requires a merge condition.");
+    }
+    this._condition = cond;
   }
 
   /**
    * Clause for rows where the merge condition matches a target row.
    * An optional extra condition narrows which matched rows the action applies to.
    */
-  whenMatched(condition?: Column): WhenMatched {
-    return new WhenMatched(this, condition);
+  whenMatched(condition?: Column | string): WhenMatched {
+    return new WhenMatched(this, toCondition(condition, "whenMatched()"));
   }
 
   /**
    * Clause for source rows with no matching target row.
    * An optional extra condition narrows which rows are inserted.
    */
-  whenNotMatched(condition?: Column): WhenNotMatched {
-    return new WhenNotMatched(this, condition);
+  whenNotMatched(condition?: Column | string): WhenNotMatched {
+    return new WhenNotMatched(this, toCondition(condition, "whenNotMatched()"));
   }
 
   /**
    * Clause for target rows with no matching source row.
    * An optional extra condition narrows which target rows the action applies to.
    */
-  whenNotMatchedBySource(condition?: Column): WhenNotMatchedBySource {
-    return new WhenNotMatchedBySource(this, condition);
+  whenNotMatchedBySource(condition?: Column | string): WhenNotMatchedBySource {
+    return new WhenNotMatchedBySource(this, toCondition(condition, "whenNotMatchedBySource()"));
   }
 
-  /** Enable automatic schema evolution for this merge. */
+  /**
+   * Enable automatic schema evolution for this merge.
+   *
+   * Depends on server and table-provider support: a provider that does not
+   * honor plan-level evolution ignores the flag silently. Delta additionally
+   * gates evolution behind `spark.databricks.delta.schema.autoMerge.enabled`.
+   */
   withSchemaEvolution(): this {
     this._schemaEvolution = true;
     return this;
