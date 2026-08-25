@@ -198,6 +198,22 @@ describe("MergeIntoWriter validation", () => {
     );
   });
 
+  it("rejects non-Column assignment values naming the key", () => {
+    const { writer } = makeWriter();
+    assert.throws(
+      () => writer.whenMatched().update({ val: "s.val" as unknown as Column }),
+      (err: unknown) =>
+        err instanceof InvalidInputError &&
+        /update\(\) assignment for "val"/.test(err.message) &&
+        /col\(\), expr\(\), or lit\(\)/.test(err.message),
+    );
+    assert.throws(
+      () => writer.whenNotMatched().insert({ id: 1n as unknown as Column }),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /insert\(\) assignment for "id"/.test(err.message),
+    );
+  });
+
   it("update({}) and insert({}) throw synchronously naming the *All alternative", () => {
     const { writer } = makeWriter();
     assert.throws(

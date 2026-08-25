@@ -42,10 +42,21 @@ function buildMergeAction(
         `${method}() requires at least one assignment; use ${all}() to ${method} all columns.`,
       );
     }
-    entries = pairs.map(([key, value]) => ({
-      key: { type: "expressionString", expression: key },
-      value: value._expr,
-    }));
+    entries = pairs.map(([key, value]) => {
+      // No string sugar for values: in SQL, SET val = 's.val' assigns a
+      // literal, so a bare string is ambiguous. Require an explicit Column.
+      if (!(value instanceof Column)) {
+        throw new InvalidInputError(
+          `${method}() assignment for "${key}" must be a Column; ` +
+            `wrap the value with col(), expr(), or lit().`,
+        );
+      }
+
+      return {
+        key: { type: "expressionString", expression: key } as Expression,
+        value: value._expr,
+      };
+    });
   }
 
   return {
@@ -141,6 +152,9 @@ export class MergeIntoWriter {
 
   /**
    * Execute the merge.
+   *
+   * The writer stays usable: calling `merge()` again re-executes the same
+   * merge against the table's current state.
    *
    * @throws `InvalidInputError` when no clause action has been defined.
    */
