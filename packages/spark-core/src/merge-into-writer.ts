@@ -53,7 +53,7 @@ function buildMergeAction(
       }
 
       return {
-        key: { type: "expressionString", expression: key } as Expression,
+        key: { type: "expressionString", expression: key },
         value: value._expr,
       };
     });
