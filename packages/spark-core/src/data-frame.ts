@@ -6,6 +6,7 @@ import { expr as sqlExpr } from "./functions/conditional.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
+import { MergeIntoWriter } from "./merge-into-writer.js";
 import { DataStreamWriter } from "./streaming/data-stream-writer.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
@@ -813,6 +814,30 @@ export class DataFrame<R extends Row = Row> {
    */
   writeTo(tableName: string): DataFrameWriterV2 {
     return new DataFrameWriterV2(this, tableName);
+  }
+
+  /**
+   * Returns a {@link MergeIntoWriter} that merges this DataFrame (the source)
+   * into the given target table on the given condition. Chain
+   * whenMatched/whenNotMatched/whenNotMatchedBySource clauses, then call
+   * `merge()` to execute.
+   *
+   * The target is addressed by table name in conditions and assignments, so
+   * alias the source to keep references unambiguous.
+   *
+   * @example
+   * ```ts
+   * await updates.alias("s")
+   *   .mergeInto("events", expr("s.id = events.id"))
+   *   .whenMatched().updateAll()
+   *   .whenNotMatched().insertAll()
+   *   .merge();
+   * ```
+   *
+   * @see [Spark source: MergeIntoWriter.scala](https://github.com/apache/spark/blob/master/sql/api/src/main/scala/org/apache/spark/sql/MergeIntoWriter.scala)
+   */
+  mergeInto(table: string, condition: Column): MergeIntoWriter {
+    return new MergeIntoWriter(this, table, condition);
   }
 
   /**

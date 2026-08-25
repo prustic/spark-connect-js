@@ -55,6 +55,7 @@ import {
   WriteOperation_SaveTable_TableSaveMethod,
   WriteOperation_BucketBySchema,
   WriteOperationV2Schema,
+  MergeIntoTableCommandSchema,
   WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
   WriteStreamOperationStartSchema,
@@ -1383,6 +1384,29 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
       commandType: {
         case: "writeOperationV2",
         value: writeV2,
+      },
+    });
+  }
+
+  if (type === "mergeIntoTableCommand") {
+    const plan = command.sourceTablePlan as import("@spark-connect-js/core").LogicalPlan;
+    const toActions = (v: unknown) =>
+      ((v as import("@spark-connect-js/core").Expression[]) ?? []).map((e) => buildExpression(e));
+
+    return create(CommandSchema, {
+      commandType: {
+        case: "mergeIntoTableCommand",
+        value: create(MergeIntoTableCommandSchema, {
+          targetTableName: command.targetTableName as string,
+          sourceTablePlan: buildRelation(plan),
+          mergeCondition: buildExpression(
+            command.mergeCondition as import("@spark-connect-js/core").Expression,
+          ),
+          matchActions: toActions(command.matchActions),
+          notMatchedActions: toActions(command.notMatchedActions),
+          notMatchedBySourceActions: toActions(command.notMatchedBySourceActions),
+          withSchemaEvolution: (command.withSchemaEvolution as boolean) ?? false,
+        }),
       },
     });
   }

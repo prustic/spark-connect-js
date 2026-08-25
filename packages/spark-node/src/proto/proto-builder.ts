@@ -115,6 +115,9 @@ import {
   Aggregate_PivotSchema,
   WithWatermarkSchema,
   CollectMetricsSchema,
+  MergeActionSchema,
+  MergeAction_AssignmentSchema,
+  MergeAction_ActionType,
 } from "@spark-connect-js/connect";
 
 /** Maps our expression type names to Spark's internal function names. */
@@ -1151,6 +1154,23 @@ export function buildExpression(expr: CoreExpression): Expression {
       });
     }
 
+    case "mergeAction":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "mergeAction",
+          value: create(MergeActionSchema, {
+            actionType: MERGE_ACTION_TYPE_MAP[expr.actionType],
+            ...(expr.condition !== undefined && { condition: buildExpression(expr.condition) }),
+            assignments: expr.assignments.map((a) =>
+              create(MergeAction_AssignmentSchema, {
+                key: buildExpression(a.key),
+                value: buildExpression(a.value),
+              }),
+            ),
+          }),
+        },
+      });
+
     default: {
       const _exhaustive: never = expr;
       throw new UnsupportedOperationError(
@@ -1159,3 +1179,12 @@ export function buildExpression(expr: CoreExpression): Expression {
     }
   }
 }
+
+// Total over the IR's closed actionType union, so no runtime guard is needed.
+const MERGE_ACTION_TYPE_MAP = {
+  delete: MergeAction_ActionType.DELETE,
+  insert: MergeAction_ActionType.INSERT,
+  insertStar: MergeAction_ActionType.INSERT_STAR,
+  update: MergeAction_ActionType.UPDATE,
+  updateStar: MergeAction_ActionType.UPDATE_STAR,
+} as const satisfies Record<string, MergeAction_ActionType>;
