@@ -14,6 +14,9 @@ function toCondition(condition: Column | string | undefined, where: string): Col
     return undefined;
   }
   if (typeof condition === "string") {
+    if (condition.trim().length === 0) {
+      throw new InvalidInputError(`${where} condition string must be non-empty.`);
+    }
     return expr(condition);
   }
   if (condition instanceof Column) {
@@ -43,6 +46,9 @@ function buildMergeAction(
       );
     }
     entries = pairs.map(([key, value]) => {
+      if (key.trim().length === 0) {
+        throw new InvalidInputError(`${method}() assignment keys must be non-empty column names.`);
+      }
       // No string sugar for values: in SQL, SET val = 's.val' assigns a
       // literal, so a bare string is ambiguous. Require an explicit Column.
       if (!(value instanceof Column)) {
@@ -105,8 +111,8 @@ export class MergeIntoWriter {
 
   /** @internal Obtained via `DataFrame.mergeInto`. */
   constructor(df: DataFrame, tableName: string, condition: Column | string) {
-    if (tableName.trim().length === 0) {
-      throw new InvalidInputError("mergeInto: table name must be non-empty.");
+    if (typeof tableName !== "string" || tableName.trim().length === 0) {
+      throw new InvalidInputError("mergeInto: table name must be a non-empty string.");
     }
     this._df = df;
     this._tableName = tableName;

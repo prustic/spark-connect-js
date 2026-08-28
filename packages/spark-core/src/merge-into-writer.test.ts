@@ -179,14 +179,34 @@ describe("MergeIntoWriter validation", () => {
     assert.deepEqual(actions[0].condition, { type: "expressionString", expression: "s.val = 'x'" });
   });
 
-  it("rejects an empty table name up front", () => {
+  it("rejects an empty or non-string table name up front", () => {
     const { df } = makeWriter();
     assert.throws(
       () => df.mergeInto("", expr("s.id = t.id")),
       (err: unknown) =>
-        err instanceof InvalidInputError && /table name must be non-empty/.test(err.message),
+        err instanceof InvalidInputError &&
+        /table name must be a non-empty string/.test(err.message),
     );
     assert.throws(() => df.mergeInto("  ", expr("s.id = t.id")), InvalidInputError);
+    assert.throws(
+      () => df.mergeInto(42 as unknown as string, expr("s.id = t.id")),
+      InvalidInputError,
+    );
+  });
+
+  it("rejects blank condition strings and empty assignment keys", () => {
+    const { df, writer } = makeWriter();
+    assert.throws(
+      () => df.mergeInto("target", "  "),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /condition string must be non-empty/.test(err.message),
+    );
+    assert.throws(() => writer.whenMatched(""), InvalidInputError);
+    assert.throws(
+      () => writer.whenMatched().update({ "": col("s.val") }),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /assignment keys must be non-empty/.test(err.message),
+    );
   });
 
   it("rejects non-Column, non-string conditions up front", () => {
