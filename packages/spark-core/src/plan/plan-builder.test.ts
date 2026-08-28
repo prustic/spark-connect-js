@@ -294,6 +294,41 @@ describe("PlanBuilder toExpression", () => {
     );
   });
 
+  it("mergeAction maps action type, condition, and assignments", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "mergeAction",
+        actionType: "update",
+        condition: { type: "expressionString", expression: "target.stale" },
+        assignments: [
+          {
+            key: { type: "expressionString", expression: "val" },
+            value: { type: "unresolvedAttribute", name: "s.val" },
+          },
+        ],
+      }),
+      {
+        mergeAction: {
+          actionType: "ACTION_TYPE_UPDATE",
+          condition: { expressionString: { expression: "target.stale" } },
+          assignments: [
+            {
+              key: { expressionString: { expression: "val" } },
+              value: { unresolvedAttribute: { unparsedIdentifier: "s.val" } },
+            },
+          ],
+        },
+      },
+    );
+  });
+
+  it("mergeAction omits the condition and keeps empty assignments for star actions", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "mergeAction", actionType: "insertStar", assignments: [] }),
+      { mergeAction: { actionType: "ACTION_TYPE_INSERT_STAR", assignments: [] } },
+    );
+  });
+
   it("binary operator gt", () => {
     assert.deepStrictEqual(
       PlanBuilder.toExpression({

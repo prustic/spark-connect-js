@@ -208,6 +208,11 @@ export {
   CommonInlineUserDefinedFunctionSchema,
   type JavaUDF,
   JavaUDFSchema,
+  type MergeAction,
+  MergeActionSchema,
+  type MergeAction_Assignment,
+  MergeAction_AssignmentSchema,
+  MergeAction_ActionType,
 } from "./gen/spark/connect/expressions_pb.js";
 
 // Window expression messages
@@ -366,6 +371,9 @@ export {
   type StreamingQueryListenerEventsResult,
   StreamingQueryListenerEventsResultSchema,
   StreamingQueryEventType,
+  // MERGE INTO
+  type MergeIntoTableCommand,
+  MergeIntoTableCommandSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

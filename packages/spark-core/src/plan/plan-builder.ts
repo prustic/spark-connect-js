@@ -23,6 +23,14 @@
 import type { LogicalPlan, Expression } from "./logical-plan.js";
 import { UnsupportedOperationError } from "../errors.js";
 
+const MERGE_ACTION_TYPE_NAME = {
+  delete: "ACTION_TYPE_DELETE",
+  insert: "ACTION_TYPE_INSERT",
+  insertStar: "ACTION_TYPE_INSERT_STAR",
+  update: "ACTION_TYPE_UPDATE",
+  updateStar: "ACTION_TYPE_UPDATE_STAR",
+} as const satisfies Record<string, string>;
+
 /**
  * Converts a LogicalPlan tree into a plain object that mirrors the Spark
  * Connect proto Relation message.  This is an intermediate representation -
@@ -606,6 +614,21 @@ export class PlanBuilder {
           };
         }
         return { window: w };
+      }
+
+      case "mergeAction": {
+        const action: Record<string, unknown> = {
+          actionType: MERGE_ACTION_TYPE_NAME[expr.actionType],
+          assignments: expr.assignments.map((a) => ({
+            key: PlanBuilder.toExpression(a.key),
+            value: PlanBuilder.toExpression(a.value),
+          })),
+        };
+        if (expr.condition) {
+          action.condition = PlanBuilder.toExpression(expr.condition);
+        }
+
+        return { mergeAction: action };
       }
 
       default: {

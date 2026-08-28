@@ -44,6 +44,12 @@ export { Column, col, lit } from "./column.js";
 export { GroupedData } from "./grouped-data.js";
 export { DataFrameWriter } from "./data-frame-writer.js";
 export { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
+export {
+  MergeIntoWriter,
+  WhenMatched,
+  WhenNotMatched,
+  WhenNotMatchedBySource,
+} from "./merge-into-writer.js";
 export { DataFrameStat } from "./data-frame-stat.js";
 export type { SaveMode } from "./data-frame-writer.js";
 export { DataType } from "./types/data-type.js";

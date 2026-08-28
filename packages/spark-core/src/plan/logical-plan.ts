@@ -60,6 +60,14 @@ export type Expression =
       partitionSpec: Expression[];
       orderSpec: SortOrder[];
       frameSpec?: WindowFrame;
+    }
+  // MERGE INTO action clause (maps to Spark Connect's Expression.MergeAction).
+  // Only appears inside a mergeIntoTableCommand's action lists.
+  | {
+      type: "mergeAction";
+      actionType: "delete" | "insert" | "insertStar" | "update" | "updateStar";
+      condition?: Expression;
+      assignments: { key: Expression; value: Expression }[];
     };
 
 /** Window frame specification. */
