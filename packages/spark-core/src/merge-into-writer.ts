@@ -105,6 +105,9 @@ export class MergeIntoWriter {
 
   /** @internal Obtained via `DataFrame.mergeInto`. */
   constructor(df: DataFrame, tableName: string, condition: Column | string) {
+    if (tableName.trim().length === 0) {
+      throw new InvalidInputError("mergeInto: table name must be non-empty.");
+    }
     this._df = df;
     this._tableName = tableName;
     const cond = toCondition(condition, "mergeInto()");

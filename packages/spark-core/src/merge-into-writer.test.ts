@@ -179,6 +179,16 @@ describe("MergeIntoWriter validation", () => {
     assert.deepEqual(actions[0].condition, { type: "expressionString", expression: "s.val = 'x'" });
   });
 
+  it("rejects an empty table name up front", () => {
+    const { df } = makeWriter();
+    assert.throws(
+      () => df.mergeInto("", expr("s.id = t.id")),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /table name must be non-empty/.test(err.message),
+    );
+    assert.throws(() => df.mergeInto("  ", expr("s.id = t.id")), InvalidInputError);
+  });
+
   it("rejects non-Column, non-string conditions up front", () => {
     const { df, writer } = makeWriter();
     assert.throws(
