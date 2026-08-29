@@ -3,7 +3,8 @@
  */
 
 import { Column, fnExpr, toExpr, type ColOrName, fn, _liftCol } from "./_helpers.js";
-import type { ColOrLiteral } from "../column.js";
+import { toCondition, type ColOrLiteral } from "../column.js";
+import { InvalidInputError } from "../errors.js";
 
 // when / otherwise
 
@@ -19,8 +20,13 @@ import type { Expression } from "../plan/logical-plan.js";
  *     .when(col("age").gt(lit(12)), lit("teen"))
  *     .otherwise(lit("child"))
  */
-export function when(condition: Column, value: ColOrLiteral): WhenBuilder {
-  return new WhenBuilder([{ condition: condition._expr, value: _liftCol(value)._expr }]);
+export function when(condition: Column | string, value: ColOrLiteral): WhenBuilder {
+  const cond = toCondition(condition, "when()");
+  if (cond === undefined) {
+    throw new InvalidInputError("when() requires a condition.");
+  }
+
+  return new WhenBuilder([{ condition: cond._expr, value: _liftCol(value)._expr }]);
 }
 
 /**
@@ -37,10 +43,15 @@ export class WhenBuilder extends Column {
     this._branches = [...branches];
   }
 
-  override when(condition: Column, value: ColOrLiteral): WhenBuilder {
+  override when(condition: Column | string, value: ColOrLiteral): WhenBuilder {
+    const cond = toCondition(condition, "when()");
+    if (cond === undefined) {
+      throw new InvalidInputError("when() requires a condition.");
+    }
+
     return new WhenBuilder([
       ...this._branches,
-      { condition: condition._expr, value: _liftCol(value)._expr },
+      { condition: cond._expr, value: _liftCol(value)._expr },
     ]);
   }
 

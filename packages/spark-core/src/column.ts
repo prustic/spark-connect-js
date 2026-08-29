@@ -26,6 +26,34 @@ function fnOf(name: string, ...args: Expression[]): Expression {
 }
 
 /**
+ * Coerce a predicate argument to a Column, accepting a SQL string. Anything
+ * else throws rather than reaching serialization, where a missing expression
+ * surfaces as an opaque failure or, worse, a silently dropped condition.
+ *
+ * @internal
+ */
+export function toCondition(
+  condition: Column | string | undefined,
+  where: string,
+): Column | undefined {
+  if (condition === undefined) {
+    return undefined;
+  }
+  if (typeof condition === "string") {
+    if (condition.trim().length === 0) {
+      throw new InvalidInputError(`${where} condition string must be non-empty.`);
+    }
+
+    return new Column({ type: "expressionString", expression: condition });
+  }
+  if (condition instanceof Column) {
+    return condition;
+  }
+
+  throw new InvalidInputError(`${where} condition must be a Column or a SQL string.`);
+}
+
+/**
  * A reference to a column expression, typically obtained from {@link col} or
  * from methods on a {@link DataFrame} such as `df.col("name")`.
  *
@@ -195,12 +223,16 @@ export class Column {
    *   .otherwise(lit("child"));
    * ```
    */
-  when(condition: Column, value: ColOrLiteral): Column {
+  when(condition: Column | string, value: ColOrLiteral): Column {
     const chain = this._openCaseWhen("when");
+    const cond = toCondition(condition, "when()");
+    if (cond === undefined) {
+      throw new InvalidInputError("when() requires a condition.");
+    }
 
     return new Column({
       type: "caseWhen",
-      branches: [...chain.branches, { condition: condition._expr, value: liftCol(value)._expr }],
+      branches: [...chain.branches, { condition: cond._expr, value: liftCol(value)._expr }],
     });
   }
 

@@ -76,6 +76,33 @@ describe("when/otherwise", () => {
     }
   });
 
+  it("accepts a SQL string condition", () => {
+    const result = when("age > 18", "adult").when("age > 12", "teen");
+    if (result._expr.type === "caseWhen") {
+      assert.deepStrictEqual(result._expr.branches[0].condition, {
+        type: "expressionString",
+        expression: "age > 18",
+      });
+      assert.deepStrictEqual(result._expr.branches[1].condition, {
+        type: "expressionString",
+        expression: "age > 12",
+      });
+    }
+  });
+
+  it("rejects a condition that is neither a Column nor a SQL string", () => {
+    assert.throws(
+      () => when(42 as unknown as Column, "x"),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /must be a Column or a SQL string/.test(err.message),
+    );
+    assert.throws(() => when("  ", "x"), InvalidInputError);
+    assert.throws(
+      () => when(col("a").gt(1), "x").when(undefined as unknown as Column, "y"),
+      InvalidInputError,
+    );
+  });
+
   it("rejects when()/otherwise() on a column that is not an open chain", () => {
     assert.throws(
       () => col("age").when(col("x").gt(1), lit("y")),

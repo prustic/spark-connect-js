@@ -1,30 +1,9 @@
 import type { DataFrame } from "./data-frame.js";
-import { Column } from "./column.js";
-import { expr } from "./functions/conditional.js";
+import { Column, toCondition } from "./column.js";
 import type { Expression } from "./plan/logical-plan.js";
 import { InvalidInputError } from "./errors.js";
 
 type MergeActionType = "delete" | "insert" | "insertStar" | "update" | "updateStar";
-
-// Fail fast on anything that is not a Column or SQL string: a bad condition
-// would otherwise surface as an opaque TypeError (or worse, a clause
-// condition silently dropped) during serialization in merge().
-function toCondition(condition: Column | string | undefined, where: string): Column | undefined {
-  if (condition === undefined) {
-    return undefined;
-  }
-  if (typeof condition === "string") {
-    if (condition.trim().length === 0) {
-      throw new InvalidInputError(`${where} condition string must be non-empty.`);
-    }
-    return expr(condition);
-  }
-  if (condition instanceof Column) {
-    return condition;
-  }
-
-  throw new InvalidInputError(`${where} condition must be a Column or a SQL string.`);
-}
 
 // Built eagerly at clause-method call time so a later mutation of the caller's
 // assignments record cannot change the queued action. Keys are parsed as SQL
