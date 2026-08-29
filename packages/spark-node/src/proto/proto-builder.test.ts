@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildRelation, buildExpression } from "./proto-builder.js";
 import type { LogicalPlan, Expression as CoreExpression } from "@spark-connect-js/core";
 import { UnsupportedOperationError } from "@spark-connect-js/core";
+import { Expression_Cast_EvalMode } from "@spark-connect-js/connect";
 
 describe("buildRelation()", () => {
   it("builds a SQL relation", () => {
@@ -368,7 +369,55 @@ describe("buildExpression()", () => {
       assert.equal(result.exprType.value.castToType.case, "typeStr");
       assert.equal(result.exprType.value.castToType.value, "string");
       assert.ok(result.exprType.value.expr);
+      assert.equal(result.exprType.value.evalMode, Expression_Cast_EvalMode.UNSPECIFIED);
     }
+  });
+
+  it("builds cast with the try eval mode", () => {
+    const result = buildExpression({
+      type: "cast",
+      inner: { type: "unresolvedAttribute", name: "id" },
+      targetType: "int",
+      evalMode: "try",
+    });
+    if (result.exprType.case !== "cast") {
+      assert.fail("expected a cast expression");
+    }
+    assert.equal(result.exprType.value.evalMode, Expression_Cast_EvalMode.TRY);
+  });
+
+  it("lowers caseWhen to the when function, flattening branches", () => {
+    const branch = (n: number) => ({
+      condition: { type: "unresolvedAttribute" as const, name: `c${String(n)}` },
+      value: { type: "literal" as const, value: n },
+    });
+    const result = buildExpression({
+      type: "caseWhen",
+      branches: [branch(1), branch(2)],
+      elseValue: { type: "literal", value: 0 },
+    });
+    if (result.exprType.case !== "unresolvedFunction") {
+      assert.fail("expected an unresolvedFunction expression");
+    }
+    assert.equal(result.exprType.value.functionName, "when");
+    assert.equal(result.exprType.value.arguments.length, 5);
+    assert.equal(result.exprType.value.isDistinct, false);
+  });
+
+  it("omits the trailing argument when caseWhen has no else value", () => {
+    const result = buildExpression({
+      type: "caseWhen",
+      branches: [
+        {
+          condition: { type: "unresolvedAttribute", name: "c" },
+          value: { type: "literal", value: 1 },
+        },
+      ],
+    });
+    if (result.exprType.case !== "unresolvedFunction") {
+      assert.fail("expected an unresolvedFunction expression");
+    }
+    assert.equal(result.exprType.value.arguments.length, 2);
   });
 });
 

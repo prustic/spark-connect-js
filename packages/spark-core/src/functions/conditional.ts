@@ -2,7 +2,9 @@
  * Conditional functions: when/otherwise, cast, coalesce, null-handling, predicates.
  */
 
-import { Column, fnExpr, toExpr, type ColOrName, fn } from "./_helpers.js";
+import { Column, fnExpr, toExpr, type ColOrName, fn, _liftCol } from "./_helpers.js";
+import { toCondition, type ColOrLiteral } from "../column.js";
+import { InvalidInputError } from "../errors.js";
 
 // when / otherwise
 
@@ -18,38 +20,48 @@ import type { Expression } from "../plan/logical-plan.js";
  *     .when(col("age").gt(lit(12)), lit("teen"))
  *     .otherwise(lit("child"))
  */
-export function when(condition: Column, value: Column): WhenBuilder {
-  return new WhenBuilder([{ condition, value }]);
+export function when(condition: Column | string, value: ColOrLiteral): WhenBuilder {
+  const cond = toCondition(condition, "when()");
+  if (cond === undefined) {
+    throw new InvalidInputError("when() requires a condition.");
+  }
+
+  return new WhenBuilder([{ condition: cond._expr, value: _liftCol(value)._expr }]);
 }
 
-export class WhenBuilder {
-  /** @internal */
-  private readonly _branches: Array<{ condition: Column; value: Column }>;
+/**
+ * An open CASE WHEN chain. It is a {@link Column}, so it can be used directly
+ * wherever a column is expected (non-matching rows yield `NULL`), or closed
+ * with {@link Column.otherwise} for an explicit default.
+ */
+export class WhenBuilder extends Column {
+  private readonly _branches: readonly { condition: Expression; value: Expression }[];
 
-  constructor(branches: Array<{ condition: Column; value: Column }>) {
-    this._branches = branches;
+  /** @internal Obtained via {@link when}. */
+  constructor(branches: { condition: Expression; value: Expression }[]) {
+    super({ type: "caseWhen", branches: [...branches] });
+    this._branches = [...branches];
   }
 
-  when(condition: Column, value: Column): WhenBuilder {
-    return new WhenBuilder([...this._branches, { condition, value }]);
-  }
-
-  otherwise(value: Column): Column {
-    const args: Expression[] = [];
-    for (const branch of this._branches) {
-      args.push(branch.condition._expr, branch.value._expr);
+  override when(condition: Column | string, value: ColOrLiteral): WhenBuilder {
+    const cond = toCondition(condition, "when()");
+    if (cond === undefined) {
+      throw new InvalidInputError("when() requires a condition.");
     }
-    args.push(value._expr);
-    return new Column(fnExpr("when", ...args));
+
+    return new WhenBuilder([
+      ...this._branches,
+      { condition: cond._expr, value: _liftCol(value)._expr },
+    ]);
   }
 
-  /** Convert to Column without an otherwise clause (NULL for non-matching rows). */
+  /**
+   * Convert to a plain Column with a `NULL` default.
+   *
+   * @deprecated A chain is already a Column; use it directly.
+   */
   toColumn(): Column {
-    const args: Expression[] = [];
-    for (const branch of this._branches) {
-      args.push(branch.condition._expr, branch.value._expr);
-    }
-    return new Column(fnExpr("when", ...args));
+    return new Column(this._expr);
   }
 }
 

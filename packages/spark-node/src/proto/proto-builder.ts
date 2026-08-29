@@ -51,6 +51,7 @@ import {
   Expression_SortOrder_SortDirection,
   Expression_SortOrder_NullOrdering,
   Expression_CastSchema,
+  Expression_Cast_EvalMode,
   DataType_NULLSchema,
   Expression_ExpressionStringSchema,
   type Catalog,
@@ -1129,9 +1130,34 @@ export function buildExpression(expr: CoreExpression): Expression {
           value: create(Expression_CastSchema, {
             expr: buildExpression(expr.inner),
             castToType: { case: "typeStr", value: expr.targetType },
+            ...(expr.evalMode !== undefined && {
+              evalMode: CAST_EVAL_MODE_MAP[expr.evalMode],
+            }),
           }),
         },
       });
+
+    case "caseWhen": {
+      const args: Expression[] = [];
+      for (const branch of expr.branches) {
+        args.push(buildExpression(branch.condition));
+        args.push(buildExpression(branch.value));
+      }
+      if (expr.elseValue !== undefined) {
+        args.push(buildExpression(expr.elseValue));
+      }
+
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "unresolvedFunction",
+          value: create(Expression_UnresolvedFunctionSchema, {
+            functionName: "when",
+            arguments: args,
+            isDistinct: false,
+          }),
+        },
+      });
+    }
 
     case "window": {
       const windowValue = create(Expression_WindowSchema, {
@@ -1181,6 +1207,12 @@ export function buildExpression(expr: CoreExpression): Expression {
 }
 
 // Total over the IR's closed actionType union, so no runtime guard is needed.
+const CAST_EVAL_MODE_MAP = {
+  legacy: Expression_Cast_EvalMode.LEGACY,
+  ansi: Expression_Cast_EvalMode.ANSI,
+  try: Expression_Cast_EvalMode.TRY,
+} as const satisfies Record<string, Expression_Cast_EvalMode>;
+
 const MERGE_ACTION_TYPE_MAP = {
   delete: MergeAction_ActionType.DELETE,
   insert: MergeAction_ActionType.INSERT,

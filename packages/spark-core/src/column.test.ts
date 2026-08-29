@@ -444,3 +444,61 @@ describe("Column struct/map/array field access", () => {
     }
   });
 });
+
+describe("Column operator methods", () => {
+  function fnName(c: { _expr: { type: string } }): string | undefined {
+    const expr = c._expr as { type: string; name?: string };
+    return expr.type === "unresolvedFunction" ? expr.name : undefined;
+  }
+
+  it("mod() and pow() map to the SQL function names", () => {
+    assert.equal(fnName(col("a").mod(2)), "%");
+    assert.equal(fnName(col("a").pow(2)), "power");
+  });
+
+  it("not() and negate() map to the SQL function names", () => {
+    assert.equal(fnName(col("flag").not()), "not");
+    assert.equal(fnName(col("n").negate()), "negative");
+  });
+
+  it("auto-wraps primitive operands", () => {
+    const expr = col("a").mod(2)._expr;
+    if (expr.type === "unresolvedFunction") {
+      assert.deepStrictEqual(expr.arguments[1], lit(2)._expr);
+    }
+  });
+});
+
+describe("Column cast variants", () => {
+  it("cast() sets no eval mode", () => {
+    assert.deepStrictEqual(col("id").cast("string")._expr, {
+      type: "cast",
+      inner: col("id")._expr,
+      targetType: "string",
+    });
+  });
+
+  it("try_cast() sets the try eval mode", () => {
+    assert.deepStrictEqual(col("id").try_cast("int")._expr, {
+      type: "cast",
+      inner: col("id")._expr,
+      targetType: "int",
+      evalMode: "try",
+    });
+  });
+
+  it("astype() is an alias of cast()", () => {
+    assert.deepStrictEqual(col("id").astype("double")._expr, col("id").cast("double")._expr);
+  });
+});
+
+describe("Column aliasing and composition", () => {
+  it("name() is an alias of alias()", () => {
+    assert.deepStrictEqual(col("a").name("b")._expr, col("a").alias("b")._expr);
+  });
+
+  it("transform() applies the function to this column", () => {
+    const doubled = col("a").transform((c) => c.multiply(2));
+    assert.deepStrictEqual(doubled._expr, col("a").multiply(2)._expr);
+  });
+});
