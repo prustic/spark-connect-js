@@ -23,6 +23,12 @@
 import type { LogicalPlan, Expression } from "./logical-plan.js";
 import { UnsupportedOperationError } from "../errors.js";
 
+const CAST_EVAL_MODE_NAME = {
+  legacy: "EVAL_MODE_LEGACY",
+  ansi: "EVAL_MODE_ANSI",
+  try: "EVAL_MODE_TRY",
+} as const satisfies Record<string, string>;
+
 const MERGE_ACTION_TYPE_NAME = {
   delete: "ACTION_TYPE_DELETE",
   insert: "ACTION_TYPE_INSERT",
@@ -583,13 +589,32 @@ export class PlanBuilder {
           },
         };
 
-      case "cast":
-        return {
-          cast: {
-            expr: PlanBuilder.toExpression(expr.inner),
-            typeStr: expr.targetType,
-          },
+      case "cast": {
+        const cast: Record<string, unknown> = {
+          expr: PlanBuilder.toExpression(expr.inner),
+          typeStr: expr.targetType,
         };
+        if (expr.evalMode !== undefined) {
+          cast.evalMode = CAST_EVAL_MODE_NAME[expr.evalMode];
+        }
+
+        return { cast };
+      }
+
+      case "caseWhen": {
+        const args: Record<string, unknown>[] = [];
+        for (const branch of expr.branches) {
+          args.push(PlanBuilder.toExpression(branch.condition));
+          args.push(PlanBuilder.toExpression(branch.value));
+        }
+        if (expr.elseValue !== undefined) {
+          args.push(PlanBuilder.toExpression(expr.elseValue));
+        }
+
+        return {
+          unresolvedFunction: { functionName: "when", arguments: args, isDistinct: false },
+        };
+      }
 
       case "window": {
         const w: Record<string, unknown> = {

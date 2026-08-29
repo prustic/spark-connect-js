@@ -294,6 +294,49 @@ describe("PlanBuilder toExpression", () => {
     );
   });
 
+  it("cast carries the eval mode only when set", () => {
+    const inner = { type: "unresolvedAttribute" as const, name: "id" };
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "cast", inner, targetType: "int" }), {
+      cast: { expr: { unresolvedAttribute: { unparsedIdentifier: "id" } }, typeStr: "int" },
+    });
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "cast", inner, targetType: "int", evalMode: "try" }),
+      {
+        cast: {
+          expr: { unresolvedAttribute: { unparsedIdentifier: "id" } },
+          typeStr: "int",
+          evalMode: "EVAL_MODE_TRY",
+        },
+      },
+    );
+  });
+
+  it("caseWhen lowers to the when function", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "caseWhen",
+        branches: [
+          {
+            condition: { type: "unresolvedAttribute", name: "c" },
+            value: { type: "literal", value: "yes" },
+          },
+        ],
+        elseValue: { type: "literal", value: "no" },
+      }),
+      {
+        unresolvedFunction: {
+          functionName: "when",
+          arguments: [
+            { unresolvedAttribute: { unparsedIdentifier: "c" } },
+            { literal: { string: "yes" } },
+            { literal: { string: "no" } },
+          ],
+          isDistinct: false,
+        },
+      },
+    );
+  });
+
   it("mergeAction maps action type, condition, and assignments", () => {
     assert.deepStrictEqual(
       PlanBuilder.toExpression({

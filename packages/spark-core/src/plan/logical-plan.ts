@@ -51,8 +51,17 @@ export type Expression =
     }
   // SQL expression string (maps to Spark Connect's Expression.ExpressionString)
   | { type: "expressionString"; expression: string }
-  // Cast expression (maps to Spark Connect's Expression.Cast)
-  | { type: "cast"; inner: Expression; targetType: string }
+  // Cast expression (maps to Spark Connect's Expression.Cast). evalMode
+  // selects the failure behavior; "try" yields NULL where ANSI would throw.
+  | { type: "cast"; inner: Expression; targetType: string; evalMode?: "legacy" | "ansi" | "try" }
+  // CASE WHEN chain. Tracked structurally (not as an unresolvedFunction) so
+  // Column.when/otherwise can validate chain state client-side; lowered to
+  // UnresolvedFunction("when", ...) at serialization.
+  | {
+      type: "caseWhen";
+      branches: { condition: Expression; value: Expression }[];
+      elseValue?: Expression;
+    }
   // Window expression (maps to Spark Connect's Expression.Window)
   | {
       type: "window";

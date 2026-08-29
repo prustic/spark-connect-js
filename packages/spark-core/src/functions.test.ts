@@ -41,10 +41,10 @@ import {
 describe("when/otherwise", () => {
   it("builds a when expression with otherwise", () => {
     const result = when(col("age").gt(lit(18)), lit("adult")).otherwise(lit("child"));
-    assert.equal(result._expr.type, "unresolvedFunction");
-    if (result._expr.type === "unresolvedFunction") {
-      assert.equal(result._expr.name, "when");
-      assert.equal(result._expr.arguments.length, 3); // condition, value, otherwise
+    assert.equal(result._expr.type, "caseWhen");
+    if (result._expr.type === "caseWhen") {
+      assert.equal(result._expr.branches.length, 1);
+      assert.notEqual(result._expr.elseValue, undefined);
     }
   });
 
@@ -52,8 +52,9 @@ describe("when/otherwise", () => {
     const result = when(col("age").gt(lit(18)), lit("adult"))
       .when(col("age").gt(lit(12)), lit("teen"))
       .otherwise(lit("child"));
-    if (result._expr.type === "unresolvedFunction") {
-      assert.equal(result._expr.arguments.length, 5); // 2 pairs + otherwise
+    if (result._expr.type === "caseWhen") {
+      assert.equal(result._expr.branches.length, 2);
+      assert.notEqual(result._expr.elseValue, undefined);
     }
   });
 
