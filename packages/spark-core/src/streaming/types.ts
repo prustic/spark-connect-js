@@ -173,3 +173,51 @@ export interface StreamingQueryException {
   /** Server-side stack trace, preformatted as a single string. */
   stackTrace?: string;
 }
+
+/**
+ * Reshape the observed-metrics payload into the declared `Record<string, Row>`.
+ *
+ * The server sends each metric as a `{ values, schema }` wrapper rather than a
+ * row object, so without this the declared type silently lies and every field
+ * access yields `undefined`. Values are zipped against the schema field names.
+ * Payloads already in row form pass through unchanged.
+ *
+ * @internal
+ */
+export function normalizeProgress(progress: StreamingQueryProgress): StreamingQueryProgress {
+  const observed = progress.observedMetrics;
+  if (observed === undefined || observed === null) {
+    return progress;
+  }
+
+  const normalized: Record<string, Row> = {};
+  for (const [name, value] of Object.entries(observed)) {
+    normalized[name] = isMetricWrapper(value) ? metricToRow(value) : value;
+  }
+  progress.observedMetrics = normalized;
+
+  return progress;
+}
+
+interface MetricWrapper {
+  values: unknown[];
+  schema?: { fields?: { name?: string }[] };
+}
+
+function isMetricWrapper(value: unknown): value is MetricWrapper {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { values?: unknown }).values)
+  );
+}
+
+function metricToRow(wrapper: MetricWrapper): Row {
+  const fields = wrapper.schema?.fields ?? [];
+  const row: Row = {};
+  wrapper.values.forEach((value, i) => {
+    row[fields[i]?.name ?? `col_${String(i)}`] = value;
+  });
+
+  return row;
+}

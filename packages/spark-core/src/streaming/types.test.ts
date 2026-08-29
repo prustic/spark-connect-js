@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { totalInputRows, type StreamingQueryProgress } from "./types.js";
+import { totalInputRows, normalizeProgress, type StreamingQueryProgress } from "./types.js";
 
 // Captured from a live Spark 4.0 Connect server: windowed + watermarked rate
 // query in append mode, so eventTime, stateOperators, sources, and sink are
@@ -204,5 +204,41 @@ describe("StreamingQueryProgress shape, listener-bus path", () => {
 
   it("eventTime carries only the watermark before any data", () => {
     assert.deepStrictEqual(progress.eventTime, { watermark: "1970-01-01T00:00:00.000Z" });
+  });
+});
+
+describe("normalizeProgress observed metrics", () => {
+  it("reshapes the server's {values, schema} wrapper into a Row", () => {
+    const progress = normalizeProgress({
+      observedMetrics: {
+        m: {
+          values: [20, "x"],
+          schema: { type: "struct", fields: [{ name: "cnt" }, { name: "label" }] },
+        },
+      },
+    });
+
+    assert.deepStrictEqual(progress.observedMetrics, { m: { cnt: 20, label: "x" } });
+  });
+
+  it("leaves a payload that is already row-shaped untouched", () => {
+    const progress = normalizeProgress({
+      observedMetrics: { m: { cnt: 20 } },
+    });
+
+    assert.deepStrictEqual(progress.observedMetrics, { m: { cnt: 20 } });
+  });
+
+  it("falls back to positional names when the schema is absent", () => {
+    const progress = normalizeProgress({
+      observedMetrics: { m: { values: [1, 2] } },
+    });
+
+    assert.deepStrictEqual(progress.observedMetrics, { m: { col_0: 1, col_1: 2 } });
+  });
+
+  it("passes through a progress report with no observed metrics", () => {
+    const progress = normalizeProgress({ id: "q" });
+    assert.equal(progress.observedMetrics, undefined);
   });
 });

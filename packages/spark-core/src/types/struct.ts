@@ -86,7 +86,7 @@ export class StructType {
    */
   toDDL(): string {
     return this.fields
-      .map((f) => `${f.name} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
+      .map((f) => `${quoteIfNeeded(f.name)} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
       .join(", ");
   }
 
@@ -263,4 +263,31 @@ function unwrapKind(
     }
   }
   return undefined;
+}
+
+// Spark quotes an identifier unless it matches ^[a-zA-Z_][a-zA-Z0-9_]*$, and
+// escapes inner back-ticks by doubling them (QuotingUtils.quoteIfNeeded).
+// Checked character-wise rather than with a regex, since field names are
+// caller-supplied.
+function needsQuoting(name: string): boolean {
+  if (name.length === 0) {
+    return true;
+  }
+  for (let i = 0; i < name.length; i++) {
+    const c = name[i];
+    const isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
+    const isDigit = c >= "0" && c <= "9";
+    if (isLetter || c === "_" || (isDigit && i > 0)) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+/** @internal */
+export function quoteIfNeeded(name: string): string {
+  return needsQuoting(name) ? `\`${name.replaceAll("`", "``")}\`` : name;
 }

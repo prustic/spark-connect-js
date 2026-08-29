@@ -361,6 +361,15 @@ export class SparkSession {
             "or pass `arrowEncoder` in SparkSessionConfig.",
         );
       }
+      // Rows are encoded nullable unless a StructType carries nullability, so a
+      // DDL string's NOT NULL always loses to the encoded data and the server
+      // rejects it naming a positional column instead of the user's.
+      if (typeof schema === "string" && containsNotNull(schema)) {
+        throw new InvalidInputError(
+          "createDataFrame([...]): a DDL string cannot apply NOT NULL to encoded rows. " +
+            "Pass a StructType instead, which carries per-field nullability into the data.",
+        );
+      }
       if (structSchema !== undefined && input.length > 0) {
         validateRowsAgainstSchema(input, structSchema);
       }
@@ -864,4 +873,21 @@ export class DataFrameReader {
   text(path: string): DataFrame {
     return this.format("text").load(path);
   }
+}
+
+// Scanned rather than parsed: enough to catch the NOT NULL a DDL string cannot
+// deliver on the encoded-rows path, without pulling in a DDL parser.
+function containsNotNull(ddl: string): boolean {
+  const lower = ddl.toLowerCase();
+  for (let i = lower.indexOf("not"); i !== -1; i = lower.indexOf("not", i + 1)) {
+    let j = i + 3;
+    while (j < lower.length && (lower[j] === " " || lower[j] === "\t" || lower[j] === "\n")) {
+      j++;
+    }
+    if (j > i + 3 && lower.startsWith("null", j)) {
+      return true;
+    }
+  }
+
+  return false;
 }
