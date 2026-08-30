@@ -1,5 +1,11 @@
 # @spark-connect-js/connect
 
+## 0.6.0
+
+### Minor Changes
+
+- [#129](https://github.com/prustic/spark-connect-js/pull/129) [`c700e57`](https://github.com/prustic/spark-connect-js/commit/c700e57886605892057d9492c048ae6ddb68c0a3) Thanks [@prustic](https://github.com/prustic)! - `DataFrame.mergeInto(table, condition)` returns a `MergeIntoWriter` for MERGE INTO with chainable `whenMatched`, `whenNotMatched`, and `whenNotMatchedBySource` clauses, each supporting update/insert/delete actions with optional conditions, plus `withSchemaEvolution()`. Merge and clause conditions accept a `Column` or a SQL string, and assignment keys are parsed as SQL expression strings, so nested fields like `"address.city"` work. `merge()` validates client-side that at least one clause action is defined and that `update`/`insert` assignment maps are non-empty.
+
 ## 0.5.1
 
 ### Patch Changes
