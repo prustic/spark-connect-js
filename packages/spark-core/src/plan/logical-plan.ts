@@ -145,6 +145,10 @@ export type LogicalPlan = (
   | StatApproxQuantilePlan
   | WatermarkPlan
   | CollectMetricsPlan
+  | TransposePlan
+  | LateralJoinPlan
+  | ToSchemaPlan
+  | StatSampleByPlan
 ) & {
   /**
    * Per-DataFrame identifier set by `DataFrame._fromPlan`. Surfaces as
@@ -237,7 +241,9 @@ export interface AggregatePlan {
   child: LogicalPlan;
   groupingExpressions: Expression[];
   aggregateExpressions: Expression[];
-  groupType?: "groupby" | "rollup" | "cube" | "pivot";
+  groupType?: "groupby" | "rollup" | "cube" | "pivot" | "groupingSets";
+  /** Column sets for GROUPING SETS; each inner array is one set. */
+  groupingSets?: Expression[][];
   pivot?: {
     col: Expression;
     values: Array<string | number | boolean | null>;
@@ -331,6 +337,8 @@ export interface DeduplicatePlan {
   child: LogicalPlan;
   columnNames?: string[];
   allColumnsAsKeys: boolean;
+  /** Bound deduplication state by the event-time watermark. */
+  withinWatermark?: boolean;
 }
 
 /**
@@ -690,4 +698,54 @@ export interface CollectMetricsPlan {
   name: string;
   /** Aggregate expressions to observe. */
   metrics: Expression[];
+}
+
+/**
+ * Transpose a DataFrame, turning column names into row values.
+ *
+ * - Spark Connect: Relation.Transpose { input, index_columns }
+ */
+export interface TransposePlan {
+  type: "transpose";
+  child: LogicalPlan;
+  /** The proto is repeated, but the server supports at most one. */
+  indexColumns: Expression[];
+}
+
+/**
+ * Join where the right side may reference columns of the left.
+ *
+ * - Spark Connect: Relation.LateralJoin { left, right, join_condition, join_type }
+ */
+export interface LateralJoinPlan {
+  type: "lateralJoin";
+  left: LogicalPlan;
+  right: LogicalPlan;
+  condition?: Expression;
+  joinType: "inner" | "cross" | "left_outer";
+}
+
+/**
+ * Reconcile a DataFrame to the given schema, casting and reordering columns.
+ *
+ * - Spark Connect: Relation.ToSchema { input, schema }
+ */
+export interface ToSchemaPlan {
+  type: "toSchema";
+  child: LogicalPlan;
+  /** DDL string; the adapter wraps it as an unparsed DataType. */
+  schema: string;
+}
+
+/**
+ * Stratified sample without replacement.
+ *
+ * - Spark Connect: Relation.StatSampleBy { input, col, fractions, seed }
+ */
+export interface StatSampleByPlan {
+  type: "statSampleBy";
+  child: LogicalPlan;
+  col: Expression;
+  fractions: { stratum: string | number | boolean | bigint | null; fraction: number }[];
+  seed: bigint;
 }

@@ -22,19 +22,22 @@ import type { Expression } from "./plan/logical-plan.js";
 export class GroupedData {
   private readonly _df: DataFrame;
   private readonly _groupExprs: Expression[];
-  private readonly _groupType: "groupby" | "rollup" | "cube" | "pivot";
+  private readonly _groupType: "groupby" | "rollup" | "cube" | "pivot" | "groupingSets";
   private readonly _pivot?: { col: Expression; values: Array<string | number | boolean | null> };
+  private readonly _groupingSets?: Expression[][];
 
   constructor(
     df: DataFrame,
     groupExprs: Expression[],
-    groupType: "groupby" | "rollup" | "cube" | "pivot" = "groupby",
+    groupType: "groupby" | "rollup" | "cube" | "pivot" | "groupingSets" = "groupby",
     pivot?: { col: Expression; values: Array<string | number | boolean | null> },
+    groupingSets?: Expression[][],
   ) {
     this._df = df;
     this._groupExprs = [...groupExprs];
     this._groupType = groupType;
     this._pivot = pivot;
+    this._groupingSets = groupingSets?.map((set) => [...set]);
   }
 
   /**
@@ -58,6 +61,7 @@ export class GroupedData {
       aggregateExpressions: aggExprs,
       groupType: this._groupType,
       pivot: this._pivot,
+      groupingSets: this._groupingSets,
     });
   }
 

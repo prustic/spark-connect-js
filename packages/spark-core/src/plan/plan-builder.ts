@@ -108,6 +108,7 @@ export class PlanBuilder {
           rollup: "GROUP_TYPE_ROLLUP",
           cube: "GROUP_TYPE_CUBE",
           pivot: "GROUP_TYPE_PIVOT",
+          groupingSets: "GROUP_TYPE_GROUPING_SETS",
         };
         const aggregate: Record<string, unknown> = {
           input: PlanBuilder.toRelation(plan.child),
@@ -115,6 +116,11 @@ export class PlanBuilder {
           groupingExpressions: plan.groupingExpressions.map((e) => PlanBuilder.toExpression(e)),
           aggregateExpressions: plan.aggregateExpressions.map((e) => PlanBuilder.toExpression(e)),
         };
+        if (plan.groupingSets) {
+          aggregate.groupingSets = plan.groupingSets.map((set) => ({
+            groupingSet: set.map((e) => PlanBuilder.toExpression(e)),
+          }));
+        }
         if (plan.pivot) {
           aggregate.pivot = {
             col: PlanBuilder.toExpression(plan.pivot.col),
@@ -180,6 +186,7 @@ export class PlanBuilder {
             input: PlanBuilder.toRelation(plan.child),
             columnNames: plan.columnNames ?? [],
             allColumnsAsKeys: plan.allColumnsAsKeys,
+            ...(plan.withinWatermark !== undefined && { withinWatermark: plan.withinWatermark }),
           },
         };
 
@@ -499,6 +506,48 @@ export class PlanBuilder {
             input: PlanBuilder.toRelation(plan.child),
             name: plan.name,
             metrics: plan.metrics.map((m) => PlanBuilder.toExpression(m)),
+          },
+        };
+
+      case "transpose":
+        return {
+          transpose: {
+            input: PlanBuilder.toRelation(plan.child),
+            indexColumns: plan.indexColumns.map((e) => PlanBuilder.toExpression(e)),
+          },
+        };
+
+      case "lateralJoin": {
+        const lateral: Record<string, unknown> = {
+          left: PlanBuilder.toRelation(plan.left),
+          right: PlanBuilder.toRelation(plan.right),
+          joinType: plan.joinType,
+        };
+        if (plan.condition) {
+          lateral.joinCondition = PlanBuilder.toExpression(plan.condition);
+        }
+
+        return { lateralJoin: lateral };
+      }
+
+      case "toSchema":
+        return {
+          toSchema: {
+            input: PlanBuilder.toRelation(plan.child),
+            schema: { unparsed: { dataTypeString: plan.schema } },
+          },
+        };
+
+      case "statSampleBy":
+        return {
+          sampleBy: {
+            input: PlanBuilder.toRelation(plan.child),
+            col: PlanBuilder.toExpression(plan.col),
+            fractions: plan.fractions.map((f) => ({
+              stratum: PlanBuilder.toExpression({ type: "literal", value: f.stratum }),
+              fraction: f.fraction,
+            })),
+            seed: plan.seed,
           },
         };
 

@@ -1659,3 +1659,94 @@ describe("DataFrameReader.text()", () => {
     }
   });
 });
+
+describe("DataFrame relation methods", () => {
+  it("transpose() carries at most one index column", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const withIndex = df.transpose("a")._plan;
+    assert.equal(withIndex.type, "transpose");
+    if (withIndex.type === "transpose") {
+      assert.equal(withIndex.indexColumns.length, 1);
+    }
+    const bare = df.transpose()._plan;
+    if (bare.type === "transpose") {
+      assert.deepEqual(bare.indexColumns, []);
+    }
+  });
+
+  it("lateralJoin() threads the condition and join type", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const plan = df.lateralJoin(df, col("a").eq(col("b")), "left_outer")._plan;
+    assert.equal(plan.type, "lateralJoin");
+    if (plan.type === "lateralJoin") {
+      assert.equal(plan.joinType, "left_outer");
+      assert.notEqual(plan.condition, undefined);
+    }
+    assert.throws(() => df.lateralJoin(df, 42 as unknown as Column), InvalidInputError);
+  });
+
+  it("to() renders a StructType to DDL and rejects an empty schema", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const plan = df.to(new StructType().add("a", "int"))._plan;
+    if (plan.type === "toSchema") {
+      assert.equal(plan.schema, "a int");
+    }
+    assert.equal((df.to("a int, b string")._plan as { schema?: string }).schema, "a int, b string");
+    assert.throws(() => df.to("   "), InvalidInputError);
+  });
+
+  it("dropDuplicatesWithinWatermark() sets the watermark flag", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const named = df.dropDuplicatesWithinWatermark("a")._plan;
+    assert.equal(named.type, "deduplicate");
+    if (named.type === "deduplicate") {
+      assert.equal(named.withinWatermark, true);
+      assert.deepEqual(named.columnNames, ["a"]);
+      assert.equal(named.allColumnsAsKeys, false);
+    }
+    const bare = df.dropDuplicatesWithinWatermark()._plan;
+    if (bare.type === "deduplicate") {
+      assert.equal(bare.allColumnsAsKeys, true);
+    }
+  });
+
+  it("groupingSets() sets the group type and carries each set", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const plan = df
+      .groupingSets([[col("a"), col("b")], [col("a")], []], col("a"), col("b"))
+      .count()._plan;
+    assert.equal(plan.type, "aggregate");
+    if (plan.type === "aggregate") {
+      assert.equal(plan.groupType, "groupingSets");
+      assert.deepEqual(
+        plan.groupingSets?.map((s) => s.length),
+        [2, 1, 0],
+      );
+    }
+    assert.throws(() => df.groupingSets([], col("a")), InvalidInputError);
+  });
+
+  it("sampleBy() normalizes fractions and always sends a seed", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const plan = df.sampleBy("a", { x: 0.5 }, 42)._plan;
+    assert.equal(plan.type, "statSampleBy");
+    if (plan.type === "statSampleBy") {
+      assert.equal(plan.seed, 42n);
+      assert.deepEqual(plan.fractions, [{ stratum: "x", fraction: 0.5 }]);
+    }
+    // A Map carries strata that are not strings.
+    const mapped = df.sampleBy("a", new Map([[1n, 0.5]]))._plan;
+    if (mapped.type === "statSampleBy") {
+      assert.equal(mapped.fractions[0].stratum, 1n);
+      assert.ok(mapped.seed > 0n, "a seed is generated when omitted");
+    }
+    assert.throws(() => df.sampleBy("a", {}), InvalidInputError);
+    assert.throws(() => df.sampleBy("a", { x: 2 }), InvalidInputError);
+  });
+});

@@ -116,10 +116,23 @@ import {
   Aggregate_PivotSchema,
   WithWatermarkSchema,
   CollectMetricsSchema,
+  TransposeSchema,
+  LateralJoinSchema,
+  ToSchemaSchema,
+  StatSampleBySchema,
+  StatSampleBy_FractionSchema,
+  Aggregate_GroupingSetsSchema,
   MergeActionSchema,
   MergeAction_AssignmentSchema,
   MergeAction_ActionType,
 } from "@spark-connect-js/connect";
+
+// LateralJoin accepts only these three; the analyzer rejects the rest.
+const LATERAL_JOIN_TYPE_MAP = {
+  inner: Join_JoinType.INNER,
+  cross: Join_JoinType.CROSS,
+  left_outer: Join_JoinType.LEFT_OUTER,
+} as const satisfies Record<string, Join_JoinType>;
 
 /** Maps our expression type names to Spark's internal function names. */
 const OPERATOR_FN: Record<string, string> = {
@@ -236,6 +249,7 @@ function buildRelationInner(plan: LogicalPlan): Relation {
         rollup: Aggregate_GroupType.ROLLUP,
         cube: Aggregate_GroupType.CUBE,
         pivot: Aggregate_GroupType.PIVOT,
+        groupingSets: Aggregate_GroupType.GROUPING_SETS,
       };
       const aggValue = create(AggregateSchema, {
         input: buildRelation(plan.child),
@@ -243,6 +257,11 @@ function buildRelationInner(plan: LogicalPlan): Relation {
         groupingExpressions: plan.groupingExpressions.map(buildExpression),
         aggregateExpressions: plan.aggregateExpressions.map(buildExpression),
       });
+      if (plan.groupingSets) {
+        aggValue.groupingSets = plan.groupingSets.map((set) =>
+          create(Aggregate_GroupingSetsSchema, { groupingSet: set.map(buildExpression) }),
+        );
+      }
       if (plan.pivot) {
         aggValue.pivot = create(Aggregate_PivotSchema, {
           col: buildExpression(plan.pivot.col),
@@ -335,6 +354,7 @@ function buildRelationInner(plan: LogicalPlan): Relation {
             input: buildRelation(plan.child),
             columnNames: plan.columnNames ?? [],
             allColumnsAsKeys: plan.allColumnsAsKeys,
+            ...(plan.withinWatermark !== undefined && { withinWatermark: plan.withinWatermark }),
           }),
         },
       });
@@ -869,6 +889,66 @@ function buildRelationInner(plan: LogicalPlan): Relation {
         },
       });
 
+    case "transpose":
+      return create(RelationSchema, {
+        relType: {
+          case: "transpose",
+          value: create(TransposeSchema, {
+            input: buildRelation(plan.child),
+            indexColumns: plan.indexColumns.map((e) => buildExpression(e)),
+          }),
+        },
+      });
+
+    case "lateralJoin":
+      return create(RelationSchema, {
+        relType: {
+          case: "lateralJoin",
+          value: create(LateralJoinSchema, {
+            left: buildRelation(plan.left),
+            right: buildRelation(plan.right),
+            joinType: LATERAL_JOIN_TYPE_MAP[plan.joinType],
+            ...(plan.condition !== undefined && {
+              joinCondition: buildExpression(plan.condition),
+            }),
+          }),
+        },
+      });
+
+    case "toSchema":
+      return create(RelationSchema, {
+        relType: {
+          case: "toSchema",
+          value: create(ToSchemaSchema, {
+            input: buildRelation(plan.child),
+            schema: create(DataTypeSchema, {
+              kind: {
+                case: "unparsed",
+                value: create(DataType_UnparsedSchema, { dataTypeString: plan.schema }),
+              },
+            }),
+          }),
+        },
+      });
+
+    case "statSampleBy":
+      return create(RelationSchema, {
+        relType: {
+          case: "sampleBy",
+          value: create(StatSampleBySchema, {
+            input: buildRelation(plan.child),
+            col: buildExpression(plan.col),
+            fractions: plan.fractions.map((f) =>
+              create(StatSampleBy_FractionSchema, {
+                stratum: buildLiteral(f.stratum),
+                fraction: f.fraction,
+              }),
+            ),
+            seed: plan.seed,
+          }),
+        },
+      });
+
     default: {
       const _exhaustive: never = plan;
       throw new UnsupportedOperationError(
@@ -881,7 +961,7 @@ function buildRelationInner(plan: LogicalPlan): Relation {
 /**
  * Convert a JS primitive to an Expression_Literal proto message.
  */
-function buildLiteral(value: string | number | boolean | null) {
+function buildLiteral(value: string | number | boolean | bigint | null) {
   if (value === null) {
     return create(Expression_LiteralSchema, {
       literalType: {
@@ -900,6 +980,11 @@ function buildLiteral(value: string | number | boolean | null) {
   if (typeof value === "boolean") {
     return create(Expression_LiteralSchema, {
       literalType: { case: "boolean", value },
+    });
+  }
+  if (typeof value === "bigint") {
+    return create(Expression_LiteralSchema, {
+      literalType: { case: "long", value },
     });
   }
   if (Number.isInteger(value) && Number.isSafeInteger(value)) {

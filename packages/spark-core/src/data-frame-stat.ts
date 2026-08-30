@@ -1,4 +1,6 @@
 import { DataFrame } from "./data-frame.js";
+import { Column, col as _col } from "./column.js";
+import { InvalidInputError } from "./errors.js";
 
 /**
  * Statistical and approximate-query operations on a {@link DataFrame}.
@@ -71,6 +73,45 @@ export class DataFrameStat {
       cols,
       probabilities,
       relativeError,
+    });
+  }
+
+  /**
+   * Stratified sample without replacement, taking `fractions[stratum]` of the
+   * rows in each stratum. Strata absent from the map are dropped.
+   *
+   * @param col - The column defining the strata.
+   * @param fractions - Sampling fraction per stratum. Use a `Map` for strata
+   * that are not strings.
+   * @param seed - Optional seed; a random one is used when omitted.
+   *
+   * @see [Spark source: DataFrameStatFunctions.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/DataFrameStatFunctions.scala)
+   */
+  sampleBy(
+    col: Column | string,
+    fractions: Record<string, number> | Map<string | number | boolean | bigint | null, number>,
+    seed?: number,
+  ): DataFrame {
+    const entries = fractions instanceof Map ? [...fractions.entries()] : Object.entries(fractions);
+    if (entries.length === 0) {
+      throw new InvalidInputError("sampleBy() requires at least one stratum fraction.");
+    }
+    for (const [stratum, fraction] of entries) {
+      if (typeof fraction !== "number" || fraction < 0 || fraction > 1) {
+        throw new InvalidInputError(
+          `sampleBy() fraction for stratum ${String(stratum)} must be between 0 and 1.`,
+        );
+      }
+    }
+
+    return DataFrame._fromPlan(this._df._session, {
+      type: "statSampleBy",
+      child: this._df._plan,
+      col: (typeof col === "string" ? _col(col) : col)._expr,
+      fractions: entries.map(([stratum, fraction]) => ({ stratum, fraction })),
+      // The proto marks seed optional, but the server treats an absent seed as
+      // zero, which makes repeated samples identical (SPARK-48184).
+      seed: seed === undefined ? BigInt(Math.floor(Math.random() * 2 ** 31)) : BigInt(seed),
     });
   }
 }
