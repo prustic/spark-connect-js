@@ -265,24 +265,11 @@ function unwrapKind(
   return undefined;
 }
 
-// Mirrors Spark's QuotingUtils.quoteIfNeeded. Scanned rather than matched with
-// a pattern, so caller-supplied names never reach a regex engine.
+// Mirrors Spark's QuotingUtils.quoteIfNeeded, which compiles this same pattern.
+const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 function needsQuoting(name: string): boolean {
-  if (name.length === 0) {
-    return true;
-  }
-  for (let i = 0; i < name.length; i++) {
-    const c = name[i];
-    const isLetter = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
-    const isDigit = c >= "0" && c <= "9";
-    if (isLetter || c === "_" || (isDigit && i > 0)) {
-      continue;
-    }
-
-    return true;
-  }
-
-  return false;
+  return !VALID_IDENTIFIER.test(name);
 }
 
 /** @internal */
