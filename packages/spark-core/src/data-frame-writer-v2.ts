@@ -1,5 +1,7 @@
 import type { DataFrame } from "./data-frame.js";
 import type { Column } from "./column.js";
+import { toColumnCondition } from "./column.js";
+import { InvalidInputError } from "./errors.js";
 import type { Expression } from "./plan/logical-plan.js";
 
 /**
@@ -134,10 +136,15 @@ export class DataFrameWriterV2 {
    * Rows in the table that match the condition are replaced; others are kept.
    */
   async overwrite(condition: Column): Promise<void> {
+    const cond = toColumnCondition(condition, "overwrite()");
+    if (cond === undefined) {
+      throw new InvalidInputError("overwrite() requires a condition.");
+    }
+
     await this._df._session._executeCommand({
       ...this._commandFields(),
       mode: "overwrite",
-      overwriteCondition: condition._expr,
+      overwriteCondition: cond._expr,
     });
   }
 

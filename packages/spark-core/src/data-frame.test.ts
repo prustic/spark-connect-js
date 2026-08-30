@@ -219,6 +219,30 @@ describe("DataFrame transformations (lazy)", () => {
     assert.throws(() => df.filter("   "), InvalidInputError);
   });
 
+  it("where() reports its own name, not filter()", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM t").where(undefined as unknown as Column),
+      (err: unknown) => err instanceof InvalidInputError && /where\(\)/.test(err.message),
+    );
+  });
+
+  it("join() rejects a non-Column condition instead of widening to a cartesian product", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.throws(
+      () => df.join(df, 42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /join\(\) condition must be a Column/.test(err.message),
+    );
+    // An omitted condition stays legal: that is an intentional cross join.
+    const crossed = df.join(df);
+    assert.equal(crossed._plan.type, "join");
+    if (crossed._plan.type === "join") {
+      assert.equal(crossed._plan.condition, undefined);
+    }
+  });
+
   it("where() with a SQL predicate string works the same as filter(string)", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t").where("x >= 10");
