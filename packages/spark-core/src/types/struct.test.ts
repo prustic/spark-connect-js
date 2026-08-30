@@ -289,3 +289,24 @@ describe("StructType", () => {
     assert.equal(sf.metadata.key, "val"); // unaffected
   });
 });
+
+describe("StructType.toDDL identifier quoting", () => {
+  it("quotes only names that are not plain identifiers", () => {
+    const schema = new StructType()
+      .add("ok_1", "int")
+      .add("_x", "int")
+      .add("a b", "int")
+      .add("c.d", "string")
+      .add("1bad", "int");
+
+    assert.equal(schema.toDDL(), "ok_1 int, _x int, `a b` int, `c.d` string, `1bad` int");
+  });
+
+  it("escapes an inner back-tick by doubling it", () => {
+    assert.equal(new StructType().add("e`f", "int").toDDL(), "`e``f` int");
+  });
+
+  it("keeps NOT NULL after the quoted name", () => {
+    assert.equal(new StructType().add("a b", "int", false).toDDL(), "`a b` int NOT NULL");
+  });
+});

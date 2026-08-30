@@ -309,6 +309,41 @@ describe("SparkSession.createDataFrame schema forwarding", () => {
     assert.throws(() => spark.createDataFrame([{ id: 1n }], new StructType()), InvalidInputError);
   });
 
+  it("rejects a NOT NULL DDL string on the rows path, pointing at StructType", () => {
+    const { spark, calls } = sessionWithEncoder();
+    assert.throws(
+      () => spark.createDataFrame([{ id: 1n }], "id BIGINT NOT NULL"),
+      (err: unknown) =>
+        err instanceof InvalidInputError &&
+        /cannot apply NOT NULL/.test(err.message) &&
+        /StructType/.test(err.message),
+    );
+    assert.equal(calls.length, 0);
+    assert.doesNotThrow(() => spark.createDataFrame([{ id: 1n }], "id BIGINT"));
+  });
+
+  it("does not mistake quoted text for a NOT NULL constraint", () => {
+    const { spark } = sessionWithEncoder();
+    // A comment, and a field literally named `not null` — which is toDDL()'s
+    // own output, so the library must accept what it emits.
+    assert.doesNotThrow(() => spark.createDataFrame([{ id: 1n }], "id INT COMMENT 'not null'"));
+    assert.doesNotThrow(() =>
+      spark.createDataFrame([{ id: 1n }], new StructType().add("not null", "int").toDDL()),
+    );
+    // A real constraint outside quotes is still caught.
+    assert.throws(
+      () => spark.createDataFrame([{ id: 1n }], "id INT COMMENT 'x', b INT NOT NULL"),
+      InvalidInputError,
+    );
+  });
+
+  it("still allows NOT NULL DDL with caller-supplied Arrow bytes", () => {
+    const { spark } = sessionWithEncoder();
+    const notFile = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    const df = spark.createDataFrame(notFile, "id BIGINT NOT NULL");
+    assert.equal((df._plan as { schema?: string }).schema, "id BIGINT NOT NULL");
+  });
+
   it("rejects an empty DDL string like the readers do", () => {
     const { spark } = sessionWithEncoder();
     assert.throws(() => spark.createDataFrame([{ id: 1n }], "  "), InvalidInputError);

@@ -1,5 +1,6 @@
 import type { SparkSession } from "../spark-session.js";
 import type { StreamingQueryProgress } from "./types.js";
+import { normalizeProgress } from "./types.js";
 
 /** Fired when a streaming query is launched. */
 export interface QueryStartedEvent {
@@ -192,7 +193,8 @@ export class StreamingQueryListenerBus {
       const wrapper = safeParse<{ progress?: StreamingQueryProgress }>(eventJson);
       const progress = wrapper?.progress;
       if (progress !== undefined) {
-        await this._dispatch((l) => l.onQueryProgress?.(progress));
+        const normalized = normalizeProgress(progress);
+        await this._dispatch((l) => l.onQueryProgress?.(normalized));
       }
       return;
     }

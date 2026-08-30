@@ -361,6 +361,15 @@ export class SparkSession {
             "or pass `arrowEncoder` in SparkSessionConfig.",
         );
       }
+      // Rows are encoded nullable unless a StructType carries nullability, so a
+      // DDL string's NOT NULL always loses to the encoded data and the server
+      // rejects it naming a positional column instead of the user's.
+      if (typeof schema === "string" && containsNotNull(schema)) {
+        throw new InvalidInputError(
+          "createDataFrame([...]): a DDL string cannot apply NOT NULL to encoded rows. " +
+            "Pass a StructType instead, which carries per-field nullability into the data.",
+        );
+      }
       if (structSchema !== undefined && input.length > 0) {
         validateRowsAgainstSchema(input, structSchema);
       }
@@ -864,4 +873,57 @@ export class DataFrameReader {
   text(path: string): DataFrame {
     return this.format("text").load(path);
   }
+}
+
+// Scanned rather than parsed: enough to catch the NOT NULL a DDL string cannot
+// deliver on the encoded-rows path, without pulling in a DDL parser. Quoted
+// regions are skipped, so a comment or a field named `not null` (which toDDL
+// itself emits) is not mistaken for the constraint.
+function containsNotNull(ddl: string): boolean {
+  const lower = ddl.toLowerCase();
+  let i = 0;
+  while (i < lower.length) {
+    const c = lower[i];
+    if (c === "`" || c === "'" || c === '"') {
+      i = skipQuoted(lower, i);
+      continue;
+    }
+    if (lower.startsWith("not", i) && !isWordChar(lower[i - 1])) {
+      let j = i + 3;
+      while (j < lower.length && (lower[j] === " " || lower[j] === "\t" || lower[j] === "\n")) {
+        j++;
+      }
+      if (j > i + 3 && lower.startsWith("null", j) && !isWordChar(lower[j + 4])) {
+        return true;
+      }
+    }
+    i++;
+  }
+
+  return false;
+}
+
+// SQL escapes a quote by doubling it, inside both identifiers and literals.
+function skipQuoted(s: string, start: number): number {
+  const quote = s[start];
+  for (let i = start + 1; i < s.length; i++) {
+    if (s[i] === quote) {
+      if (s[i + 1] === quote) {
+        i++;
+        continue;
+      }
+
+      return i + 1;
+    }
+  }
+
+  return s.length;
+}
+
+function isWordChar(c: string | undefined): boolean {
+  if (c === undefined) {
+    return false;
+  }
+
+  return (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c === "_";
 }

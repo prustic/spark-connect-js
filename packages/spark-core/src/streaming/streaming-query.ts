@@ -5,6 +5,7 @@ import type {
   StreamingQueryProgress,
   StreamingQueryStatus,
 } from "./types.js";
+import { normalizeProgress } from "./types.js";
 
 /**
  * Decoded `StreamingQueryCommandResult` payload as the transport hands it
@@ -193,7 +194,7 @@ export class StreamingQuery {
  */
 function parseProgress(json: string, op: string): StreamingQueryProgress {
   try {
-    return JSON.parse(json) as StreamingQueryProgress;
+    return normalizeProgress(JSON.parse(json) as StreamingQueryProgress);
   } catch (cause) {
     throw new SparkClientError(
       `StreamingQuery.${op}: server returned a progress report that is not valid JSON: ${json}`,

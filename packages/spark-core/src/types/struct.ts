@@ -81,12 +81,16 @@ export class StructType {
   }
 
   /**
-   * Return a DDL-formatted schema string, e.g. "name string, age integer".
-   * Compatible with DataFrameReader.schema().
+   * Return a DDL-formatted schema string, e.g. `"name string, age integer"`.
+   * Field names that are not plain identifiers are back-tick quoted.
+   *
+   * Compatible with `DataFrameReader.schema()`. Non-nullable fields render as
+   * `NOT NULL`, which `createDataFrame(rows, ddl)` rejects because encoded rows
+   * are always nullable. Pass the {@link StructType} there instead.
    */
   toDDL(): string {
     return this.fields
-      .map((f) => `${f.name} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
+      .map((f) => `${quoteIfNeeded(f.name)} ${f.dataType}${f.nullable ? "" : " NOT NULL"}`)
       .join(", ");
   }
 
@@ -263,4 +267,17 @@ function unwrapKind(
     }
   }
   return undefined;
+}
+
+// Mirrors Spark 4.x QuotingUtils.quoteIfNeeded. SPARK-47300 added the rule in
+// 4.0, so 3.5 leaves a leading-digit name bare.
+const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function needsQuoting(name: string): boolean {
+  return !VALID_IDENTIFIER.test(name);
+}
+
+/** @internal */
+export function quoteIfNeeded(name: string): string {
+  return needsQuoting(name) ? `\`${name.replaceAll("`", "``")}\`` : name;
 }

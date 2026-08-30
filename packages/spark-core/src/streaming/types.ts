@@ -173,3 +173,59 @@ export interface StreamingQueryException {
   /** Server-side stack trace, preformatted as a single string. */
   stackTrace?: string;
 }
+
+/**
+ * Reshape the observed-metrics payload into the declared `Record<string, Row>`.
+ *
+ * The server sends each metric as a `{ values, schema }` wrapper rather than a
+ * row object, so without this the declared type silently lies and every field
+ * access yields `undefined`. Values are zipped against the schema field names.
+ * Payloads already in row form pass through unchanged.
+ *
+ * @internal
+ */
+export function normalizeProgress(progress: StreamingQueryProgress): StreamingQueryProgress {
+  const observed = progress.observedMetrics;
+  if (observed === undefined || observed === null) {
+    return progress;
+  }
+
+  const normalized: Record<string, Row> = {};
+  for (const [name, value] of Object.entries(observed)) {
+    normalized[name] = isMetricWrapper(value) ? metricToRow(value) : value;
+  }
+  progress.observedMetrics = normalized;
+
+  return progress;
+}
+
+interface MetricWrapper {
+  values: unknown[];
+  schema: { fields: { name?: string }[] };
+}
+
+// Both halves are required to discriminate: a metric row may legitimately have
+// a column named `values` holding an array, and rewriting that would drop its
+// siblings. Anything unrecognized is left alone.
+function isMetricWrapper(value: unknown): value is MetricWrapper {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as { values?: unknown; schema?: { fields?: unknown } };
+
+  return (
+    Array.isArray(candidate.values) &&
+    typeof candidate.schema === "object" &&
+    candidate.schema !== null &&
+    Array.isArray(candidate.schema.fields)
+  );
+}
+
+function metricToRow(wrapper: MetricWrapper): Row {
+  const row: Row = {};
+  wrapper.values.forEach((value, i) => {
+    row[wrapper.schema.fields[i]?.name ?? `col_${String(i)}`] = value;
+  });
+
+  return row;
+}
