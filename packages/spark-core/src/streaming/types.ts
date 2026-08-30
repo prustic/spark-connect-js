@@ -201,22 +201,30 @@ export function normalizeProgress(progress: StreamingQueryProgress): StreamingQu
 
 interface MetricWrapper {
   values: unknown[];
-  schema?: { fields?: { name?: string }[] };
+  schema: { fields: { name?: string }[] };
 }
 
+// Both halves are required to discriminate: a metric row may legitimately have
+// a column named `values` holding an array, and rewriting that would drop its
+// siblings. Anything unrecognized is left alone.
 function isMetricWrapper(value: unknown): value is MetricWrapper {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const candidate = value as { values?: unknown; schema?: { fields?: unknown } };
+
   return (
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as { values?: unknown }).values)
+    Array.isArray(candidate.values) &&
+    typeof candidate.schema === "object" &&
+    candidate.schema !== null &&
+    Array.isArray(candidate.schema.fields)
   );
 }
 
 function metricToRow(wrapper: MetricWrapper): Row {
-  const fields = wrapper.schema?.fields ?? [];
   const row: Row = {};
   wrapper.values.forEach((value, i) => {
-    row[fields[i]?.name ?? `col_${String(i)}`] = value;
+    row[wrapper.schema.fields[i]?.name ?? `col_${String(i)}`] = value;
   });
 
   return row;

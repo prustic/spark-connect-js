@@ -229,12 +229,22 @@ describe("normalizeProgress observed metrics", () => {
     assert.deepStrictEqual(progress.observedMetrics, { m: { cnt: 20 } });
   });
 
-  it("falls back to positional names when the schema is absent", () => {
+  it("leaves a metric row that merely has a values column untouched", () => {
+    // A real observation can alias a collect_list to `values`; rewriting that
+    // would explode the array into positional keys and drop its siblings.
+    const progress = normalizeProgress({
+      observedMetrics: { m: { values: [37, 38, 39], n: 5 } },
+    });
+
+    assert.deepStrictEqual(progress.observedMetrics, { m: { values: [37, 38, 39], n: 5 } });
+  });
+
+  it("leaves a payload without schema fields untouched", () => {
     const progress = normalizeProgress({
       observedMetrics: { m: { values: [1, 2] } },
     });
 
-    assert.deepStrictEqual(progress.observedMetrics, { m: { col_0: 1, col_1: 2 } });
+    assert.deepStrictEqual(progress.observedMetrics, { m: { values: [1, 2] } });
   });
 
   it("passes through a progress report with no observed metrics", () => {

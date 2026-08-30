@@ -322,6 +322,21 @@ describe("SparkSession.createDataFrame schema forwarding", () => {
     assert.doesNotThrow(() => spark.createDataFrame([{ id: 1n }], "id BIGINT"));
   });
 
+  it("does not mistake quoted text for a NOT NULL constraint", () => {
+    const { spark } = sessionWithEncoder();
+    // A comment, and a field literally named `not null` — which is toDDL()'s
+    // own output, so the library must accept what it emits.
+    assert.doesNotThrow(() => spark.createDataFrame([{ id: 1n }], "id INT COMMENT 'not null'"));
+    assert.doesNotThrow(() =>
+      spark.createDataFrame([{ id: 1n }], new StructType().add("not null", "int").toDDL()),
+    );
+    // A real constraint outside quotes is still caught.
+    assert.throws(
+      () => spark.createDataFrame([{ id: 1n }], "id INT COMMENT 'x', b INT NOT NULL"),
+      InvalidInputError,
+    );
+  });
+
   it("still allows NOT NULL DDL with caller-supplied Arrow bytes", () => {
     const { spark } = sessionWithEncoder();
     const notFile = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00]);
