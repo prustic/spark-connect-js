@@ -829,3 +829,105 @@ describe("PlanBuilder toRelation", () => {
     assert.ok(collectMetrics.input);
   });
 });
+
+describe("PlanBuilder relation additions", () => {
+  const child = { type: "sql" as const, query: "SELECT 1" };
+
+  it("transpose carries the index columns", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toRelation({
+        type: "transpose",
+        child,
+        indexColumns: [{ type: "unresolvedAttribute", name: "k" }],
+      }),
+      {
+        transpose: {
+          input: { sql: { query: "SELECT 1" } },
+          indexColumns: [{ unresolvedAttribute: { unparsedIdentifier: "k" } }],
+        },
+      },
+    );
+  });
+
+  it("lateralJoin emits the join type and omits an absent condition", () => {
+    const withCond = PlanBuilder.toRelation({
+      type: "lateralJoin",
+      left: child,
+      right: child,
+      condition: { type: "expressionString", expression: "a = b" },
+      joinType: "left_outer",
+    }) as { lateralJoin: Record<string, unknown> };
+    assert.equal(withCond.lateralJoin["joinType"], "left_outer");
+    assert.notEqual(withCond.lateralJoin["joinCondition"], undefined);
+
+    const bare = PlanBuilder.toRelation({
+      type: "lateralJoin",
+      left: child,
+      right: child,
+      joinType: "inner",
+    }) as { lateralJoin: Record<string, unknown> };
+    assert.equal("joinCondition" in bare.lateralJoin, false);
+  });
+
+  it("toSchema wraps the DDL as an unparsed type", () => {
+    assert.deepStrictEqual(PlanBuilder.toRelation({ type: "toSchema", child, schema: "a int" }), {
+      toSchema: {
+        input: { sql: { query: "SELECT 1" } },
+        schema: { unparsed: { dataTypeString: "a int" } },
+      },
+    });
+  });
+
+  it("statSampleBy emits stratum literals and a serializable seed", () => {
+    const rel = PlanBuilder.toRelation({
+      type: "statSampleBy",
+      child,
+      col: { type: "unresolvedAttribute", name: "k" },
+      fractions: [{ stratum: "a", fraction: 0.5 }],
+      seed: 42,
+    });
+    assert.deepStrictEqual(rel, {
+      sampleBy: {
+        input: { sql: { query: "SELECT 1" } },
+        col: { unresolvedAttribute: { unparsedIdentifier: "k" } },
+        fractions: [{ stratum: { literal: { string: "a" } }, fraction: 0.5 }],
+        seed: 42,
+      },
+    });
+    // PlanBuilder's contract is a plain serializable object.
+    assert.doesNotThrow(() => JSON.stringify(rel));
+  });
+
+  it("aggregate emits the grouping-set group type and sets", () => {
+    const rel = PlanBuilder.toRelation({
+      type: "aggregate",
+      child,
+      groupingExpressions: [],
+      aggregateExpressions: [],
+      groupType: "groupingSets",
+      groupingSets: [[{ type: "unresolvedAttribute", name: "a" }], []],
+    }) as { aggregate: Record<string, unknown> };
+    assert.equal(rel.aggregate["groupType"], "GROUP_TYPE_GROUPING_SETS");
+    assert.deepStrictEqual(rel.aggregate["groupingSets"], [
+      { groupingSet: [{ unresolvedAttribute: { unparsedIdentifier: "a" } }] },
+      { groupingSet: [] },
+    ]);
+  });
+
+  it("deduplicate carries withinWatermark only when set", () => {
+    const withFlag = PlanBuilder.toRelation({
+      type: "deduplicate",
+      child,
+      allColumnsAsKeys: true,
+      withinWatermark: true,
+    }) as { deduplicate: Record<string, unknown> };
+    assert.equal(withFlag.deduplicate["withinWatermark"], true);
+
+    const without = PlanBuilder.toRelation({
+      type: "deduplicate",
+      child,
+      allColumnsAsKeys: true,
+    }) as { deduplicate: Record<string, unknown> };
+    assert.equal("withinWatermark" in without.deduplicate, false);
+  });
+});

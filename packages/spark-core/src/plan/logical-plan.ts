@@ -747,5 +747,5 @@ export interface StatSampleByPlan {
   child: LogicalPlan;
   col: Expression;
   fractions: { stratum: string | number | boolean | bigint | null; fraction: number }[];
-  seed: bigint;
+  seed: number;
 }

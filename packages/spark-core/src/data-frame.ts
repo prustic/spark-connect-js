@@ -2,11 +2,6 @@ import type { SparkSession } from "./spark-session.js";
 import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
 import { Column, col, toCondition, toColumnCondition } from "./column.js";
-
-/** Lift a column name to a Column, leaving Columns alone. */
-function toCol(c: Column | string): Column {
-  return typeof c === "string" ? col(c) : c;
-}
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
@@ -18,6 +13,11 @@ import { StructType } from "./types/struct.js";
 import type { Observation } from "./observation.js";
 import type { StorageLevel } from "./storage-level.js";
 import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
+
+/** Lift a column name to a Column, leaving Columns alone. */
+function toCol(c: Column | string): Column {
+  return typeof c === "string" ? col(c) : c;
+}
 
 /** Parse a string key into its actual typed value (for replace() Record keys). */
 function inferLiteralValue(s: string): string | number | boolean | null {
@@ -348,6 +348,10 @@ export class DataFrame<R extends Row = Row> {
    * Reconcile this DataFrame to the given schema, casting and reordering
    * columns to match. Columns absent from the schema are dropped.
    *
+   * The schema is sent as DDL, so field metadata does not survive and nested
+   * field nullability cannot be expressed. PySpark and Scala send a structured
+   * type here and do carry metadata over.
+   *
    * @param schema - A {@link StructType} or a DDL string.
    */
   to(schema: StructType | string): DataFrame {
@@ -371,7 +375,7 @@ export class DataFrame<R extends Row = Row> {
     col: Column | string,
     fractions: Record<string, number> | Map<string | number | boolean | bigint | null, number>,
     seed?: number,
-  ): DataFrame {
+  ): DataFrame<R> {
     return this.stat.sampleBy(col, fractions, seed);
   }
 
@@ -379,8 +383,8 @@ export class DataFrame<R extends Row = Row> {
    * Drop duplicate rows, bounding the state Spark keeps by the event-time
    * watermark. Requires `withWatermark` upstream.
    */
-  dropDuplicatesWithinWatermark(...columnNames: string[]): DataFrame {
-    return DataFrame._fromPlan(this._session, {
+  dropDuplicatesWithinWatermark(...columnNames: string[]): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
       type: "deduplicate",
       child: this._plan,
       columnNames: columnNames.length > 0 ? columnNames : undefined,
@@ -923,8 +927,8 @@ export class DataFrame<R extends Row = Row> {
   }
 
   /** Access statistical functions (corr, cov, crosstab, etc.). */
-  get stat(): DataFrameStat {
-    return new DataFrameStat(this);
+  get stat(): DataFrameStat<R> {
+    return new DataFrameStat<R>(this);
   }
 
   // Writer

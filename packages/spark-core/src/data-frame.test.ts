@@ -1691,9 +1691,8 @@ describe("DataFrame relation methods", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t");
     const plan = df.to(new StructType().add("a", "int"))._plan;
-    if (plan.type === "toSchema") {
-      assert.equal(plan.schema, "a int");
-    }
+    assert.ok(plan.type === "toSchema");
+    assert.equal(plan.schema, "a int");
     assert.equal((df.to("a int, b string")._plan as { schema?: string }).schema, "a int, b string");
     assert.throws(() => df.to("   "), InvalidInputError);
   });
@@ -1735,17 +1734,16 @@ describe("DataFrame relation methods", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t");
     const plan = df.sampleBy("a", { x: 0.5 }, 42)._plan;
-    assert.equal(plan.type, "statSampleBy");
-    if (plan.type === "statSampleBy") {
-      assert.equal(plan.seed, 42n);
-      assert.deepEqual(plan.fractions, [{ stratum: "x", fraction: 0.5 }]);
-    }
+    assert.ok(plan.type === "statSampleBy");
+    assert.equal(plan.seed, 42);
+    assert.deepEqual(plan.fractions, [{ stratum: "x", fraction: 0.5 }]);
+
     // A Map carries strata that are not strings.
     const mapped = df.sampleBy("a", new Map([[1n, 0.5]]))._plan;
-    if (mapped.type === "statSampleBy") {
-      assert.equal(mapped.fractions[0].stratum, 1n);
-      assert.ok(mapped.seed > 0n, "a seed is generated when omitted");
-    }
+    assert.ok(mapped.type === "statSampleBy");
+    assert.equal(mapped.fractions[0].stratum, 1n);
+    assert.ok(mapped.seed > 0, "a seed is generated when omitted");
+    assert.throws(() => df.sampleBy("a", { x: 0.5 }, 1.5), InvalidInputError);
     assert.throws(() => df.sampleBy("a", {}), InvalidInputError);
     assert.throws(() => df.sampleBy("a", { x: 2 }), InvalidInputError);
   });

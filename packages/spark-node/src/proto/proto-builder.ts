@@ -944,7 +944,7 @@ function buildRelationInner(plan: LogicalPlan): Relation {
                 fraction: f.fraction,
               }),
             ),
-            seed: plan.seed,
+            seed: BigInt(plan.seed),
           }),
         },
       });
