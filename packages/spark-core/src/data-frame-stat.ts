@@ -97,7 +97,7 @@ export class DataFrameStat {
       throw new InvalidInputError("sampleBy() requires at least one stratum fraction.");
     }
     for (const [stratum, fraction] of entries) {
-      if (typeof fraction !== "number" || fraction < 0 || fraction > 1) {
+      if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) {
         throw new InvalidInputError(
           `sampleBy() fraction for stratum ${String(stratum)} must be between 0 and 1.`,
         );
