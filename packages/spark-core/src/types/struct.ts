@@ -265,10 +265,8 @@ function unwrapKind(
   return undefined;
 }
 
-// Spark quotes an identifier unless it matches ^[a-zA-Z_][a-zA-Z0-9_]*$, and
-// escapes inner back-ticks by doubling them (QuotingUtils.quoteIfNeeded).
-// Checked character-wise rather than with a regex, since field names are
-// caller-supplied.
+// Mirrors Spark's QuotingUtils.quoteIfNeeded. Scanned rather than matched with
+// a pattern, so caller-supplied names never reach a regex engine.
 function needsQuoting(name: string): boolean {
   if (name.length === 0) {
     return true;
