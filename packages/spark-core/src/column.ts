@@ -26,6 +26,26 @@ function fnOf(name: string, ...args: Expression[]): Expression {
 }
 
 /**
+ * Validate a predicate argument that must be a Column. A string is rejected
+ * because Spark reads one in this position as a column name, not a predicate.
+ *
+ * @internal
+ */
+export function toColumnCondition(
+  condition: Column | undefined,
+  where: string,
+): Column | undefined {
+  if (condition === undefined) {
+    return undefined;
+  }
+  if (condition instanceof Column) {
+    return condition;
+  }
+
+  throw new InvalidInputError(`${where} condition must be a Column.`);
+}
+
+/**
  * Coerce a predicate argument to a Column, accepting a SQL string. Anything
  * else throws rather than reaching serialization, where a missing expression
  * surfaces as an opaque failure or, worse, a silently dropped condition.

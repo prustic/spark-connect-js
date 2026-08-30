@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
+import type { Column } from "./column.js";
+import { InvalidInputError } from "./errors.js";
 
 function mockCommandTransport() {
   const commandCalls: Record<string, unknown>[] = [];
@@ -167,5 +169,22 @@ describe("DataFrameWriterV2", () => {
     assert.equal((cmd.options as Record<string, string>)["fanout-enabled"], "true");
     assert.equal((cmd.tableProperties as Record<string, string>)["format-version"], "2");
     assert.equal((cmd.partitioningColumns as unknown[]).length, 1);
+  });
+});
+
+describe("DataFrameWriterV2 condition validation", () => {
+  it("overwrite() rejects a non-Column condition", async () => {
+    const transport = mockCommandTransport();
+    const spark = makeSession(transport);
+    await assert.rejects(
+      spark
+        .sql("SELECT 1")
+        .writeTo("t")
+        .overwrite(42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError &&
+        /overwrite\(\) condition must be a Column/.test(err.message),
+    );
+    assert.equal(transport.commandCalls.length, 0);
   });
 });

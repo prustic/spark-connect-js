@@ -1,8 +1,7 @@
 import type { SparkSession } from "./spark-session.js";
 import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js";
 import type { Row } from "./types/row.js";
-import { Column, col } from "./column.js";
-import { expr as sqlExpr } from "./functions/conditional.js";
+import { Column, col, toCondition, toColumnCondition } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
@@ -160,7 +159,11 @@ export class DataFrame<R extends Row = Row> {
    *   df.filter("status = 'active' AND region IN ('EU', 'US')");
    */
   filter(condition: Column | string): DataFrame<R> {
-    const cond = typeof condition === "string" ? sqlExpr(condition) : condition;
+    const cond = toCondition(condition, "filter()");
+    if (cond === undefined) {
+      throw new InvalidInputError("filter() requires a condition.");
+    }
+
     return DataFrame._fromPlan<R>(this._session, {
       type: "filter",
       child: this._plan,
@@ -170,7 +173,12 @@ export class DataFrame<R extends Row = Row> {
 
   /** Alias for filter(). */
   where(condition: Column | string): DataFrame<R> {
-    return this.filter(condition);
+    const cond = toCondition(condition, "where()");
+    if (cond === undefined) {
+      throw new InvalidInputError("where() requires a condition.");
+    }
+
+    return this.filter(cond);
   }
 
   /** Project (select) a subset of columns. */
@@ -279,11 +287,15 @@ export class DataFrame<R extends Row = Row> {
           "Use crossJoin() or join(other, undefined, 'cross') instead.",
       );
     }
+    // Unvalidated, a bad condition reads as absent and silently widens the
+    // join to a cartesian product rather than failing.
+    const cond = toColumnCondition(condition, "join()");
+
     return DataFrame._fromPlan(this._session, {
       type: "join",
       left: this._plan,
       right: other._plan,
-      condition: condition?._expr,
+      condition: cond?._expr,
       joinType,
     });
   }

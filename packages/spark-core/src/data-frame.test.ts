@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
-import { col, lit } from "./column.js";
+import { col, lit, type Column } from "./column.js";
 import { InvalidConfigError, InvalidInputError } from "./errors.js";
 import { StructType } from "./types/struct.js";
 import { Observation } from "./observation.js";
@@ -204,6 +204,42 @@ describe("DataFrame transformations (lazy)", () => {
       if (df._plan.condition.type === "expressionString") {
         assert.equal(df._plan.condition.expression, "x >= 10");
       }
+    }
+  });
+
+  it("filter() rejects a condition that is neither a Column nor a SQL string", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.throws(
+      () => df.filter(42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /must be a Column or a SQL string/.test(err.message),
+    );
+    assert.throws(() => df.where(undefined as unknown as Column), InvalidInputError);
+    assert.throws(() => df.filter("   "), InvalidInputError);
+  });
+
+  it("where() reports its own name, not filter()", () => {
+    const { spark } = createSession();
+    assert.throws(
+      () => spark.sql("SELECT * FROM t").where(undefined as unknown as Column),
+      (err: unknown) => err instanceof InvalidInputError && /where\(\)/.test(err.message),
+    );
+  });
+
+  it("join() rejects a non-Column condition instead of widening to a cartesian product", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.throws(
+      () => df.join(df, 42 as unknown as Column),
+      (err: unknown) =>
+        err instanceof InvalidInputError && /join\(\) condition must be a Column/.test(err.message),
+    );
+    // An omitted condition stays legal: that is an intentional cross join.
+    const crossed = df.join(df);
+    assert.equal(crossed._plan.type, "join");
+    if (crossed._plan.type === "join") {
+      assert.equal(crossed._plan.condition, undefined);
     }
   });
 
