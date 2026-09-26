@@ -1,6 +1,7 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
 import { ArrowDecoder } from "@spark-connect-js/node";
+import { Table, tableFromIPC } from "apache-arrow";
 import { spark, stopSession, tempPath } from "./setup.js";
 
 describe("DataFrame expression-level methods", () => {
@@ -35,6 +36,16 @@ describe("DataFrame expression-level methods", () => {
     const df = source();
     const decoded = await ArrowDecoder.decode(await df.toArrow());
     assert.deepEqual(decoded, await df.collect());
+  });
+
+  it("toArrow() over several batches decodes fully with the documented idiom", async () => {
+    const chunks = await spark().range(100_000).toArrow();
+    assert.ok(chunks.length > 1, `expected several IPC streams, got ${String(chunks.length)}`);
+
+    const table = new Table(chunks.flatMap((c) => tableFromIPC(c).batches));
+    assert.equal(table.numRows, 100_000);
+    // The trap the TSDoc warns about: the array form reads only the first stream.
+    assert.ok(tableFromIPC(chunks).numRows < 100_000);
   });
 
   it("metadataColumn('_metadata') exposes the source file of a parquet read", async () => {

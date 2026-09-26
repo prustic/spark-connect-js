@@ -179,7 +179,7 @@ export class DataFrame<R extends Row = Row> {
    * as `_metadata` on a file-based read.
    *
    * @example
-   *   df.select(df.metadataColumn("_metadata").getField("file_path"))
+   *   df.select(df.metadataColumn("_metadata"))
    */
   metadataColumn(colName: string): Column {
     requireName(colName, "metadataColumn()");
@@ -802,7 +802,10 @@ export class DataFrame<R extends Row = Row> {
 
   /**
    * Convert each row to a JSON string, in a single column named `value`.
-   * Returns a DataFrame, as PySpark's Connect client does.
+   * Null fields are omitted, as `to_json` does.
+   *
+   * Returns a DataFrame, following PySpark's Connect client on `master`. Its
+   * 4.0 release raises `NOT_IMPLEMENTED` for `toJSON` instead.
    */
   toJSON(): DataFrame<{ value: string }> {
     return this.select(to_json(struct(col("*"))).alias("value")).as<{ value: string }>();
@@ -1272,9 +1275,20 @@ export class DataFrame<R extends Row = Row> {
    * decoding it into rows.
    *
    * Each element is a complete Arrow IPC stream (schema plus record batches),
-   * so it can be read with `tableFromIPC` from `apache-arrow`. Unlike PySpark,
-   * which returns a `pyarrow.Table`, this returns bytes, since the core package
-   * has no Arrow dependency.
+   * one per server batch, so larger results arrive as several streams. Decode
+   * them together, since `tableFromIPC(chunks)` reads only the first stream and
+   * silently drops the rest.
+   *
+   * Unlike PySpark, which returns a `pyarrow.Table`, this returns bytes, since
+   * the core package has no Arrow dependency.
+   *
+   * @example
+   * ```ts
+   * import { Table, tableFromIPC } from "apache-arrow";
+   *
+   * const chunks = await df.toArrow();
+   * const table = new Table(chunks.flatMap((c) => tableFromIPC(c).batches));
+   * ```
    */
   async toArrow(): Promise<Uint8Array[]> {
     const chunks: Uint8Array[] = [];
