@@ -45,6 +45,8 @@ import {
   ExpressionSchema,
   Expression_LiteralSchema,
   Expression_UnresolvedAttributeSchema,
+  Expression_UnresolvedStarSchema,
+  Expression_UnresolvedRegexSchema,
   Expression_UnresolvedFunctionSchema,
   Expression_AliasSchema,
   Expression_SortOrderSchema,
@@ -340,6 +342,7 @@ function buildRelationInner(plan: LogicalPlan): Relation {
               create(Expression_AliasSchema, {
                 expr: buildExpression(a.expression),
                 name: [a.name],
+                ...(a.metadata !== undefined && { metadata: a.metadata }),
               }),
             ),
           }),
@@ -1063,6 +1066,29 @@ export function buildExpression(expr: CoreExpression): Expression {
           case: "unresolvedAttribute",
           value: create(Expression_UnresolvedAttributeSchema, {
             unparsedIdentifier: expr.name,
+            ...(expr.planId !== undefined && { planId: expr.planId }),
+            ...(expr.isMetadataColumn === true && { isMetadataColumn: true }),
+          }),
+        },
+      });
+
+    case "unresolvedStar":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "unresolvedStar",
+          value: create(Expression_UnresolvedStarSchema, {
+            ...(expr.target !== undefined && { unparsedTarget: expr.target }),
+            ...(expr.planId !== undefined && { planId: expr.planId }),
+          }),
+        },
+      });
+
+    case "unresolvedRegex":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "unresolvedRegex",
+          value: create(Expression_UnresolvedRegexSchema, {
+            colName: expr.colName,
             ...(expr.planId !== undefined && { planId: expr.planId }),
           }),
         },

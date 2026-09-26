@@ -568,8 +568,19 @@ export class Column {
  *
  * @param name - Column name; may be a simple identifier or a dotted path
  *   (for example `"address.city"`) to reference a nested struct field.
+ *   `"*"` selects every column and `"t.*"` every column of `t` or of the
+ *   struct `t`.
  */
 export function col(name: string): Column {
+  // The analyzer resolves an attribute named `*` literally, so star
+  // expansion must travel as UnresolvedStar (as PySpark sends it).
+  if (name === "*") {
+    return new Column({ type: "unresolvedStar" });
+  }
+  if (name.endsWith(".*")) {
+    return new Column({ type: "unresolvedStar", target: name });
+  }
+
   return new Column({ type: "unresolvedAttribute", name });
 }
 

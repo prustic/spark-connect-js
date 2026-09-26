@@ -100,6 +100,14 @@ export class GroupedData {
     return this.agg(...avgExprs);
   }
 
+  /**
+   * Alias of {@link avg}, matching PySpark. Output columns keep the `avg(x)`
+   * name, as they do there.
+   */
+  mean(...columnNames: string[]): DataFrame {
+    return this.avg(...columnNames);
+  }
+
   /** Shorthand for agg(min(column)) */
   min(...columnNames: string[]): DataFrame {
     const minExprs = columnNames.map((name) =>

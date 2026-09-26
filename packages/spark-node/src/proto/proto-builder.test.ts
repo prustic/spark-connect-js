@@ -1508,3 +1508,57 @@ describe("buildRelation() - relation additions", () => {
     assert.equal(rel.relType.value.withinWatermark, true);
   });
 });
+
+describe("buildExpression() - star, regex, and metadata", () => {
+  it("builds UnresolvedStar with and without a target", () => {
+    const bare = buildExpression({ type: "unresolvedStar" });
+    if (bare.exprType.case !== "unresolvedStar") {
+      assert.fail("expected unresolvedStar");
+    }
+    assert.equal(bare.exprType.value.unparsedTarget, undefined);
+
+    const targeted = buildExpression({ type: "unresolvedStar", target: "t.*", planId: 7n });
+    if (targeted.exprType.case !== "unresolvedStar") {
+      assert.fail("expected unresolvedStar");
+    }
+    assert.equal(targeted.exprType.value.unparsedTarget, "t.*");
+    assert.equal(targeted.exprType.value.planId, 7n);
+  });
+
+  it("builds UnresolvedRegex with the plan id", () => {
+    const result = buildExpression({ type: "unresolvedRegex", colName: "`a.*`", planId: 7n });
+    if (result.exprType.case !== "unresolvedRegex") {
+      assert.fail("expected unresolvedRegex");
+    }
+    assert.equal(result.exprType.value.colName, "`a.*`");
+    assert.equal(result.exprType.value.planId, 7n);
+  });
+
+  it("sets is_metadata_column on a metadata attribute", () => {
+    const result = buildExpression({
+      type: "unresolvedAttribute",
+      name: "_metadata",
+      isMetadataColumn: true,
+    });
+    if (result.exprType.case !== "unresolvedAttribute") {
+      assert.fail("expected unresolvedAttribute");
+    }
+    assert.equal(result.exprType.value.isMetadataColumn, true);
+  });
+
+  it("sets Alias.metadata on withColumns aliases only when present", () => {
+    const rel = buildRelation({
+      type: "withColumns",
+      child: { type: "sql", query: "SELECT 1" },
+      aliases: [
+        { name: "a", expression: { type: "unresolvedAttribute", name: "a" }, metadata: "{}" },
+        { name: "b", expression: { type: "unresolvedAttribute", name: "b" } },
+      ],
+    });
+    if (rel.relType.case !== "withColumns") {
+      assert.fail("expected withColumns");
+    }
+    assert.equal(rel.relType.value.aliases[0].metadata, "{}");
+    assert.equal(rel.relType.value.aliases[1].metadata, undefined);
+  });
+});

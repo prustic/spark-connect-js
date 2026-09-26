@@ -3,6 +3,8 @@ import type { LogicalPlan, Expression, SortOrder } from "./plan/logical-plan.js"
 import type { Row } from "./types/row.js";
 import { Column, col, toCondition, toColumnCondition } from "./column.js";
 import { GroupedData } from "./grouped-data.js";
+import { to_json } from "./functions/json.js";
+import { struct } from "./functions/collection.js";
 import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
 import { MergeIntoWriter } from "./merge-into-writer.js";
@@ -13,6 +15,12 @@ import { StructType } from "./types/struct.js";
 import type { Observation } from "./observation.js";
 import type { StorageLevel } from "./storage-level.js";
 import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
+
+function requireName(name: string, where: string): void {
+  if (typeof name !== "string" || name.trim().length === 0) {
+    throw new InvalidInputError(`${where} requires a non-empty column name.`);
+  }
+}
 
 /** Lift a column name to a Column, leaving Columns alone. */
 function toCol(c: Column | string): Column {
@@ -151,6 +159,37 @@ export class DataFrame<R extends Row = Row> {
    */
   col(name: string): Column {
     return new Column({ type: "unresolvedAttribute", name, planId: this._plan.planId });
+  }
+
+  /**
+   * Select the columns whose names match a regular expression, written in
+   * back-ticks as Spark requires.
+   *
+   * @example
+   *   df.select(df.colRegex("`(id|name)`"))
+   */
+  colRegex(colName: string): Column {
+    requireName(colName, "colRegex()");
+
+    return new Column({ type: "unresolvedRegex", colName, planId: this._plan.planId });
+  }
+
+  /**
+   * Return a {@link Column} for a hidden metadata column of the source, such
+   * as `_metadata` on a file-based read.
+   *
+   * @example
+   *   df.select(df.metadataColumn("_metadata").getField("file_path"))
+   */
+  metadataColumn(colName: string): Column {
+    requireName(colName, "metadataColumn()");
+
+    return new Column({
+      type: "unresolvedAttribute",
+      name: colName,
+      planId: this._plan.planId,
+      isMetadataColumn: true,
+    });
   }
 
   // Transformations
@@ -460,6 +499,36 @@ export class DataFrame<R extends Row = Row> {
     });
   }
 
+  /**
+   * Attach metadata to an existing column. The metadata replaces what the
+   * column carried and is visible through `schema()`.
+   *
+   * @param metadata - A plain object, serialized as JSON.
+   * @throws `InvalidInputError` when the metadata is not a plain object or
+   * cannot be serialized.
+   */
+  withMetadata(columnName: string, metadata: Record<string, unknown>): DataFrame<R> {
+    requireName(columnName, "withMetadata()");
+    if (typeof metadata !== "object" || metadata === null || Array.isArray(metadata)) {
+      throw new InvalidInputError("withMetadata() metadata must be a plain object.");
+    }
+    let json: string;
+    try {
+      json = JSON.stringify(metadata);
+    } catch (cause) {
+      throw new InvalidInputError(
+        `withMetadata() could not serialize the metadata for column "${columnName}".`,
+        { cause },
+      );
+    }
+
+    return DataFrame._fromPlan<R>(this._session, {
+      type: "withColumns",
+      child: this._plan,
+      aliases: [{ name: columnName, expression: this.col(columnName)._expr, metadata: json }],
+    });
+  }
+
   /** Rename a single column. */
   withColumnRenamed(existing: string, newName: string): DataFrame {
     return DataFrame._fromPlan(this._session, {
@@ -731,6 +800,14 @@ export class DataFrame<R extends Row = Row> {
     });
   }
 
+  /**
+   * Convert each row to a JSON string, in a single column named `value`.
+   * Returns a DataFrame, as PySpark's Connect client does.
+   */
+  toJSON(): DataFrame<{ value: string }> {
+    return this.select(to_json(struct(col("*"))).alias("value")).as<{ value: string }>();
+  }
+
   // Transform
 
   /**
@@ -927,6 +1004,11 @@ export class DataFrame<R extends Row = Row> {
   }
 
   /** Access statistical functions (corr, cov, crosstab, etc.). */
+  /** The {@link SparkSession} this DataFrame belongs to. */
+  get sparkSession(): SparkSession {
+    return this._session;
+  }
+
   get stat(): DataFrameStat<R> {
     return new DataFrameStat<R>(this);
   }
@@ -1183,6 +1265,24 @@ export class DataFrame<R extends Row = Row> {
     for await (const row of this.toLocalIterator()) {
       fn(row);
     }
+  }
+
+  /**
+   * Execute the plan and return the result as raw Arrow IPC data, without
+   * decoding it into rows.
+   *
+   * Each element is a complete Arrow IPC stream (schema plus record batches),
+   * so it can be read with `tableFromIPC` from `apache-arrow`. Unlike PySpark,
+   * which returns a `pyarrow.Table`, this returns bytes, since the core package
+   * has no Arrow dependency.
+   */
+  async toArrow(): Promise<Uint8Array[]> {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of this._session._executePlan(this._plan)) {
+      chunks.push(chunk);
+    }
+
+    return chunks;
   }
 
   /** @internal */

@@ -17,7 +17,11 @@ import type { StorageLevel } from "../storage-level.js";
  * @see [Spark Connect proto: expressions.proto](https://github.com/apache/spark/blob/master/sql/connect/common/src/main/protobuf/spark/connect/expressions.proto)
  */
 export type Expression =
-  | { type: "unresolvedAttribute"; name: string; planId?: bigint }
+  | { type: "unresolvedAttribute"; name: string; planId?: bigint; isMetadataColumn?: boolean }
+  // `*` or `target.*`; the analyzer expands it to the matching columns.
+  | { type: "unresolvedStar"; target?: string; planId?: bigint }
+  // Selects the columns whose names match a regex (DataFrame.colRegex).
+  | { type: "unresolvedRegex"; colName: string; planId?: bigint }
   | { type: "literal"; value: string | number | boolean | bigint | null }
   | { type: "alias"; inner: Expression; name: string }
   // Comparison / logical / arithmetic operators
@@ -324,7 +328,8 @@ export interface DropPlan {
 export interface WithColumnsPlan {
   type: "withColumns";
   child: LogicalPlan;
-  aliases: { name: string; expression: Expression }[];
+  /** `metadata` is a JSON object string, carried on the proto Alias. */
+  aliases: { name: string; expression: Expression; metadata?: string }[];
 }
 
 /**
