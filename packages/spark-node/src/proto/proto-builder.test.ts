@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { buildRelation, buildExpression } from "./proto-builder.js";
 import type { LogicalPlan, Expression as CoreExpression } from "@spark-connect-js/core";
 import { UnsupportedOperationError } from "@spark-connect-js/core";
-import { Expression_Cast_EvalMode } from "@spark-connect-js/connect";
+import {
+  Expression_Cast_EvalMode,
+  Join_JoinType,
+  Aggregate_GroupType,
+} from "@spark-connect-js/connect";
 
 describe("buildRelation()", () => {
   it("builds a SQL relation", () => {
@@ -1404,5 +1408,103 @@ describe("exhaustive checks", () => {
   it("buildExpression throws UnsupportedOperationError on unsupported expression type", () => {
     const bogus = { type: "bogus" } as unknown as CoreExpression;
     assert.throws(() => buildExpression(bogus), UnsupportedOperationError);
+  });
+});
+
+describe("buildRelation() - relation additions", () => {
+  const child: LogicalPlan = { type: "sql", query: "SELECT 1" };
+
+  it("transpose carries index columns", () => {
+    const rel = buildRelation({
+      type: "transpose",
+      child,
+      indexColumns: [{ type: "unresolvedAttribute", name: "k" }],
+    });
+    assert.equal(rel.relType.case, "transpose");
+    if (rel.relType.case !== "transpose") return;
+    assert.equal(rel.relType.value.indexColumns.length, 1);
+    assert.ok(rel.relType.value.input);
+  });
+
+  it("lateralJoin maps each supported join type", () => {
+    const expectations = [
+      ["inner", Join_JoinType.INNER],
+      ["cross", Join_JoinType.CROSS],
+      ["left_outer", Join_JoinType.LEFT_OUTER],
+    ] as const;
+    for (const [irType, protoEnum] of expectations) {
+      const rel = buildRelation({
+        type: "lateralJoin",
+        left: child,
+        right: child,
+        joinType: irType,
+      });
+      if (rel.relType.case !== "lateralJoin") {
+        assert.fail("expected a lateralJoin relation");
+      }
+      assert.equal(rel.relType.value.joinType, protoEnum);
+      assert.equal(rel.relType.value.joinCondition, undefined);
+    }
+  });
+
+  it("toSchema sends the DDL as an unparsed data type", () => {
+    const rel = buildRelation({ type: "toSchema", child, schema: "a int" });
+    if (rel.relType.case !== "toSchema") {
+      assert.fail("expected a toSchema relation");
+    }
+    assert.equal(rel.relType.value.schema?.kind.case, "unparsed");
+    if (rel.relType.value.schema?.kind.case === "unparsed") {
+      assert.equal(rel.relType.value.schema.kind.value.dataTypeString, "a int");
+    }
+  });
+
+  it("statSampleBy converts the seed and typed strata", () => {
+    const rel = buildRelation({
+      type: "statSampleBy",
+      child,
+      col: { type: "unresolvedAttribute", name: "k" },
+      fractions: [
+        { stratum: "a", fraction: 0.5 },
+        { stratum: 1n, fraction: 0.25 },
+      ],
+      seed: 42,
+    });
+    if (rel.relType.case !== "sampleBy") {
+      assert.fail("expected a sampleBy relation");
+    }
+    assert.equal(rel.relType.value.seed, 42n);
+    assert.equal(rel.relType.value.fractions.length, 2);
+    assert.equal(rel.relType.value.fractions[0].stratum?.literalType.case, "string");
+    assert.equal(rel.relType.value.fractions[1].stratum?.literalType.case, "long");
+  });
+
+  it("aggregate maps the grouping-set group type", () => {
+    const rel = buildRelation({
+      type: "aggregate",
+      child,
+      groupingExpressions: [],
+      aggregateExpressions: [],
+      groupType: "groupingSets",
+      groupingSets: [[{ type: "unresolvedAttribute", name: "a" }], []],
+    });
+    if (rel.relType.case !== "aggregate") {
+      assert.fail("expected an aggregate relation");
+    }
+    assert.equal(rel.relType.value.groupType, Aggregate_GroupType.GROUPING_SETS);
+    assert.equal(rel.relType.value.groupingSets.length, 2);
+    assert.equal(rel.relType.value.groupingSets[0].groupingSet.length, 1);
+  });
+
+  it("deduplicate sets withinWatermark", () => {
+    const rel = buildRelation({
+      type: "deduplicate",
+      child,
+      allColumnsAsKeys: true,
+      withinWatermark: true,
+    });
+    if (rel.relType.case !== "deduplicate") {
+      assert.fail("expected a deduplicate relation");
+    }
+    assert.equal(rel.relType.value.withinWatermark, true);
   });
 });

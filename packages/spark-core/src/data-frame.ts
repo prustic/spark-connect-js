@@ -14,6 +14,11 @@ import type { Observation } from "./observation.js";
 import type { StorageLevel } from "./storage-level.js";
 import { MEMORY_AND_DISK, NONE } from "./storage-level.js";
 
+/** Lift a column name to a Column, leaving Columns alone. */
+function toCol(c: Column | string): Column {
+  return typeof c === "string" ? col(c) : c;
+}
+
 /** Parse a string key into its actual typed value (for replace() Record keys). */
 function inferLiteralValue(s: string): string | number | boolean | null {
   if (s === "null") return null;
@@ -298,6 +303,119 @@ export class DataFrame<R extends Row = Row> {
       condition: cond?._expr,
       joinType,
     });
+  }
+
+  /**
+   * Join where the right side may reference columns of the left, as SQL's
+   * `LATERAL` does. Only inner, cross, and left outer joins are supported.
+   *
+   * @see [Spark source: Dataset.scala](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/Dataset.scala)
+   */
+  lateralJoin(
+    other: DataFrame,
+    condition?: Column,
+    joinType: "inner" | "cross" | "left_outer" = "inner",
+  ): DataFrame {
+    const cond = toColumnCondition(condition, "lateralJoin()");
+
+    return DataFrame._fromPlan(this._session, {
+      type: "lateralJoin",
+      left: this._plan,
+      right: other._plan,
+      condition: cond?._expr,
+      joinType,
+    });
+  }
+
+  /**
+   * Transpose the DataFrame, turning column names into row values. Without an
+   * index column the first column is used.
+   *
+   * The server requires a transposable schema, so a wide or mixed-type frame
+   * is rejected during analysis.
+   */
+  transpose(indexColumn?: Column | string): DataFrame {
+    const index = indexColumn === undefined ? [] : [toCol(indexColumn)._expr];
+
+    return DataFrame._fromPlan(this._session, {
+      type: "transpose",
+      child: this._plan,
+      indexColumns: index,
+    });
+  }
+
+  /**
+   * Reconcile this DataFrame to the given schema, casting and reordering
+   * columns to match. Columns absent from the schema are dropped.
+   *
+   * The schema is sent as DDL, so field metadata does not survive and nested
+   * field nullability cannot be expressed. PySpark and Scala send a structured
+   * type here and do carry metadata over.
+   *
+   * @param schema - A {@link StructType} or a DDL string.
+   */
+  to(schema: StructType | string): DataFrame {
+    const ddl = typeof schema === "string" ? schema : schema.toDDL();
+    if (ddl.trim().length === 0) {
+      throw new InvalidInputError("to() requires a non-empty schema.");
+    }
+
+    return DataFrame._fromPlan(this._session, {
+      type: "toSchema",
+      child: this._plan,
+      schema: ddl,
+    });
+  }
+
+  /**
+   * Stratified sample without replacement, taking the given fraction of rows
+   * per stratum. Delegates to `stat.sampleBy`.
+   */
+  sampleBy(
+    col: Column | string,
+    fractions: Record<string, number> | Map<string | number | boolean | bigint | null, number>,
+    seed?: number,
+  ): DataFrame<R> {
+    return this.stat.sampleBy(col, fractions, seed);
+  }
+
+  /**
+   * Drop duplicate rows, bounding the state Spark keeps by the event-time
+   * watermark. Requires `withWatermark` upstream.
+   */
+  dropDuplicatesWithinWatermark(...columnNames: string[]): DataFrame<R> {
+    return DataFrame._fromPlan<R>(this._session, {
+      type: "deduplicate",
+      child: this._plan,
+      columnNames: columnNames.length > 0 ? columnNames : undefined,
+      allColumnsAsKeys: columnNames.length === 0,
+      withinWatermark: true,
+    });
+  }
+
+  /**
+   * Group by GROUPING SETS, computing aggregates for each listed set of
+   * columns in one pass.
+   *
+   * @example
+   *   df.groupingSets([[col("a"), col("b")], [col("a")], []], col("a"), col("b"))
+   */
+  groupingSets(
+    sets: Array<Array<Column | string>>,
+    ...columns: Array<Column | string>
+  ): GroupedData {
+    if (sets.length === 0) {
+      throw new InvalidInputError("groupingSets() requires at least one grouping set.");
+    }
+    const groupExprs = columns.map((c) => toCol(c)._expr);
+
+    return new GroupedData(
+      this,
+      groupExprs,
+      "groupingSets",
+      undefined,
+      sets.map((set) => set.map((c) => toCol(c)._expr)),
+    );
   }
 
   /** Alias for join with joinType="cross". */
@@ -809,8 +927,8 @@ export class DataFrame<R extends Row = Row> {
   }
 
   /** Access statistical functions (corr, cov, crosstab, etc.). */
-  get stat(): DataFrameStat {
-    return new DataFrameStat(this);
+  get stat(): DataFrameStat<R> {
+    return new DataFrameStat<R>(this);
   }
 
   // Writer

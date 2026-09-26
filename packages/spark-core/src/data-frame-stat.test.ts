@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
+import { InvalidInputError } from "./errors.js";
 
 function mockTransport(): Transport & { calls: LogicalPlan[] } {
   const calls: LogicalPlan[] = [];
@@ -107,5 +108,31 @@ describe("DataFrameStat", () => {
     if (df._plan.type === "statCov") {
       assert.equal(df._plan.child.type, "sql");
     }
+  });
+});
+
+describe("DataFrameStat.sampleBy fraction validation", () => {
+  function statOf() {
+    const spark = SparkSession.builder()
+      .remote("sc://stub")
+      .transport({
+        executePlan: () => {
+          throw new Error("not used");
+        },
+      })
+      .getOrCreate();
+    return spark.sql("SELECT 1 AS a").stat;
+  }
+
+  it("rejects fractions that are not finite numbers in [0, 1]", () => {
+    const stat = statOf();
+    for (const bad of [NaN, Infinity, -1, 2, "0.5" as unknown as number]) {
+      assert.throws(() => stat.sampleBy("a", { x: bad }), InvalidInputError);
+    }
+  });
+
+  it("accepts the inclusive bounds", () => {
+    const stat = statOf();
+    assert.doesNotThrow(() => stat.sampleBy("a", { x: 0, y: 1 }));
   });
 });
