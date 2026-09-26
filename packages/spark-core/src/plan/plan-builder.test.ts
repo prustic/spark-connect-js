@@ -1032,3 +1032,12 @@ describe("PlanBuilder extract-value and update-fields expressions", () => {
     assert.deepStrictEqual(withValue.updateFields["valueExpression"], { literal: { long: "3" } });
   });
 });
+
+describe("PlanBuilder cached remote relation", () => {
+  it("references the relation by id", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toRelation({ type: "cachedRemoteRelation", relationId: "rel-1" }),
+      { cachedRemoteRelation: { relationId: "rel-1" } },
+    );
+  });
+});

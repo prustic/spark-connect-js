@@ -125,6 +125,7 @@ import {
   ToSchemaSchema,
   StatSampleBySchema,
   StatSampleBy_FractionSchema,
+  CachedRemoteRelationSchema,
   Aggregate_GroupingSetsSchema,
   MergeActionSchema,
   MergeAction_AssignmentSchema,
@@ -933,6 +934,14 @@ function buildRelationInner(plan: LogicalPlan): Relation {
               },
             }),
           }),
+        },
+      });
+
+    case "cachedRemoteRelation":
+      return create(RelationSchema, {
+        relType: {
+          case: "cachedRemoteRelation",
+          value: create(CachedRemoteRelationSchema, { relationId: plan.relationId }),
         },
       });
 

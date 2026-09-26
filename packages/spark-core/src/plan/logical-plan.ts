@@ -157,6 +157,7 @@ export type LogicalPlan = (
   | LateralJoinPlan
   | ToSchemaPlan
   | StatSampleByPlan
+  | CachedRemoteRelationPlan
 ) & {
   /**
    * Per-DataFrame identifier set by `DataFrame._fromPlan`. Surfaces as
@@ -757,4 +758,14 @@ export interface StatSampleByPlan {
   col: Expression;
   fractions: { stratum: string | number | boolean | bigint | null; fraction: number }[];
   seed: number;
+}
+
+/**
+ * A relation the server holds, referenced by id, such as a checkpoint result.
+ *
+ * - Spark Connect: Relation.CachedRemoteRelation { relation_id }
+ */
+export interface CachedRemoteRelationPlan {
+  type: "cachedRemoteRelation";
+  relationId: string;
 }

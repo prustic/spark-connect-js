@@ -539,6 +539,9 @@ export class PlanBuilder {
           },
         };
 
+      case "cachedRemoteRelation":
+        return { cachedRemoteRelation: { relationId: plan.relationId } };
+
       case "statSampleBy":
         return {
           sampleBy: {

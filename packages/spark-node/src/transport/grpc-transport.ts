@@ -34,6 +34,9 @@ import {
   AnalyzePlanRequest_GetStorageLevelSchema,
   AnalyzePlanRequest_SameSemanticsSchema,
   AnalyzePlanRequest_SemanticHashSchema,
+  AnalyzePlanRequest_IsLocalSchema,
+  AnalyzePlanRequest_IsStreamingSchema,
+  AnalyzePlanRequest_InputFilesSchema,
   AnalyzePlanRequest_SparkVersionSchema,
   ConfigRequestSchema,
   ConfigResponseSchema,
@@ -48,6 +51,7 @@ import {
   InterruptRequest_InterruptType,
   KeyValueSchema,
   StorageLevelSchema,
+  type ProtoStorageLevel,
   CommandSchema,
   WriteOperationSchema,
   WriteOperation_SaveMode,
@@ -56,6 +60,7 @@ import {
   WriteOperation_BucketBySchema,
   WriteOperationV2Schema,
   MergeIntoTableCommandSchema,
+  CheckpointCommandSchema,
   WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
   WriteStreamOperationStartSchema,
@@ -992,6 +997,9 @@ export function decodeCommandResponse(
   if (r.case === "streamingQueryListenerEventsResult") {
     return decodeStreamingQueryListenerEventsResult(r.value);
   }
+  if (r.case === "checkpointCommandResult") {
+    return { type: "checkpointCommandResult", relationId: r.value.relation?.relationId };
+  }
   return undefined;
 }
 
@@ -1456,6 +1464,20 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
     });
   }
 
+  if (type === "checkpoint") {
+    return create(CommandSchema, {
+      commandType: {
+        case: "checkpointCommand",
+        value: create(CheckpointCommandSchema, {
+          relation: buildRelation(command.plan as import("@spark-connect-js/core").LogicalPlan),
+          local: command.local === true,
+          eager: command.eager === true,
+          storageLevel: buildStorageLevel(command.storageLevel),
+        }),
+      },
+    });
+  }
+
   throw new UnsupportedOperationError(`Unsupported command type: ${type}`);
 }
 
@@ -1649,7 +1671,8 @@ function buildStreamingQueryListenerBusCommand(command: Record<string, unknown>)
 
 // AnalyzePlan request/response building
 
-function buildAnalyzePlanRequest(
+/** @internal Exported for unit tests. */
+export function buildAnalyzePlanRequest(
   sessionId: string,
   request: Record<string, unknown>,
   userContext: UserContext,
@@ -1709,30 +1732,13 @@ function buildAnalyzePlanRequest(
   }
 
   if (type === "persist") {
-    const sl = request.storageLevel as
-      | {
-          useDisk: boolean;
-          useMemory: boolean;
-          useOffHeap: boolean;
-          deserialized: boolean;
-          replication: number;
-        }
-      | undefined;
     return create(AnalyzePlanRequestSchema, {
       ...base,
       analyze: {
         case: "persist",
         value: create(AnalyzePlanRequest_PersistSchema, {
           relation: relation!,
-          storageLevel: sl
-            ? create(StorageLevelSchema, {
-                useDisk: sl.useDisk,
-                useMemory: sl.useMemory,
-                useOffHeap: sl.useOffHeap,
-                deserialized: sl.deserialized,
-                replication: sl.replication,
-              })
-            : undefined,
+          storageLevel: buildStorageLevel(request.storageLevel),
         }),
       },
     });
@@ -1782,6 +1788,42 @@ function buildAnalyzePlanRequest(
     });
   }
 
+  if (type === "isLocal") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "isLocal",
+        value: create(AnalyzePlanRequest_IsLocalSchema, {
+          plan: create(PlanSchema, { opType: { case: "root", value: relation! } }),
+        }),
+      },
+    });
+  }
+
+  if (type === "isStreaming") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "isStreaming",
+        value: create(AnalyzePlanRequest_IsStreamingSchema, {
+          plan: create(PlanSchema, { opType: { case: "root", value: relation! } }),
+        }),
+      },
+    });
+  }
+
+  if (type === "inputFiles") {
+    return create(AnalyzePlanRequestSchema, {
+      ...base,
+      analyze: {
+        case: "inputFiles",
+        value: create(AnalyzePlanRequest_InputFilesSchema, {
+          plan: create(PlanSchema, { opType: { case: "root", value: relation! } }),
+        }),
+      },
+    });
+  }
+
   if (type === "semanticHash") {
     return create(AnalyzePlanRequestSchema, {
       ...base,
@@ -1809,7 +1851,8 @@ function buildAnalyzePlanRequest(
   throw new UnsupportedOperationError(`Unsupported analyze type: ${type}`);
 }
 
-function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unknown> {
+/** @internal Exported for unit tests. */
+export function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unknown> {
   const result = response.result;
   if (!result || result.case === undefined) {
     return {};
@@ -1843,9 +1886,30 @@ function extractAnalyzeResult(response: AnalyzePlanResponse): Record<string, unk
       return { type: "sameSemantics", result: result.value.result };
     case "semanticHash":
       return { type: "semanticHash", result: result.value.result };
+    case "isLocal":
+      return { type: "isLocal", result: result.value.isLocal };
+    case "isStreaming":
+      return { type: "isStreaming", result: result.value.isStreaming };
+    case "inputFiles":
+      return { type: "inputFiles", result: [...result.value.files] };
     case "sparkVersion":
       return { type: "sparkVersion", version: result.value.version };
     default:
       return { type: result.case };
   }
+}
+
+function buildStorageLevel(value: unknown): ProtoStorageLevel | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const sl = value as import("@spark-connect-js/core").StorageLevel;
+
+  return create(StorageLevelSchema, {
+    useDisk: sl.useDisk,
+    useMemory: sl.useMemory,
+    useOffHeap: sl.useOffHeap,
+    deserialized: sl.deserialized,
+    replication: sl.replication,
+  });
 }

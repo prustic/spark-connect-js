@@ -1611,3 +1611,13 @@ describe("buildExpression() - extract value and update fields", () => {
     assert.equal(drop.exprType.value.structExpression?.exprType.case, "updateFields");
   });
 });
+
+describe("buildRelation() - cached remote relation", () => {
+  it("references the server-held relation by id", () => {
+    const rel = buildRelation({ type: "cachedRemoteRelation", relationId: "rel-1" });
+    if (rel.relType.case !== "cachedRemoteRelation") {
+      assert.fail("expected cachedRemoteRelation");
+    }
+    assert.equal(rel.relType.value.relationId, "rel-1");
+  });
+});
