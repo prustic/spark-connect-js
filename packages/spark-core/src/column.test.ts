@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { col, lit } from "./column.js";
+import { col, lit, type Column } from "./column.js";
 import { InvalidInputError } from "./errors.js";
 
 describe("col()", () => {
@@ -408,40 +408,55 @@ describe("Column.ilike()", () => {
 });
 
 describe("Column struct/map/array field access", () => {
-  it("getField()", () => {
-    const expr = col("address").getField("city")._expr;
-    assert.equal(expr.type, "unresolvedFunction");
-    if (expr.type === "unresolvedFunction") {
-      assert.equal(expr.name, "get_field");
-      assert.equal(expr.arguments.length, 2);
-    }
+  it("getField() extracts a struct field by literal name", () => {
+    assert.deepStrictEqual(col("address").getField("city")._expr, {
+      type: "unresolvedExtractValue",
+      child: { type: "unresolvedAttribute", name: "address" },
+      extraction: { type: "literal", value: "city" },
+    });
   });
 
-  it("getItem()", () => {
-    const expr = col("items").getItem(0)._expr;
-    assert.equal(expr.type, "unresolvedFunction");
-    if (expr.type === "unresolvedFunction") {
-      assert.equal(expr.name, "get");
-      assert.equal(expr.arguments.length, 2);
-    }
+  it("getItem() extracts by literal index or key", () => {
+    assert.deepStrictEqual(col("items").getItem(0)._expr, {
+      type: "unresolvedExtractValue",
+      child: { type: "unresolvedAttribute", name: "items" },
+      extraction: { type: "literal", value: 0 },
+    });
+    const byKey = col("m").getItem("k")._expr;
+    assert.ok(byKey.type === "unresolvedExtractValue");
+    assert.deepStrictEqual(byKey.extraction, { type: "literal", value: "k" });
   });
 
-  it("withField()", () => {
-    const expr = col("address").withField("zip", col("postal_code"))._expr;
-    assert.equal(expr.type, "unresolvedFunction");
-    if (expr.type === "unresolvedFunction") {
-      assert.equal(expr.name, "with_field");
-      assert.equal(expr.arguments.length, 3);
-    }
+  it("withField() updates the struct with a value", () => {
+    assert.deepStrictEqual(col("address").withField("zip", col("postal_code"))._expr, {
+      type: "updateFields",
+      struct: { type: "unresolvedAttribute", name: "address" },
+      fieldName: "zip",
+      value: { type: "unresolvedAttribute", name: "postal_code" },
+    });
   });
 
-  it("dropFields()", () => {
-    const expr = col("address").dropFields("line2", "line3")._expr;
-    assert.equal(expr.type, "unresolvedFunction");
-    if (expr.type === "unresolvedFunction") {
-      assert.equal(expr.name, "drop_fields");
-      assert.equal(expr.arguments.length, 3); // self + 2 field names
-    }
+  it("dropFields() chains one valueless update per name, in order", () => {
+    assert.deepStrictEqual(col("address").dropFields("line2", "line3")._expr, {
+      type: "updateFields",
+      fieldName: "line3",
+      struct: {
+        type: "updateFields",
+        fieldName: "line2",
+        struct: { type: "unresolvedAttribute", name: "address" },
+      },
+    });
+  });
+
+  it("rejects unusable field names, keys, and values at the call site", () => {
+    const c = col("s");
+    assert.throws(() => c.getField(""), InvalidInputError);
+    assert.throws(() => c.getField(1 as unknown as string), InvalidInputError);
+    assert.throws(() => c.getItem(true as unknown as number), InvalidInputError);
+    assert.throws(() => c.withField("", lit(1)), InvalidInputError);
+    assert.throws(() => c.withField("x", 1 as unknown as Column), InvalidInputError);
+    assert.throws(() => c.dropFields(), InvalidInputError);
+    assert.throws(() => c.dropFields("a", ""), InvalidInputError);
   });
 });
 

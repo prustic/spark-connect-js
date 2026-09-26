@@ -158,6 +158,12 @@ export class DataFrame<R extends Row = Row> {
    *   a.join(b, a.col("id").eq(b.col("id")));
    */
   col(name: string): Column {
+    // `*` expands to this frame's columns. `t.*` stays an attribute: the
+    // planner rejects a star carrying both a target and a plan id.
+    if (name === "*") {
+      return new Column({ type: "unresolvedStar", planId: this._plan.planId });
+    }
+
     return new Column({ type: "unresolvedAttribute", name, planId: this._plan.planId });
   }
 
@@ -179,7 +185,7 @@ export class DataFrame<R extends Row = Row> {
    * as `_metadata` on a file-based read.
    *
    * @example
-   *   df.select(df.metadataColumn("_metadata"))
+   *   df.select(df.metadataColumn("_metadata").getField("file_path"))
    */
   metadataColumn(colName: string): Column {
     requireName(colName, "metadataColumn()");

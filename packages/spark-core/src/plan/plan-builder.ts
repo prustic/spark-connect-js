@@ -580,6 +580,25 @@ export class PlanBuilder {
           },
         };
 
+      case "unresolvedExtractValue":
+        return {
+          unresolvedExtractValue: {
+            child: PlanBuilder.toExpression(expr.child),
+            extraction: PlanBuilder.toExpression(expr.extraction),
+          },
+        };
+
+      case "updateFields":
+        return {
+          updateFields: {
+            structExpression: PlanBuilder.toExpression(expr.struct),
+            fieldName: expr.fieldName,
+            ...(expr.value !== undefined && {
+              valueExpression: PlanBuilder.toExpression(expr.value),
+            }),
+          },
+        };
+
       case "unresolvedRegex":
         return {
           unresolvedRegex: {

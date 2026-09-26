@@ -1562,3 +1562,52 @@ describe("buildExpression() - star, regex, and metadata", () => {
     assert.equal(rel.relType.value.aliases[1].metadata, undefined);
   });
 });
+
+describe("buildExpression() - extract value and update fields", () => {
+  const s: CoreExpression = { type: "unresolvedAttribute", name: "s" };
+
+  it("builds UnresolvedExtractValue for a string key and a numeric index", () => {
+    for (const [value, literalCase] of [
+      ["x", "string"],
+      [0, "integer"],
+    ] as const) {
+      const result = buildExpression({
+        type: "unresolvedExtractValue",
+        child: s,
+        extraction: { type: "literal", value },
+      });
+      if (result.exprType.case !== "unresolvedExtractValue") {
+        assert.fail("expected unresolvedExtractValue");
+      }
+      assert.equal(result.exprType.value.child?.exprType.case, "unresolvedAttribute");
+      const extraction = result.exprType.value.extraction?.exprType;
+      assert.ok(extraction?.case === "literal");
+      assert.equal(extraction.value.literalType.case, literalCase);
+    }
+  });
+
+  it("builds UpdateFields with a value, and without one for a drop", () => {
+    const add = buildExpression({
+      type: "updateFields",
+      struct: s,
+      fieldName: "z",
+      value: { type: "literal", value: 1 },
+    });
+    if (add.exprType.case !== "updateFields") {
+      assert.fail("expected updateFields");
+    }
+    assert.equal(add.exprType.value.fieldName, "z");
+    assert.notEqual(add.exprType.value.valueExpression, undefined);
+
+    const drop = buildExpression({
+      type: "updateFields",
+      fieldName: "b",
+      struct: { type: "updateFields", struct: s, fieldName: "a" },
+    });
+    if (drop.exprType.case !== "updateFields") {
+      assert.fail("expected updateFields");
+    }
+    assert.equal(drop.exprType.value.valueExpression, undefined);
+    assert.equal(drop.exprType.value.structExpression?.exprType.case, "updateFields");
+  });
+});
