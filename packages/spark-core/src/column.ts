@@ -20,6 +20,12 @@ export function liftCol(v: ColOrLiteral): Column {
   return v instanceof Column ? v : lit(v);
 }
 
+function requireFieldName(name: string, where: string): void {
+  if (typeof name !== "string" || name.length === 0) {
+    throw new InvalidInputError(`${where} field name must be a non-empty string.`);
+  }
+}
+
 // Local to avoid a cycle with functions/_helpers.ts, which imports Column.
 function fnOf(name: string, ...args: Expression[]): Expression {
   return { type: "unresolvedFunction", name, arguments: args, isDistinct: false };
@@ -423,44 +429,82 @@ export class Column {
 
   // Struct / Map / Array field access
 
-  /** Access a field in a StructType column by name. */
+  /**
+   * Access a field of a StructType column by name.
+   *
+   * @throws `InvalidInputError` when the field name is not a non-empty string.
+   */
   getField(fieldName: string): Column {
+    requireFieldName(fieldName, "getField()");
+
     return new Column({
-      type: "unresolvedFunction",
-      name: "get_field",
-      arguments: [this._expr, { type: "literal", value: fieldName }],
+      type: "unresolvedExtractValue",
+      child: this._expr,
+      extraction: { type: "literal", value: fieldName },
     });
   }
 
-  /** Access an element in an ArrayType or MapType column by key/index. */
+  /**
+   * Access an element of an ArrayType column by 0-based index, or a value of a
+   * MapType column by key.
+   *
+   * An out-of-bounds array index throws under Spark's default ANSI mode rather
+   * than returning null; use the `get` function for a null-returning lookup.
+   *
+   * @throws `InvalidInputError` when the key is not a number or a string.
+   */
   getItem(key: number | string): Column {
+    if (typeof key !== "number" && typeof key !== "string") {
+      throw new InvalidInputError("getItem() key must be a number or a string.");
+    }
+
     return new Column({
-      type: "unresolvedFunction",
-      name: "get",
-      arguments: [this._expr, { type: "literal", value: key }],
+      type: "unresolvedExtractValue",
+      child: this._expr,
+      extraction: { type: "literal", value: key },
     });
   }
 
-  /** Add or replace a field in a StructType column. */
+  /**
+   * Add a field to a StructType column, or replace it if it exists.
+   *
+   * @throws `InvalidInputError` when the field name is not a non-empty string
+   * or the value is not a Column.
+   */
   withField(fieldName: string, col: Column): Column {
+    requireFieldName(fieldName, "withField()");
+    if (!(col instanceof Column)) {
+      throw new InvalidInputError("withField() value must be a Column.");
+    }
+
     return new Column({
-      type: "unresolvedFunction",
-      name: "with_field",
-      arguments: [this._expr, { type: "literal", value: fieldName }, col._expr],
+      type: "updateFields",
+      struct: this._expr,
+      fieldName,
+      value: col._expr,
     });
   }
 
-  /** Drop field(s) from a StructType column. */
+  /**
+   * Drop one or more fields from a StructType column.
+   *
+   * @throws `InvalidInputError` when no field names are given or one is not a
+   * non-empty string.
+   */
   dropFields(...fieldNames: string[]): Column {
-    const args: Expression[] = [
-      this._expr,
-      ...fieldNames.map((f): Expression => ({ type: "literal", value: f })),
-    ];
-    return new Column({
-      type: "unresolvedFunction",
-      name: "drop_fields",
-      arguments: args,
-    });
+    if (fieldNames.length === 0) {
+      throw new InvalidInputError("dropFields() requires at least one field name.");
+    }
+
+    // One drop per name, each wrapping the previous, as the proto has no
+    // multi-field form.
+    let expr: Expression = this._expr;
+    for (const fieldName of fieldNames) {
+      requireFieldName(fieldName, "dropFields()");
+      expr = { type: "updateFields", struct: expr, fieldName };
+    }
+
+    return new Column(expr);
   }
 
   // Membership / range

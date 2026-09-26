@@ -47,6 +47,8 @@ import {
   Expression_UnresolvedAttributeSchema,
   Expression_UnresolvedStarSchema,
   Expression_UnresolvedRegexSchema,
+  Expression_UnresolvedExtractValueSchema,
+  Expression_UpdateFieldsSchema,
   Expression_UnresolvedFunctionSchema,
   Expression_AliasSchema,
   Expression_SortOrderSchema,
@@ -1079,6 +1081,29 @@ export function buildExpression(expr: CoreExpression): Expression {
           value: create(Expression_UnresolvedStarSchema, {
             ...(expr.target !== undefined && { unparsedTarget: expr.target }),
             ...(expr.planId !== undefined && { planId: expr.planId }),
+          }),
+        },
+      });
+
+    case "unresolvedExtractValue":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "unresolvedExtractValue",
+          value: create(Expression_UnresolvedExtractValueSchema, {
+            child: buildExpression(expr.child),
+            extraction: buildExpression(expr.extraction),
+          }),
+        },
+      });
+
+    case "updateFields":
+      return create(ExpressionSchema, {
+        exprType: {
+          case: "updateFields",
+          value: create(Expression_UpdateFieldsSchema, {
+            structExpression: buildExpression(expr.struct),
+            fieldName: expr.fieldName,
+            ...(expr.value !== undefined && { valueExpression: buildExpression(expr.value) }),
           }),
         },
       });

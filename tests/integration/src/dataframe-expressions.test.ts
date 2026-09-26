@@ -56,14 +56,13 @@ describe("DataFrame expression-level methods", () => {
     const path = tempPath("metadata_column");
     await spark().range(3).write.mode("overwrite").parquet(path);
 
-    // Read the struct itself: Column.getField is not usable here, since it
-    // sends a function name Spark does not define.
     const df = spark().read.parquet(path);
-    const rows = await df.select(df.metadataColumn("_metadata").alias("m")).collect();
+    const rows = await df
+      .select(df.metadataColumn("_metadata").getField("file_path").alias("f"))
+      .collect();
     assert.equal(rows.length, 3);
     for (const row of rows) {
-      const meta = row["m"] as { file_path?: unknown };
-      assert.match(String(meta.file_path), /metadata_column/);
+      assert.match(String(row["f"]), /metadata_column/);
     }
   });
 

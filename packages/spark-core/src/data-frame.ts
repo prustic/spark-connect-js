@@ -152,12 +152,28 @@ export class DataFrame<R extends Row = Row> {
    * columns in self-joins and same-schema joins where the unqualified column
    * name would be ambiguous on the server side.
    *
+   * `df.col("*")` expands to this DataFrame's columns. A qualified star such as
+   * `"t.*"` cannot be bound to a DataFrame; use the `col("t.*")` function.
+   *
+   * @throws `InvalidInputError` for a qualified star.
+   *
    * @example
    *   const a = df.alias("a");
    *   const b = df.alias("b");
    *   a.join(b, a.col("id").eq(b.col("id")));
    */
   col(name: string): Column {
+    if (name === "*") {
+      return new Column({ type: "unresolvedStar", planId: this._plan.planId });
+    }
+    // A targeted star cannot be bound to a frame: the planner rejects one that
+    // carries a plan id, and as an attribute it never resolves.
+    if (name.endsWith(".*")) {
+      throw new InvalidInputError(
+        `df.col("${name}") cannot expand a qualified star; use col("${name}") instead.`,
+      );
+    }
+
     return new Column({ type: "unresolvedAttribute", name, planId: this._plan.planId });
   }
 
@@ -179,7 +195,7 @@ export class DataFrame<R extends Row = Row> {
    * as `_metadata` on a file-based read.
    *
    * @example
-   *   df.select(df.metadataColumn("_metadata"))
+   *   df.select(df.metadataColumn("_metadata").getField("file_path"))
    */
   metadataColumn(colName: string): Column {
     requireName(colName, "metadataColumn()");

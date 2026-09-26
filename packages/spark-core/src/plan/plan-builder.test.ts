@@ -982,3 +982,53 @@ describe("PlanBuilder star, regex, and metadata expressions", () => {
     assert.doesNotThrow(() => JSON.stringify([withMeta, star]));
   });
 });
+
+describe("PlanBuilder extract-value and update-fields expressions", () => {
+  const s = { type: "unresolvedAttribute" as const, name: "s" };
+
+  it("unresolvedExtractValue emits child and extraction", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "unresolvedExtractValue",
+        child: s,
+        extraction: { type: "literal", value: "x" },
+      }),
+      {
+        unresolvedExtractValue: {
+          child: { unresolvedAttribute: { unparsedIdentifier: "s" } },
+          extraction: { literal: { string: "x" } },
+        },
+      },
+    );
+  });
+
+  it("updateFields omits the value for a drop and nests chained drops", () => {
+    const rel = PlanBuilder.toExpression({
+      type: "updateFields",
+      fieldName: "b",
+      struct: { type: "updateFields", struct: s, fieldName: "a" },
+    });
+    assert.deepStrictEqual(rel, {
+      updateFields: {
+        structExpression: {
+          updateFields: {
+            structExpression: { unresolvedAttribute: { unparsedIdentifier: "s" } },
+            fieldName: "a",
+          },
+        },
+        fieldName: "b",
+      },
+    });
+    assert.doesNotThrow(() => JSON.stringify(rel));
+  });
+
+  it("updateFields carries the value when adding or replacing", () => {
+    const withValue = PlanBuilder.toExpression({
+      type: "updateFields",
+      struct: s,
+      fieldName: "z",
+      value: { type: "literal", value: 3n },
+    }) as { updateFields: Record<string, unknown> };
+    assert.deepStrictEqual(withValue.updateFields["valueExpression"], { literal: { long: "3" } });
+  });
+});

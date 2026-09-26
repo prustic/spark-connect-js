@@ -22,6 +22,10 @@ export type Expression =
   | { type: "unresolvedStar"; target?: string; planId?: bigint }
   // Selects the columns whose names match a regex (DataFrame.colRegex).
   | { type: "unresolvedRegex"; colName: string; planId?: bigint }
+  // Struct field, array element, or map value (Column.getField / getItem).
+  | { type: "unresolvedExtractValue"; child: Expression; extraction: Expression }
+  // Add or replace a struct field; without a value, drop it (withField / dropFields).
+  | { type: "updateFields"; struct: Expression; fieldName: string; value?: Expression }
   | { type: "literal"; value: string | number | boolean | bigint | null }
   | { type: "alias"; inner: Expression; name: string }
   // Comparison / logical / arithmetic operators

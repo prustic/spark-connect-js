@@ -1856,3 +1856,22 @@ describe("DataFrame expression-level methods", () => {
     assert.deepStrictEqual(mean, avg);
   });
 });
+
+describe("DataFrame.col star handling", () => {
+  it("sends df.col('*') as a star bound to this frame", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.deepStrictEqual(df.col("*")._expr, { type: "unresolvedStar", planId: df._plan.planId });
+  });
+
+  it("rejects df.col('t.*') and points at col('t.*')", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    assert.throws(
+      () => df.col("t.*"),
+      (err: unknown) => err instanceof InvalidInputError && /use col\("t\.\*"\)/.test(err.message),
+    );
+    // A quoted name that merely contains the characters is still an attribute.
+    assert.equal(df.col("`t.*`")._expr.type, "unresolvedAttribute");
+  });
+});
