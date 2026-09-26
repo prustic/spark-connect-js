@@ -31,7 +31,8 @@
     },
     "docs:build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "docs:dev": {
       "cache": false,
