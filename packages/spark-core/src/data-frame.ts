@@ -9,7 +9,7 @@ import { DataFrameWriter } from "./data-frame-writer.js";
 import { DataFrameWriterV2 } from "./data-frame-writer-v2.js";
 import { MergeIntoWriter } from "./merge-into-writer.js";
 import { DataStreamWriter } from "./streaming/data-stream-writer.js";
-import { InvalidConfigError, InvalidInputError } from "./errors.js";
+import { InvalidConfigError, InvalidInputError, SparkClientError } from "./errors.js";
 import { DataFrameStat } from "./data-frame-stat.js";
 import { StructType } from "./types/struct.js";
 import type { Observation } from "./observation.js";
@@ -20,6 +20,14 @@ function requireName(name: string, where: string): void {
   if (typeof name !== "string" || name.trim().length === 0) {
     throw new InvalidInputError(`${where} requires a non-empty column name.`);
   }
+}
+
+function isBoolean(v: unknown): v is boolean {
+  return typeof v === "boolean";
+}
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((f) => typeof f === "string");
 }
 
 /** Lift a column name to a Column, leaving Columns alone. */
@@ -1136,6 +1144,72 @@ export class DataFrame<R extends Row = Row> {
   }
 
   /**
+   * Checkpoint this DataFrame to reliable storage, truncating its lineage, and
+   * return a DataFrame over the checkpointed data.
+   *
+   * Requires the server to be started with a checkpoint directory
+   * (`spark.checkpoint.dir`). It is a static setting, so a client cannot set it
+   * at runtime; without it the server rejects the call. `localCheckpoint`
+   * needs no directory.
+   *
+   * The server releases the checkpointed relation once this DataFrame and
+   * every DataFrame derived from it are garbage-collected, or when the session
+   * stops. Release is best effort, as in the Scala and PySpark clients.
+   * Reliable checkpoint files outlive both: they stay in the server's
+   * checkpoint directory unless the server enables
+   * `spark.cleaner.referenceTracking.cleanCheckpoints`, and even then are
+   * deleted only after the relation is released.
+   *
+   * @param eager - Materialize now rather than on first use. Defaults to true.
+   */
+  async checkpoint(eager = true): Promise<DataFrame<R>> {
+    return this._checkpoint(false, eager, undefined);
+  }
+
+  /**
+   * Checkpoint this DataFrame to executor storage, truncating its lineage.
+   * Faster than {@link checkpoint} but not fault tolerant: data is lost if an
+   * executor fails. Released as `checkpoint` is, and it writes nothing to the
+   * checkpoint directory.
+   *
+   * @param eager - Materialize now rather than on first use. Defaults to true.
+   * @param storageLevel - Where to keep the data; the server default otherwise.
+   */
+  async localCheckpoint(eager = true, storageLevel?: StorageLevel): Promise<DataFrame<R>> {
+    return this._checkpoint(true, eager, storageLevel);
+  }
+
+  private async _checkpoint(
+    local: boolean,
+    eager: boolean,
+    storageLevel: StorageLevel | undefined,
+  ): Promise<DataFrame<R>> {
+    if (typeof eager !== "boolean") {
+      throw new InvalidInputError("checkpoint: eager must be a boolean.");
+    }
+    const responses = await this._session._executeCommandResponses({
+      type: "checkpoint",
+      plan: this._plan,
+      local,
+      eager,
+      ...(storageLevel !== undefined && { storageLevel }),
+    });
+    const result = responses.find((r) => r["type"] === "checkpointCommandResult");
+    const relationId = result?.["relationId"];
+    if (typeof relationId !== "string" || relationId.length === 0) {
+      throw new SparkClientError("checkpoint: the server did not return a checkpointed relation.");
+    }
+
+    const checkpointed = DataFrame._fromPlan<R>(this._session, {
+      type: "cachedRemoteRelation",
+      relationId,
+    });
+    this._session._trackCachedRelation(checkpointed._plan, relationId);
+
+    return checkpointed;
+  }
+
+  /**
    * Register this DataFrame as a temporary view with the given name.
    * The view is session-scoped and will be dropped when the session ends.
    */
@@ -1199,6 +1273,43 @@ export class DataFrame<R extends Row = Row> {
       plan: this._plan,
     });
     return (result.result as number) ?? 0;
+  }
+
+  /**
+   * Whether `collect()` and `take()` can run locally, without executors. Async,
+   * unlike PySpark's method, since the answer comes from the server.
+   */
+  async isLocal(): Promise<boolean> {
+    return this._analyzeResult("isLocal", isBoolean);
+  }
+
+  /**
+   * Whether this DataFrame reads from a streaming source, directly or through
+   * any of its inputs. Async, where PySpark exposes a property, since the answer
+   * comes from the server.
+   */
+  async isStreaming(): Promise<boolean> {
+    return this._analyzeResult("isStreaming", isBoolean);
+  }
+
+  /**
+   * The files this DataFrame reads, as best the server can determine. Empty for
+   * a source that is not file-based.
+   */
+  async inputFiles(): Promise<string[]> {
+    return this._analyzeResult("inputFiles", isStringArray);
+  }
+
+  // A missing field would otherwise read as false or empty, a plausible wrong
+  // answer; PySpark asserts on the same condition.
+  private async _analyzeResult<T>(type: string, isExpected: (v: unknown) => v is T): Promise<T> {
+    const response = await this._session._analyzePlan({ type, plan: this._plan });
+    const value = response.result;
+    if (!isExpected(value)) {
+      throw new SparkClientError(`${type}(): the server response did not include a result.`);
+    }
+
+    return value;
   }
 
   // Actions

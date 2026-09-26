@@ -19,6 +19,8 @@ services:
       - spark.sql.catalog.iceberg.type=hadoop
       - --conf
       - spark.sql.catalog.iceberg.warehouse=/tmp/iceberg-warehouse
+      - --conf
+      - spark.checkpoint.dir=/tmp/spark-checkpoints
     environment:
       - SPARK_NO_DAEMONIZE=true
     healthcheck:

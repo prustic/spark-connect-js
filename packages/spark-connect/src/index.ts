@@ -65,6 +65,12 @@ export {
   AnalyzePlanRequest_SemanticHashSchema,
   type AnalyzePlanRequest_SparkVersion,
   AnalyzePlanRequest_SparkVersionSchema,
+  type AnalyzePlanRequest_IsLocal,
+  AnalyzePlanRequest_IsLocalSchema,
+  type AnalyzePlanRequest_IsStreaming,
+  AnalyzePlanRequest_IsStreamingSchema,
+  type AnalyzePlanRequest_InputFiles,
+  AnalyzePlanRequest_InputFilesSchema,
   type AnalyzePlanResponse_Persist,
   type AnalyzePlanResponse_Unpersist,
   type AnalyzePlanResponse_GetStorageLevel,
@@ -89,6 +95,7 @@ export {
   ConfigRequest_IsModifiableSchema,
   type KeyValue,
   KeyValueSchema,
+  type CheckpointCommandResult,
 } from "./gen/spark/connect/base_pb.js";
 
 // Relation (logical plan) messages
@@ -127,6 +134,8 @@ export {
   StatSampleBySchema,
   type StatSampleBy_Fraction,
   StatSampleBy_FractionSchema,
+  type CachedRemoteRelation,
+  CachedRemoteRelationSchema,
   type Aggregate_GroupingSets,
   Aggregate_GroupingSetsSchema,
   type SubqueryAlias,
@@ -394,6 +403,11 @@ export {
   // MERGE INTO
   type MergeIntoTableCommand,
   MergeIntoTableCommandSchema,
+  // Checkpoint
+  type CheckpointCommand,
+  CheckpointCommandSchema,
+  type RemoveCachedRemoteRelationCommand,
+  RemoveCachedRemoteRelationCommandSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

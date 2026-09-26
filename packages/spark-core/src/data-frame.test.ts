@@ -4,7 +4,8 @@ import { SparkSession } from "./spark-session.js";
 import type { Transport } from "./spark-session.js";
 import type { LogicalPlan } from "./plan/logical-plan.js";
 import { col, lit, type Column } from "./column.js";
-import { InvalidConfigError, InvalidInputError } from "./errors.js";
+import { InvalidConfigError, InvalidInputError, SparkClientError } from "./errors.js";
+import { MEMORY_ONLY } from "./storage-level.js";
 import { StructType } from "./types/struct.js";
 import { Observation } from "./observation.js";
 import type { ExecuteOptions } from "./spark-session.js";
@@ -1873,5 +1874,158 @@ describe("DataFrame.col star handling", () => {
     );
     // A quoted name that merely contains the characters is still an attribute.
     assert.equal(df.col("`t.*`")._expr.type, "unresolvedAttribute");
+  });
+});
+
+describe("DataFrame server-answered methods", () => {
+  function sessionAnswering(result: unknown) {
+    const calls: Record<string, unknown>[] = [];
+    const transport: Transport = {
+      async *executePlan() {},
+      async analyzePlan(_sid, request) {
+        calls.push(request);
+        return { result };
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost")
+      .transport(transport)
+      .getOrCreate();
+    return { spark, calls };
+  }
+
+  it("isLocal(), isStreaming(), and inputFiles() send their analyze type with the plan", async () => {
+    const flag = sessionAnswering(true);
+    const df = flag.spark.sql("SELECT 1");
+    assert.equal(await df.isLocal(), true);
+    assert.equal(await df.isStreaming(), true);
+    assert.deepStrictEqual(
+      flag.calls.map((c) => [c["type"], c["plan"] === df._plan]),
+      [
+        ["isLocal", true],
+        ["isStreaming", true],
+      ],
+    );
+
+    const files = sessionAnswering(["/data/a.parquet"]);
+    assert.deepStrictEqual(await files.spark.sql("SELECT 1").inputFiles(), ["/data/a.parquet"]);
+    assert.equal(files.calls[0]["type"], "inputFiles");
+  });
+
+  it("throws rather than defaulting when the server omits the result", async () => {
+    const { spark } = sessionAnswering(undefined);
+    const df = spark.sql("SELECT 1");
+    await assert.rejects(df.isLocal(), SparkClientError);
+    await assert.rejects(df.isStreaming(), SparkClientError);
+    await assert.rejects(df.inputFiles(), SparkClientError);
+  });
+
+  function sessionCheckpointing(responses: Record<string, unknown>[]) {
+    const commands: Record<string, unknown>[] = [];
+    const transport: Transport = {
+      async *executePlan() {},
+      async executeCommandResponses(_sid, command) {
+        commands.push(command);
+        return responses;
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost")
+      .transport(transport)
+      .getOrCreate();
+    return { spark, commands };
+  }
+
+  it("checkpoint() sends a reliable eager command and wraps the returned relation", async () => {
+    const { spark, commands } = sessionCheckpointing([
+      { type: "somethingElse" },
+      { type: "checkpointCommandResult", relationId: "rel-1" },
+    ]);
+    const df = spark.sql("SELECT 1");
+    const checkpointed = await df.checkpoint();
+
+    assert.equal(commands[0]["type"], "checkpoint");
+    assert.equal(commands[0]["local"], false);
+    assert.equal(commands[0]["eager"], true);
+    assert.equal(commands[0]["plan"], df._plan);
+    assert.equal("storageLevel" in commands[0], false);
+    const plan = checkpointed._plan;
+    assert.ok(plan.type === "cachedRemoteRelation");
+    assert.equal(plan.relationId, "rel-1");
+  });
+
+  it("localCheckpoint() passes laziness and the storage level", async () => {
+    const { spark, commands } = sessionCheckpointing([
+      { type: "checkpointCommandResult", relationId: "rel-2" },
+    ]);
+    await spark.sql("SELECT 1").localCheckpoint(false, MEMORY_ONLY);
+    assert.equal(commands[0]["local"], true);
+    assert.equal(commands[0]["eager"], false);
+    assert.deepStrictEqual(commands[0]["storageLevel"], MEMORY_ONLY);
+  });
+
+  it("checkpoint() rejects a non-boolean eager flag", async () => {
+    const { spark, commands } = sessionCheckpointing([]);
+    await assert.rejects(
+      spark.sql("SELECT 1").checkpoint("yes" as unknown as boolean),
+      InvalidInputError,
+    );
+    assert.equal(commands.length, 0);
+  });
+
+  it("checkpoint() throws when the server returns no relation", async () => {
+    const { spark } = sessionCheckpointing([{ type: "checkpointCommandResult" }]);
+    await assert.rejects(spark.sql("SELECT 1").checkpoint(), SparkClientError);
+  });
+});
+
+describe("Checkpoint release", () => {
+  function sessionRecording(executeCommand: Transport["executeCommand"]) {
+    const transport: Transport = {
+      async *executePlan() {},
+      executeCommand,
+      async executeCommandResponses() {
+        return [{ type: "checkpointCommandResult", relationId: "rel-7" }];
+      },
+    };
+    return SparkSession.builder().remote("sc://localhost").transport(transport).getOrCreate();
+  }
+
+  it("tracks the checkpoint's plan node, which derived frames keep reachable", async () => {
+    const spark = sessionRecording(async () => {});
+    const tracked: [object, string][] = [];
+    spark._trackCachedRelation = (node, id) => {
+      tracked.push([node, id]);
+    };
+
+    const checkpointed = await spark.sql("SELECT 1").checkpoint();
+    assert.equal(tracked.length, 1);
+    assert.equal(tracked[0][0], checkpointed._plan);
+    assert.equal(tracked[0][1], "rel-7");
+
+    const derived = checkpointed.filter("true")._plan;
+    assert.ok(derived.type === "filter");
+    assert.equal(derived.child, checkpointed._plan);
+  });
+
+  it("sends the release command, and skips it once the session is stopped", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const spark = sessionRecording(async (_sid, command) => {
+      sent.push(command);
+    });
+
+    await spark._releaseCachedRelation("rel-7");
+    assert.deepStrictEqual(sent, [{ type: "removeCachedRemoteRelation", relationId: "rel-7" }]);
+
+    await spark.stop();
+    await spark._releaseCachedRelation("rel-8");
+    assert.equal(sent.length, 1);
+  });
+
+  it("drops a failed release instead of rejecting", async () => {
+    const spark = sessionRecording(async () => {
+      throw new Error("server gone");
+    });
+    await assert.doesNotReject(spark._releaseCachedRelation("rel-7"));
   });
 });
