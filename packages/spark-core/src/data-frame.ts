@@ -26,6 +26,14 @@ function isBoolean(v: unknown): v is boolean {
   return typeof v === "boolean";
 }
 
+function isNumber(v: unknown): v is number {
+  return typeof v === "number";
+}
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
+}
+
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((f) => typeof f === "string");
 }
@@ -1258,21 +1266,12 @@ export class DataFrame<R extends Row = Row> {
 
   /** Returns true if both DataFrames have the same logical plan. */
   async sameSemantics(other: DataFrame): Promise<boolean> {
-    const result = await this._session._analyzePlan({
-      type: "sameSemantics",
-      plan: this._plan,
-      otherPlan: other._plan,
-    });
-    return (result.result as boolean) ?? false;
+    return this._analyzeResult({ type: "sameSemantics", otherPlan: other._plan }, isBoolean);
   }
 
   /** Returns a hash code of the logical plan. */
   async semanticHash(): Promise<number> {
-    const result = await this._session._analyzePlan({
-      type: "semanticHash",
-      plan: this._plan,
-    });
-    return (result.result as number) ?? 0;
+    return this._analyzeResult({ type: "semanticHash" }, isNumber);
   }
 
   /**
@@ -1280,7 +1279,7 @@ export class DataFrame<R extends Row = Row> {
    * unlike PySpark's method, since the answer comes from the server.
    */
   async isLocal(): Promise<boolean> {
-    return this._analyzeResult("isLocal", isBoolean);
+    return this._analyzeResult({ type: "isLocal" }, isBoolean);
   }
 
   /**
@@ -1289,7 +1288,7 @@ export class DataFrame<R extends Row = Row> {
    * comes from the server.
    */
   async isStreaming(): Promise<boolean> {
-    return this._analyzeResult("isStreaming", isBoolean);
+    return this._analyzeResult({ type: "isStreaming" }, isBoolean);
   }
 
   /**
@@ -1297,16 +1296,22 @@ export class DataFrame<R extends Row = Row> {
    * a source that is not file-based.
    */
   async inputFiles(): Promise<string[]> {
-    return this._analyzeResult("inputFiles", isStringArray);
+    return this._analyzeResult({ type: "inputFiles" }, isStringArray);
   }
 
-  // A missing field would otherwise read as false or empty, a plausible wrong
-  // answer; PySpark asserts on the same condition.
-  private async _analyzeResult<T>(type: string, isExpected: (v: unknown) => v is T): Promise<T> {
-    const response = await this._session._analyzePlan({ type, plan: this._plan });
-    const value = response.result;
+  // A missing field would otherwise read as false, zero, or empty, each a
+  // plausible wrong answer; PySpark asserts on the same condition.
+  private async _analyzeResult<T>(
+    request: { type: string } & Record<string, unknown>,
+    isExpected: (v: unknown) => v is T,
+    field = "result",
+  ): Promise<T> {
+    const response = await this._session._analyzePlan({ plan: this._plan, ...request });
+    const value = response[field];
     if (!isExpected(value)) {
-      throw new SparkClientError(`${type}(): the server response did not include a result.`);
+      throw new SparkClientError(
+        `${request.type}(): the server response did not include a result.`,
+      );
     }
 
     return value;
@@ -1526,12 +1531,7 @@ export class DataFrame<R extends Row = Row> {
   async explain(
     mode: "simple" | "extended" | "codegen" | "cost" | "formatted" = "simple",
   ): Promise<string> {
-    const result = await this._session._analyzePlan({
-      type: "explain",
-      plan: this._plan,
-      mode,
-    });
-    return (result.explainString as string) ?? "";
+    return this._analyzeResult({ type: "explain", mode }, isString, "explainString");
   }
 
   /**

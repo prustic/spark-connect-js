@@ -2029,3 +2029,23 @@ describe("Checkpoint release", () => {
     await assert.doesNotReject(spark._releaseCachedRelation("rel-7"));
   });
 });
+
+describe("Analyze results are never defaulted", () => {
+  it("sameSemantics(), semanticHash(), and explain() throw when the server omits the result", async () => {
+    const transport: Transport = {
+      async *executePlan() {},
+      async analyzePlan() {
+        return {};
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost")
+      .transport(transport)
+      .getOrCreate();
+    const df = spark.sql("SELECT 1");
+
+    await assert.rejects(df.sameSemantics(df), SparkClientError);
+    await assert.rejects(df.semanticHash(), SparkClientError);
+    await assert.rejects(df.explain(), SparkClientError);
+  });
+});
