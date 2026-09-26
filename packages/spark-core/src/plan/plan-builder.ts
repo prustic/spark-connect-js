@@ -176,6 +176,7 @@ export class PlanBuilder {
             aliases: plan.aliases.map((a) => ({
               expr: PlanBuilder.toExpression(a.expression),
               name: [a.name],
+              ...(a.metadata !== undefined && { metadata: a.metadata }),
             })),
           },
         };
@@ -567,6 +568,23 @@ export class PlanBuilder {
         return {
           unresolvedAttribute: {
             unparsedIdentifier: expr.name,
+            ...(expr.isMetadataColumn === true && { isMetadataColumn: true }),
+          },
+        };
+
+      case "unresolvedStar":
+        return {
+          unresolvedStar: {
+            ...(expr.target !== undefined && { unparsedTarget: expr.target }),
+            ...(expr.planId !== undefined && { planId: expr.planId.toString() }),
+          },
+        };
+
+      case "unresolvedRegex":
+        return {
+          unresolvedRegex: {
+            colName: expr.colName,
+            ...(expr.planId !== undefined && { planId: expr.planId.toString() }),
           },
         };
 

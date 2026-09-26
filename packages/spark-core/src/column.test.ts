@@ -502,3 +502,15 @@ describe("Column aliasing and composition", () => {
     assert.deepStrictEqual(doubled._expr, col("a").multiply(2)._expr);
   });
 });
+
+describe("col() star expansion", () => {
+  it("sends * and t.* as UnresolvedStar, as PySpark does", () => {
+    assert.deepStrictEqual(col("*")._expr, { type: "unresolvedStar" });
+    assert.deepStrictEqual(col("t.*")._expr, { type: "unresolvedStar", target: "t.*" });
+  });
+
+  it("leaves ordinary and dotted names as attributes", () => {
+    assert.deepStrictEqual(col("a")._expr, { type: "unresolvedAttribute", name: "a" });
+    assert.deepStrictEqual(col("t.a")._expr, { type: "unresolvedAttribute", name: "t.a" });
+  });
+});

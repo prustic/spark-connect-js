@@ -931,3 +931,54 @@ describe("PlanBuilder relation additions", () => {
     assert.equal("withinWatermark" in without.deduplicate, false);
   });
 });
+
+describe("PlanBuilder star, regex, and metadata expressions", () => {
+  it("unresolvedStar emits the target and plan id only when set", () => {
+    assert.deepStrictEqual(PlanBuilder.toExpression({ type: "unresolvedStar" }), {
+      unresolvedStar: {},
+    });
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "unresolvedStar", target: "t.*", planId: 7n }),
+      { unresolvedStar: { unparsedTarget: "t.*", planId: "7" } },
+    );
+  });
+
+  it("unresolvedRegex carries the pattern and plan id", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({ type: "unresolvedRegex", colName: "`a.*`", planId: 7n }),
+      { unresolvedRegex: { colName: "`a.*`", planId: "7" } },
+    );
+  });
+
+  it("unresolvedAttribute flags metadata columns", () => {
+    assert.deepStrictEqual(
+      PlanBuilder.toExpression({
+        type: "unresolvedAttribute",
+        name: "_metadata",
+        isMetadataColumn: true,
+      }),
+      { unresolvedAttribute: { unparsedIdentifier: "_metadata", isMetadataColumn: true } },
+    );
+  });
+
+  it("withColumns carries alias metadata only when present, and stays serializable", () => {
+    const child = { type: "sql" as const, query: "SELECT 1" };
+    const expression = { type: "unresolvedAttribute" as const, name: "a" };
+    const withMeta = PlanBuilder.toRelation({
+      type: "withColumns",
+      child,
+      aliases: [{ name: "a", expression, metadata: '{"unit":"kg"}' }],
+    }) as { withColumns: { aliases: Record<string, unknown>[] } };
+    assert.equal(withMeta.withColumns.aliases[0]["metadata"], '{"unit":"kg"}');
+
+    const without = PlanBuilder.toRelation({
+      type: "withColumns",
+      child,
+      aliases: [{ name: "a", expression }],
+    }) as { withColumns: { aliases: Record<string, unknown>[] } };
+    assert.equal("metadata" in without.withColumns.aliases[0], false);
+
+    const star = PlanBuilder.toExpression({ type: "unresolvedStar", planId: 1n });
+    assert.doesNotThrow(() => JSON.stringify([withMeta, star]));
+  });
+});

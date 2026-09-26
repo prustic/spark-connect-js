@@ -1748,3 +1748,111 @@ describe("DataFrame relation methods", () => {
     assert.throws(() => df.sampleBy("a", { x: 2 }), InvalidInputError);
   });
 });
+
+describe("DataFrame expression-level methods", () => {
+  it("colRegex() and metadataColumn() bind to this DataFrame's plan", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const planId = df._plan.planId;
+
+    assert.deepStrictEqual(df.colRegex("`a.*`")._expr, {
+      type: "unresolvedRegex",
+      colName: "`a.*`",
+      planId,
+    });
+    assert.deepStrictEqual(df.metadataColumn("_metadata")._expr, {
+      type: "unresolvedAttribute",
+      name: "_metadata",
+      planId,
+      isMetadataColumn: true,
+    });
+    assert.throws(() => df.colRegex(""), InvalidInputError);
+    assert.throws(() => df.metadataColumn("  "), InvalidInputError);
+  });
+
+  it("withMetadata() carries JSON metadata on the column's alias", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const plan = df.withMetadata("a", { unit: "kg" })._plan;
+
+    assert.ok(plan.type === "withColumns");
+    assert.equal(plan.aliases.length, 1);
+    assert.equal(plan.aliases[0].name, "a");
+    assert.equal(plan.aliases[0].metadata, '{"unit":"kg"}');
+    assert.deepStrictEqual(plan.aliases[0].expression, df.col("a")._expr);
+  });
+
+  it("withMetadata() rejects metadata that is not a serializable plain object", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const cyclic: Record<string, unknown> = {};
+    cyclic["self"] = cyclic;
+
+    assert.throws(() => df.withMetadata("", {}), InvalidInputError);
+    assert.throws(
+      () => df.withMetadata("a", null as unknown as Record<string, unknown>),
+      InvalidInputError,
+    );
+    assert.throws(
+      () => df.withMetadata("a", [] as unknown as Record<string, unknown>),
+      InvalidInputError,
+    );
+    assert.throws(
+      () => df.withMetadata("a", { big: 1n }),
+      (err: unknown) => err instanceof InvalidInputError && /column "a"/.test(err.message),
+    );
+    assert.throws(() => df.withMetadata("a", cyclic), InvalidInputError);
+  });
+
+  it("toJSON() selects to_json(struct(*)) as value", () => {
+    const { spark } = createSession();
+    const plan = spark.sql("SELECT * FROM t").toJSON()._plan;
+
+    assert.ok(plan.type === "project");
+    assert.deepStrictEqual(plan.expressions, [
+      {
+        type: "alias",
+        name: "value",
+        inner: {
+          type: "unresolvedFunction",
+          name: "to_json",
+          arguments: [
+            {
+              type: "unresolvedFunction",
+              name: "struct",
+              arguments: [{ type: "unresolvedStar" }],
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("sparkSession returns the owning session", () => {
+    const { spark } = createSession();
+    assert.equal(spark.sql("SELECT 1").sparkSession, spark);
+  });
+
+  it("toArrow() returns the raw chunks without a decoder", async () => {
+    const chunks = [new Uint8Array([1, 2]), new Uint8Array([3])];
+    const transport: Transport = {
+      async *executePlan() {
+        yield* chunks;
+      },
+    };
+    const spark = SparkSession.builder()
+      .remote("sc://localhost")
+      .transport(transport)
+      .getOrCreate();
+
+    assert.deepStrictEqual(await spark.sql("SELECT 1").toArrow(), chunks);
+  });
+
+  it("GroupedData.mean() builds the same plan as avg()", () => {
+    const { spark } = createSession();
+    const df = spark.sql("SELECT * FROM t");
+    const { planId: _meanId, ...mean } = df.groupBy("k").mean("v")._plan;
+    const { planId: _avgId, ...avg } = df.groupBy("k").avg("v")._plan;
+    assert.deepStrictEqual(mean, avg);
+  });
+});
