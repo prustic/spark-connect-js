@@ -1152,9 +1152,13 @@ export class DataFrame<R extends Row = Row> {
    * at runtime; without it the server rejects the call. `localCheckpoint`
    * needs no directory.
    *
-   * The checkpoint lives until the session stops. Unlike PySpark, which
-   * releases it when the DataFrame is garbage-collected, it is not released
-   * earlier, since JavaScript finalization is not guaranteed to run.
+   * The server releases the checkpointed relation once this DataFrame and
+   * every DataFrame derived from it are garbage-collected, or when the session
+   * stops. Release is best effort, as in the Scala and PySpark clients.
+   * Reliable checkpoint files outlive both: they stay in the server's
+   * checkpoint directory unless the server enables
+   * `spark.cleaner.referenceTracking.cleanCheckpoints`, and even then are
+   * deleted only after the relation is released.
    *
    * @param eager - Materialize now rather than on first use. Defaults to true.
    */
@@ -1165,7 +1169,8 @@ export class DataFrame<R extends Row = Row> {
   /**
    * Checkpoint this DataFrame to executor storage, truncating its lineage.
    * Faster than {@link checkpoint} but not fault tolerant: data is lost if an
-   * executor fails. Lives until the session stops, as `checkpoint` does.
+   * executor fails. Released as `checkpoint` is, and it writes nothing to the
+   * checkpoint directory.
    *
    * @param eager - Materialize now rather than on first use. Defaults to true.
    * @param storageLevel - Where to keep the data; the server default otherwise.
@@ -1195,7 +1200,13 @@ export class DataFrame<R extends Row = Row> {
       throw new SparkClientError("checkpoint: the server did not return a checkpointed relation.");
     }
 
-    return DataFrame._fromPlan<R>(this._session, { type: "cachedRemoteRelation", relationId });
+    const checkpointed = DataFrame._fromPlan<R>(this._session, {
+      type: "cachedRemoteRelation",
+      relationId,
+    });
+    this._session._trackCachedRelation(checkpointed._plan, relationId);
+
+    return checkpointed;
   }
 
   /**

@@ -98,3 +98,13 @@ describe("decodeCommandResponse: checkpointCommandResult", () => {
     assert.deepStrictEqual(decoded, { type: "checkpointCommandResult", relationId: "rel-9" });
   });
 });
+
+describe("buildCommandProto: removeCachedRemoteRelation", () => {
+  it("names the relation to release", () => {
+    const cmd = buildCommandProto({ type: "removeCachedRemoteRelation", relationId: "rel-3" });
+    if (cmd.commandType.case !== "removeCachedRemoteRelationCommand") {
+      assert.fail("expected removeCachedRemoteRelationCommand");
+    }
+    assert.equal(cmd.commandType.value.relation?.relationId, "rel-3");
+  });
+});

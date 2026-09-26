@@ -189,6 +189,10 @@ export class SparkSession {
   private readonly transport: Transport;
   private readonly remote: string;
   private readonly _tagSet: Set<string> = new Set();
+  private _stopped = false;
+  private readonly _relationCleaner = new FinalizationRegistry<string>((relationId) => {
+    void this._releaseCachedRelation(relationId);
+  });
   /** Observations registered via `DataFrame.observe`, routed by name. */
   private readonly _observations = new Map<string, Observation>();
   /** @internal */
@@ -560,7 +564,32 @@ export class SparkSession {
   /**
    * Stop the session: releases server-side state and closes the transport.
    */
+  /**
+   * @internal Release a server-held relation, such as a checkpoint, once no
+   * DataFrame can reach it. Best effort, as in the Scala and PySpark clients:
+   * skipped after `stop()`, which releases everything, and errors are dropped,
+   * since nothing awaits a cleanup callback.
+   */
+  _releaseCachedRelation(relationId: string): Promise<void> {
+    if (this._stopped) {
+      return Promise.resolve();
+    }
+
+    return this._executeCommand({ type: "removeCachedRemoteRelation", relationId }).catch(
+      () => undefined,
+    );
+  }
+
+  /**
+   * @internal Release `relationId` once `planNode` is unreachable. Keyed on the
+   * plan node, not the DataFrame, so frames derived from it keep it alive.
+   */
+  _trackCachedRelation(planNode: object, relationId: string): void {
+    this._relationCleaner.register(planNode, relationId);
+  }
+
   async stop(): Promise<void> {
+    this._stopped = true;
     if (this.transport.releaseSession) {
       await this.transport.releaseSession(this.sessionId);
     }

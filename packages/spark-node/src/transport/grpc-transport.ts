@@ -61,6 +61,8 @@ import {
   WriteOperationV2Schema,
   MergeIntoTableCommandSchema,
   CheckpointCommandSchema,
+  RemoveCachedRemoteRelationCommandSchema,
+  CachedRemoteRelationSchema,
   WriteOperationV2_Mode,
   CreateDataFrameViewCommandSchema,
   WriteStreamOperationStartSchema,
@@ -1473,6 +1475,19 @@ export function buildCommandProto(command: Record<string, unknown>): Command {
           local: command.local === true,
           eager: command.eager === true,
           storageLevel: buildStorageLevel(command.storageLevel),
+        }),
+      },
+    });
+  }
+
+  if (type === "removeCachedRemoteRelation") {
+    return create(CommandSchema, {
+      commandType: {
+        case: "removeCachedRemoteRelationCommand",
+        value: create(RemoveCachedRemoteRelationCommandSchema, {
+          relation: create(CachedRemoteRelationSchema, {
+            relationId: command.relationId as string,
+          }),
         }),
       },
     });

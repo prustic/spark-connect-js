@@ -406,6 +406,8 @@ export {
   // Checkpoint
   type CheckpointCommand,
   CheckpointCommandSchema,
+  type RemoveCachedRemoteRelationCommand,
+  RemoveCachedRemoteRelationCommandSchema,
 } from "./gen/spark/connect/commands_pb.js";
 
 // Common messages (StorageLevel, etc.)

@@ -11,13 +11,13 @@ describe("DataFrame methods answered by the server", () => {
     assert.equal(await spark().readStream.format("rate").load().isStreaming(), true);
   });
 
-  it("isLocal() is true for client-supplied rows and false for server-computed ones", async () => {
-    assert.equal(
-      await spark()
-        .createDataFrame([{ id: 1n }])
-        .isLocal(),
-      true,
-    );
+  it("isLocal() is true only when the top of the plan is local data or a command result", async () => {
+    const rows = spark().createDataFrame([{ id: 1n }]);
+    assert.equal(await rows.isLocal(), true);
+    // Connect turns an executed SQL command into local data.
+    assert.equal(await spark().sql("SHOW DATABASES").isLocal(), true);
+    // Only the top node counts, so a transformation over local data is not local.
+    assert.equal(await rows.filter("id > 0").isLocal(), false);
     assert.equal(await spark().range(10).isLocal(), false);
   });
 
@@ -50,5 +50,16 @@ describe("DataFrame methods answered by the server", () => {
   it("localCheckpoint() works lazily with an explicit storage level", async () => {
     const checkpointed = await spark().range(5).localCheckpoint(false, MEMORY_ONLY);
     assert.equal(await checkpointed.count(), 5n);
+  });
+
+  it("releasing a checkpoint frees the server-held relation", async () => {
+    const checkpointed = await spark().range(5).checkpoint();
+    assert.equal(await checkpointed.count(), 5n);
+
+    const plan = checkpointed._plan;
+    assert.ok(plan.type === "cachedRemoteRelation");
+    // Normally triggered by garbage collection, which a test cannot force.
+    await spark()._releaseCachedRelation(plan.relationId);
+    await assert.rejects(checkpointed.count());
   });
 });

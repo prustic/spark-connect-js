@@ -1978,3 +1978,54 @@ describe("DataFrame server-answered methods", () => {
     await assert.rejects(spark.sql("SELECT 1").checkpoint(), SparkClientError);
   });
 });
+
+describe("Checkpoint release", () => {
+  function sessionRecording(executeCommand: Transport["executeCommand"]) {
+    const transport: Transport = {
+      async *executePlan() {},
+      executeCommand,
+      async executeCommandResponses() {
+        return [{ type: "checkpointCommandResult", relationId: "rel-7" }];
+      },
+    };
+    return SparkSession.builder().remote("sc://localhost").transport(transport).getOrCreate();
+  }
+
+  it("tracks the checkpoint's plan node, which derived frames keep reachable", async () => {
+    const spark = sessionRecording(async () => {});
+    const tracked: [object, string][] = [];
+    spark._trackCachedRelation = (node, id) => {
+      tracked.push([node, id]);
+    };
+
+    const checkpointed = await spark.sql("SELECT 1").checkpoint();
+    assert.equal(tracked.length, 1);
+    assert.equal(tracked[0][0], checkpointed._plan);
+    assert.equal(tracked[0][1], "rel-7");
+
+    const derived = checkpointed.filter("true")._plan;
+    assert.ok(derived.type === "filter");
+    assert.equal(derived.child, checkpointed._plan);
+  });
+
+  it("sends the release command, and skips it once the session is stopped", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const spark = sessionRecording(async (_sid, command) => {
+      sent.push(command);
+    });
+
+    await spark._releaseCachedRelation("rel-7");
+    assert.deepStrictEqual(sent, [{ type: "removeCachedRemoteRelation", relationId: "rel-7" }]);
+
+    await spark.stop();
+    await spark._releaseCachedRelation("rel-8");
+    assert.equal(sent.length, 1);
+  });
+
+  it("drops a failed release instead of rejecting", async () => {
+    const spark = sessionRecording(async () => {
+      throw new Error("server gone");
+    });
+    await assert.doesNotReject(spark._releaseCachedRelation("rel-7"));
+  });
+});
