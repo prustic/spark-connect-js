@@ -44,8 +44,12 @@ describe("DataFrame expression-level methods", () => {
 
     const table = new Table(chunks.flatMap((c) => tableFromIPC(c).batches));
     assert.equal(table.numRows, 100_000);
-    // The trap the TSDoc warns about: the array form reads only the first stream.
-    assert.ok(tableFromIPC(chunks).numRows < 100_000);
+    // Pins apache-arrow's behavior, not ours: if this starts failing after an
+    // arrow upgrade, the first-stream warning in the toArrow TSDoc is stale.
+    assert.ok(
+      tableFromIPC(chunks).numRows < 100_000,
+      "tableFromIPC(chunks) now reads every stream; drop the warning from the toArrow TSDoc",
+    );
   });
 
   it("metadataColumn('_metadata') exposes the source file of a parquet read", async () => {
