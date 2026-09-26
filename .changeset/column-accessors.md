@@ -8,4 +8,4 @@
 
 `getItem` on an array index past the end now throws `INVALID_ARRAY_INDEX` under Spark's default ANSI mode, as PySpark does, where it previously returned null. Use the `get` function for a null-returning lookup.
 
-`df.col("*")` now expands to the DataFrame's columns instead of failing with `UNRESOLVED_COLUMN`.
+`df.col("*")` now expands to the DataFrame's columns instead of failing with `UNRESOLVED_COLUMN`. `df.col("t.*")` throws `InvalidInputError` pointing at `col("t.*")`, since a qualified star cannot be bound to a DataFrame and the server's error does not say so.

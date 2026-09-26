@@ -1864,13 +1864,14 @@ describe("DataFrame.col star handling", () => {
     assert.deepStrictEqual(df.col("*")._expr, { type: "unresolvedStar", planId: df._plan.planId });
   });
 
-  it("keeps df.col('t.*') an attribute, since a targeted star cannot carry a plan id", () => {
+  it("rejects df.col('t.*') and points at col('t.*')", () => {
     const { spark } = createSession();
     const df = spark.sql("SELECT * FROM t");
-    assert.deepStrictEqual(df.col("t.*")._expr, {
-      type: "unresolvedAttribute",
-      name: "t.*",
-      planId: df._plan.planId,
-    });
+    assert.throws(
+      () => df.col("t.*"),
+      (err: unknown) => err instanceof InvalidInputError && /use col\("t\.\*"\)/.test(err.message),
+    );
+    // A quoted name that merely contains the characters is still an attribute.
+    assert.equal(df.col("`t.*`")._expr.type, "unresolvedAttribute");
   });
 });
