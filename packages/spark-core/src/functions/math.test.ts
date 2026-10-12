@@ -45,9 +45,27 @@ import {
   positive,
   e,
   pi,
+  ceiling,
+  power,
+  ln,
+  cot,
+  csc,
+  sec,
+  asinh,
+  acosh,
+  atanh,
+  conv,
+  width_bucket,
+  random,
+  uniform,
+  try_add,
+  try_subtract,
+  try_multiply,
+  try_divide,
+  try_mod,
 } from "./math.js";
 
-import { col, type Column } from "../column.js";
+import { col, lit, type Column } from "../column.js";
 
 // Helper: assert unresolvedFunction with correct name
 function assertFn(col: Column, name: string) {
@@ -218,5 +236,84 @@ describe("math functions", () => {
   it("e() and pi() are zero-arg", () => {
     assertFn(e(), "e");
     assertFn(pi(), "pi");
+  });
+});
+
+describe("math functions added for PySpark parity", () => {
+  it("send the function name PySpark sends", () => {
+    const cases: [Column, string, number][] = [
+      [ln("x"), "ln", 1],
+      [cot("x"), "cot", 1],
+      [csc("x"), "csc", 1],
+      [sec("x"), "sec", 1],
+      [asinh("x"), "asinh", 1],
+      [acosh("x"), "acosh", 1],
+      [atanh("x"), "atanh", 1],
+      [ceiling("x"), "ceiling", 1],
+      [try_add("a", "b"), "try_add", 2],
+      [try_subtract("a", "b"), "try_subtract", 2],
+      [try_multiply("a", "b"), "try_multiply", 2],
+      [try_divide("a", "b"), "try_divide", 2],
+      [try_mod("a", "b"), "try_mod", 2],
+    ];
+    for (const [result, name, argCount] of cases) {
+      assert.ok(result._expr.type === "unresolvedFunction", name);
+      assert.equal(result._expr.name, name);
+      assert.equal(result._expr.arguments.length, argCount, name);
+    }
+  });
+
+  it("power and random are the same functions as pow and rand, as in PySpark", () => {
+    assert.equal(power, pow);
+    assert.equal(random, rand);
+  });
+
+  it("ceil, ceiling, and floor take an optional scale", () => {
+    for (const [result, name] of [
+      [ceil("x", 2), "ceil"],
+      [ceiling("x", 2), "ceiling"],
+      [floor("x", lit(2)), "floor"],
+    ] as const) {
+      assert.ok(result._expr.type === "unresolvedFunction");
+      assert.equal(result._expr.name, name);
+      assert.deepStrictEqual(result._expr.arguments[1], { type: "literal", value: 2 });
+    }
+  });
+
+  it("conv takes its bases as literals", () => {
+    const result = conv("x", 16, 2);
+    assert.ok(result._expr.type === "unresolvedFunction");
+    assert.deepStrictEqual(result._expr.arguments.slice(1), [
+      { type: "literal", value: 16 },
+      { type: "literal", value: 2 },
+    ]);
+  });
+
+  it("width_bucket reads a number as a literal and a string as a column", () => {
+    const literal = width_bucket("v", "lo", "hi", 5);
+    const named = width_bucket("v", "lo", "hi", "n");
+    assert.ok(literal._expr.type === "unresolvedFunction");
+    assert.ok(named._expr.type === "unresolvedFunction");
+    assert.deepStrictEqual(literal._expr.arguments[3], { type: "literal", value: 5 });
+    assert.deepStrictEqual(named._expr.arguments[3], { type: "unresolvedAttribute", name: "n" });
+  });
+
+  it("picks a non-negative 63-bit seed on the client when none is given", () => {
+    for (const result of [rand(), randn(), random(), uniform(0, 10)]) {
+      assert.ok(result._expr.type === "unresolvedFunction");
+      const seed = result._expr.arguments.at(-1);
+      assert.ok(seed?.type === "literal" && typeof seed.value === "bigint");
+      assert.ok(seed.value >= 0n && seed.value < 2n ** 63n);
+    }
+  });
+
+  it("passes a given seed through", () => {
+    const result = uniform(0, 10, 42);
+    assert.ok(result._expr.type === "unresolvedFunction");
+    assert.deepStrictEqual(result._expr.arguments, [
+      { type: "literal", value: 0 },
+      { type: "literal", value: 10 },
+      { type: "literal", value: 42 },
+    ]);
   });
 });
