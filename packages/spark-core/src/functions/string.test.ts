@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { col } from "../column.js";
+import { col, lit } from "../column.js";
 import {
   upper,
   lower,
@@ -109,6 +109,34 @@ describe("string functions", () => {
     assertFn(regexp_substr("x", "a+"), "regexp_substr", 2);
     assertFn(regexp_instr("x", "a+"), "regexp_instr", 2);
     assertFn(regexp_instr("x", "(a)", 1), "regexp_instr", 3);
+  });
+
+  it("reads a bare string pattern or value as a column name, as PySpark does", () => {
+    const cases: [string, Column][] = [
+      ["regexp_extract_all", regexp_extract_all("s", "p")],
+      ["regexp_like", regexp_like("s", "p")],
+      ["regexp_count", regexp_count("s", "p")],
+      ["regexp_substr", regexp_substr("s", "p")],
+      ["regexp_instr", regexp_instr("s", "p")],
+      ["contains", contains("s", "p")],
+      ["startswith", startswith("s", "p")],
+      ["endswith", endswith("s", "p")],
+    ];
+    for (const [name, result] of cases) {
+      assert.ok(result._expr.type === "unresolvedFunction", name);
+      assert.deepStrictEqual(
+        result._expr.arguments[1],
+        { type: "unresolvedAttribute", name: "p" },
+        name,
+      );
+    }
+  });
+
+  it("takes a literal pattern or value through lit()", () => {
+    for (const result of [regexp_like("s", lit("a+")), contains("s", lit("a"))]) {
+      assert.ok(result._expr.type === "unresolvedFunction");
+      assert.equal(result._expr.arguments[1].type, "literal");
+    }
   });
 
   it("regexp family accepts a Column pattern", () => {

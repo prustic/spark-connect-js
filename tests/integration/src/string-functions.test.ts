@@ -2,6 +2,7 @@ import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
 import {
   col,
+  lit,
   lower,
   trim,
   length,
@@ -19,6 +20,9 @@ import {
   regexp_extract_all,
   regexp_like,
   regexp_count,
+  contains,
+  startswith,
+  endswith,
   regexp_substr,
   regexp_instr,
   soundex,
@@ -104,11 +108,11 @@ describe("string functions", () => {
     const rows = await spark()
       .sql("SELECT 'user-42, user-7' AS s")
       .withColumn("first_id", regexp_extract(col("s"), "user-(\\d+)", 1))
-      .withColumn("all_ids", regexp_extract_all(col("s"), "user-(\\d+)"))
-      .withColumn("is_match", regexp_like(col("s"), "user-\\d+"))
-      .withColumn("matches", regexp_count(col("s"), "user-\\d+"))
-      .withColumn("first_sub", regexp_substr(col("s"), "user-\\d+"))
-      .withColumn("pos", regexp_instr(col("s"), "user-\\d+"))
+      .withColumn("all_ids", regexp_extract_all(col("s"), lit("user-(\\d+)")))
+      .withColumn("is_match", regexp_like(col("s"), lit("user-\\d+")))
+      .withColumn("matches", regexp_count(col("s"), lit("user-\\d+")))
+      .withColumn("first_sub", regexp_substr(col("s"), lit("user-\\d+")))
+      .withColumn("pos", regexp_instr(col("s"), lit("user-\\d+")))
       .collect();
 
     assert.equal(rows[0]["first_id"], "42");
@@ -123,10 +127,10 @@ describe("string functions", () => {
     const rows = await spark()
       .sql("SELECT 'nothing here' AS s")
       .withColumn("extracted", regexp_extract(col("s"), "user-(\\d+)", 1))
-      .withColumn("is_match", regexp_like(col("s"), "user-\\d+"))
-      .withColumn("matches", regexp_count(col("s"), "user-\\d+"))
-      .withColumn("first_sub", regexp_substr(col("s"), "user-\\d+"))
-      .withColumn("pos", regexp_instr(col("s"), "user-\\d+"))
+      .withColumn("is_match", regexp_like(col("s"), lit("user-\\d+")))
+      .withColumn("matches", regexp_count(col("s"), lit("user-\\d+")))
+      .withColumn("first_sub", regexp_substr(col("s"), lit("user-\\d+")))
+      .withColumn("pos", regexp_instr(col("s"), lit("user-\\d+")))
       .collect();
 
     assert.equal(rows[0]["extracted"], "");
@@ -147,11 +151,34 @@ describe("string functions", () => {
   it("regexp_extract_all and regexp_instr take an explicit group index", async () => {
     const rows = await spark()
       .sql("SELECT '12-34, 56-78' AS s")
-      .withColumn("second_groups", regexp_extract_all(col("s"), "(\\d+)-(\\d+)", 2))
-      .withColumn("pos", regexp_instr(col("s"), "(\\d+)-(\\d+)", 1))
+      .withColumn("second_groups", regexp_extract_all(col("s"), lit("(\\d+)-(\\d+)"), 2))
+      .withColumn("pos", regexp_instr(col("s"), lit("(\\d+)-(\\d+)"), 1))
       .collect();
 
     assert.deepStrictEqual(rows[0]["second_groups"], ["34", "78"]);
     assert.equal(rows[0]["pos"], 1);
+  });
+
+  it("reads a bare string pattern or value as a column, matching the same SQL", async () => {
+    const source =
+      "SELECT * FROM VALUES ('apple', '^b', 'pp'), ('banana', '^b', 'an') AS t(s, p, v)";
+    const df = spark().sql(source);
+    const ours = await df
+      .select(
+        regexp_like(col("s"), "p").alias("like"),
+        regexp_count(col("s"), "p").alias("count"),
+        contains(col("s"), "v").alias("contains"),
+        startswith(col("s"), "v").alias("starts"),
+        endswith(col("s"), "v").alias("ends"),
+      )
+      .collect();
+    const sql = await spark()
+      .sql(
+        `SELECT regexp_like(s, p) AS like, regexp_count(s, p) AS count, contains(s, v) AS contains,
+                startswith(s, v) AS starts, endswith(s, v) AS ends FROM (${source})`,
+      )
+      .collect();
+
+    assert.deepEqual(ours, sql);
   });
 });

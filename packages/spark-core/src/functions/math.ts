@@ -2,7 +2,16 @@
  * Math functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, _liftCol, type ColOrName, fn } from "./_helpers.js";
+import {
+  Column,
+  fnExpr,
+  toExpr,
+  toNumberOrExpr,
+  _lit,
+  _liftCol,
+  type ColOrName,
+  fn,
+} from "./_helpers.js";
 
 /** Computes the absolute value of a numeric value. */
 export function abs(column: ColOrName): Column {
@@ -43,8 +52,8 @@ export function cbrt(column: ColOrName): Column {
  * Returns the value of the first argument raised to the power of the second.
  * `exponent` accepts a `Column` (per-row exponent) or a numeric literal.
  */
-export function pow(column: ColOrName, exponent: Column | number): Column {
-  return new Column(fnExpr("power", toExpr(column), _liftCol(exponent)._expr));
+export function pow(column: ColOrName, exponent: ColOrName | number): Column {
+  return new Column(fnExpr("power", toExpr(column), toNumberOrExpr(exponent)));
 }
 
 /** Computes the natural logarithm of the given value. */

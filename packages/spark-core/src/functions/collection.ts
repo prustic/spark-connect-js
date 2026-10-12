@@ -2,7 +2,17 @@
  * Collection / struct / array / map functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js";
+import {
+  Column,
+  fnExpr,
+  toExpr,
+  toNumberOrExpr,
+  _lit,
+  _liftCol,
+  type ColOrName,
+  fn,
+} from "./_helpers.js";
+import type { ColOrLiteral } from "../column.js";
 
 // Struct
 
@@ -18,9 +28,12 @@ export function array(...columns: ColOrName[]): Column {
   return fn("array", ...columns);
 }
 
-/** Returns true if the array contains the given value. */
-export function array_contains(column: ColOrName, value: ColOrName): Column {
-  return fn("array_contains", column, value);
+/**
+ * Returns true if the array contains `value`. As in PySpark, a string `value`
+ * is a literal. Pass a Column to compare against another column.
+ */
+export function array_contains(column: ColOrName, value: ColOrLiteral): Column {
+  return new Column(fnExpr("array_contains", toExpr(column), _liftCol(value)._expr));
 }
 
 /** Removes duplicate values from the array. */
@@ -70,19 +83,25 @@ export function array_min(column: ColOrName): Column {
   return fn("array_min", column);
 }
 
-/** Returns the (1-based) index of the first element of the array as long. */
-export function array_position(column: ColOrName, value: ColOrName): Column {
-  return fn("array_position", column, value);
+/**
+ * Returns the 1-based position of the first element equal to `value`, or 0.
+ * As in PySpark, a string `value` is a literal.
+ */
+export function array_position(column: ColOrName, value: ColOrLiteral): Column {
+  return new Column(fnExpr("array_position", toExpr(column), _liftCol(value)._expr));
 }
 
-/** Removes all elements that equal to the given element from the array. */
-export function array_remove(column: ColOrName, element: ColOrName): Column {
-  return fn("array_remove", column, element);
+/**
+ * Removes every element equal to `element` from the array. As in PySpark, a
+ * string `element` is a literal.
+ */
+export function array_remove(column: ColOrName, element: ColOrLiteral): Column {
+  return new Column(fnExpr("array_remove", toExpr(column), _liftCol(element)._expr));
 }
 
 /** Creates an array containing the given element repeated count times. */
-export function array_repeat(column: ColOrName, count: number): Column {
-  return new Column(fnExpr("array_repeat", toExpr(column), _lit(count)._expr));
+export function array_repeat(column: ColOrName, count: ColOrName | number): Column {
+  return new Column(fnExpr("array_repeat", toExpr(column), toNumberOrExpr(count)));
 }
 
 /** Removes null values from the array. */
@@ -112,23 +131,26 @@ export function sequence(start: ColOrName, stop: ColOrName, step?: ColOrName): C
 }
 
 /**
- * Returns the element at the given (1-based) index in the array or the value
- * for the given key in a map. `index` accepts a `Column`, a column-name string,
- * or a numeric literal. For a literal map key use `lit("key")` explicitly.
+ * Returns the element at the given 1-based index of an array, or the value for
+ * the given key of a map. As in PySpark and Scala, a string or number `index`
+ * is a literal key. Pass a Column to look up by another column's value.
  */
-export function element_at(column: ColOrName, index: ColOrName | number): Column {
-  const idxExpr = typeof index === "number" ? _lit(index)._expr : toExpr(index);
-  return new Column(fnExpr("element_at", toExpr(column), idxExpr));
+export function element_at(column: ColOrName, index: ColOrLiteral): Column {
+  return new Column(fnExpr("element_at", toExpr(column), _liftCol(index)._expr));
 }
 
 /** Returns the element at the given (0-based) index in the array. */
-export function get(column: ColOrName, index: number): Column {
-  return new Column(fnExpr("get", toExpr(column), _lit(index)._expr));
+export function get(column: ColOrName, index: ColOrName | number): Column {
+  return new Column(fnExpr("get", toExpr(column), toNumberOrExpr(index)));
 }
 
 /** Returns a portion of the array starting at the given index with the given length. */
-export function slice(column: ColOrName, start: number, length: number): Column {
-  return new Column(fnExpr("slice", toExpr(column), _lit(start)._expr, _lit(length)._expr));
+export function slice(
+  column: ColOrName,
+  start: ColOrName | number,
+  length: ColOrName | number,
+): Column {
+  return new Column(fnExpr("slice", toExpr(column), toNumberOrExpr(start), toNumberOrExpr(length)));
 }
 
 // Explode variants

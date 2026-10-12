@@ -16,6 +16,16 @@ export function toExpr(c: ColOrName): Expression {
   return toCol(c)._expr;
 }
 
+/**
+ * An argument PySpark types `Union[ColumnOrName, int]`: a number is a literal,
+ * a string names a column.
+ *
+ * @internal
+ */
+export function toNumberOrExpr(v: ColOrName | number): Expression {
+  return typeof v === "number" ? _lit(v)._expr : toExpr(v);
+}
+
 export function fnExpr(name: string, ...args: Expression[]): Expression {
   return { type: "unresolvedFunction", name, arguments: args };
 }
