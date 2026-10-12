@@ -99,72 +99,101 @@ export function regexp_extract(column: ColOrName, pattern: string, groupIdx: num
 
 /**
  * Extracts all occurrences of the group matched by the regex pattern as an
- * array. `pattern` accepts a `Column` (per-row values) or a string literal.
- * `groupIdx` defaults to 1 on the server.
+ * array. `groupIdx` defaults to 1 on the server.
+ *
+ * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
+ * `lit()`.
+ *
+ * @example regexp_extract_all(col("s"), lit("(\\d+)"))
  */
 export function regexp_extract_all(
   column: ColOrName,
-  pattern: Column | string,
+  pattern: ColOrName,
   groupIdx?: Column | number,
 ): Column {
-  const args = [toExpr(column), _liftCol(pattern)._expr];
+  const args = [toExpr(column), toExpr(pattern)];
   if (groupIdx !== undefined) args.push(_liftCol(groupIdx)._expr);
   return new Column(fnExpr("regexp_extract_all", ...args));
 }
 
 /**
- * Returns true when the string matches the regex pattern. `pattern` accepts
- * a `Column` (per-row values) or a string literal.
+ * Returns true when the string matches the regex pattern.
+ *
+ * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
+ * `lit()`.
+ *
+ * @example regexp_like(col("s"), lit("^user-\\d+$"))
  */
-export function regexp_like(column: ColOrName, pattern: Column | string): Column {
-  return new Column(fnExpr("regexp_like", toExpr(column), _liftCol(pattern)._expr));
+export function regexp_like(column: ColOrName, pattern: ColOrName): Column {
+  return new Column(fnExpr("regexp_like", toExpr(column), toExpr(pattern)));
 }
 
 /**
- * Counts how many times the regex pattern matches in the string. `pattern`
- * accepts a `Column` (per-row values) or a string literal.
+ * Counts how many times the regex pattern matches in the string.
+ *
+ * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
+ * `lit()`.
  */
-export function regexp_count(column: ColOrName, pattern: Column | string): Column {
-  return new Column(fnExpr("regexp_count", toExpr(column), _liftCol(pattern)._expr));
+export function regexp_count(column: ColOrName, pattern: ColOrName): Column {
+  return new Column(fnExpr("regexp_count", toExpr(column), toExpr(pattern)));
 }
 
 /**
  * Returns the first substring matching the regex pattern, or NULL when the
- * pattern does not match. `pattern` accepts a `Column` (per-row values) or a
- * string literal.
+ * pattern does not match.
+ *
+ * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
+ * `lit()`.
  */
-export function regexp_substr(column: ColOrName, pattern: Column | string): Column {
-  return new Column(fnExpr("regexp_substr", toExpr(column), _liftCol(pattern)._expr));
+export function regexp_substr(column: ColOrName, pattern: ColOrName): Column {
+  return new Column(fnExpr("regexp_substr", toExpr(column), toExpr(pattern)));
 }
 
 /**
  * Returns the 1-based position of the first match of the regex pattern, or 0
- * when the pattern does not match. `pattern` accepts a `Column` (per-row
- * values) or a string literal. `groupIdx` selects a match group.
+ * when the pattern does not match. `groupIdx` selects a match group.
+ *
+ * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
+ * `lit()`.
  */
 export function regexp_instr(
   column: ColOrName,
-  pattern: Column | string,
+  pattern: ColOrName,
   groupIdx?: Column | number,
 ): Column {
-  const args = [toExpr(column), _liftCol(pattern)._expr];
+  const args = [toExpr(column), toExpr(pattern)];
   if (groupIdx !== undefined) args.push(_liftCol(groupIdx)._expr);
   return new Column(fnExpr("regexp_instr", ...args));
 }
 
-/** Returns true if the string column contains the specified string. */
-export function contains(column: ColOrName, value: string): Column {
-  return new Column(fnExpr("contains", toExpr(column), _lit(value)._expr));
+/**
+ * Returns true if `column` contains `value`.
+ *
+ * As in PySpark, a string `value` names a column. For a literal, use
+ * `lit("abc")` here or the `col("s").contains("abc")` method.
+ */
+export function contains(column: ColOrName, value: ColOrName): Column {
+  return new Column(fnExpr("contains", toExpr(column), toExpr(value)));
 }
 
-/** Returns true if the string column starts with the specified prefix. */
-export function startswith(column: ColOrName, prefix: string): Column {
-  return new Column(fnExpr("startswith", toExpr(column), _lit(prefix)._expr));
+/**
+ * Returns true if `column` starts with `prefix`.
+ *
+ * As in PySpark, a string `prefix` names a column. For a literal, use
+ * `lit("abc")` here or the `col("s").startsWith("abc")` method.
+ */
+export function startswith(column: ColOrName, prefix: ColOrName): Column {
+  return new Column(fnExpr("startswith", toExpr(column), toExpr(prefix)));
 }
 
-/** Returns true if the string column ends with the specified suffix. */
-export function endswith(column: ColOrName, suffix: string): Column {
-  return new Column(fnExpr("endswith", toExpr(column), _lit(suffix)._expr));
+/**
+ * Returns true if `column` ends with `suffix`.
+ *
+ * As in PySpark, a string `suffix` names a column. For a literal, use
+ * `lit("abc")` here or the `col("s").endsWith("abc")` method.
+ */
+export function endswith(column: ColOrName, suffix: ColOrName): Column {
+  return new Column(fnExpr("endswith", toExpr(column), toExpr(suffix)));
 }
 
 /** Splits the string around matches of the given pattern. */
