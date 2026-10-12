@@ -2,7 +2,16 @@
  * String functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, _liftCol, type ColOrName, fn } from "./_helpers.js";
+import {
+  Column,
+  fnExpr,
+  toExpr,
+  toNumberOrExpr,
+  _lit,
+  _liftCol,
+  type ColOrName,
+  fn,
+} from "./_helpers.js";
 
 /** Converts a string column to upper case. */
 export function upper(column: ColOrName): Column {
@@ -68,8 +77,12 @@ export function concat_ws(sep: string, ...columns: ColOrName[]): Column {
 }
 
 /** Returns the substring from a string column starting at the given position with the given length. */
-export function substring(column: ColOrName, pos: number, len: number): Column {
-  return new Column(fnExpr("substring", toExpr(column), _lit(pos)._expr, _lit(len)._expr));
+export function substring(
+  column: ColOrName,
+  pos: ColOrName | number,
+  len: ColOrName | number,
+): Column {
+  return new Column(fnExpr("substring", toExpr(column), toNumberOrExpr(pos), toNumberOrExpr(len)));
 }
 
 /**
@@ -101,8 +114,8 @@ export function regexp_extract(column: ColOrName, pattern: string, groupIdx: num
  * Extracts all occurrences of the group matched by the regex pattern as an
  * array. `groupIdx` defaults to 1 on the server.
  *
- * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
- * `lit()`.
+ * As in PySpark, a string `pattern` names a column, so wrap a literal pattern
+ * in `lit()`.
  *
  * @example regexp_extract_all(col("s"), lit("(\\d+)"))
  */
@@ -119,8 +132,8 @@ export function regexp_extract_all(
 /**
  * Returns true when the string matches the regex pattern.
  *
- * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
- * `lit()`.
+ * As in PySpark, a string `pattern` names a column, so wrap a literal pattern
+ * in `lit()`.
  *
  * @example regexp_like(col("s"), lit("^user-\\d+$"))
  */
@@ -131,8 +144,8 @@ export function regexp_like(column: ColOrName, pattern: ColOrName): Column {
 /**
  * Counts how many times the regex pattern matches in the string.
  *
- * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
- * `lit()`.
+ * As in PySpark, a string `pattern` names a column, so wrap a literal pattern
+ * in `lit()`.
  */
 export function regexp_count(column: ColOrName, pattern: ColOrName): Column {
   return new Column(fnExpr("regexp_count", toExpr(column), toExpr(pattern)));
@@ -142,8 +155,8 @@ export function regexp_count(column: ColOrName, pattern: ColOrName): Column {
  * Returns the first substring matching the regex pattern, or NULL when the
  * pattern does not match.
  *
- * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
- * `lit()`.
+ * As in PySpark, a string `pattern` names a column, so wrap a literal pattern
+ * in `lit()`.
  */
 export function regexp_substr(column: ColOrName, pattern: ColOrName): Column {
   return new Column(fnExpr("regexp_substr", toExpr(column), toExpr(pattern)));
@@ -153,8 +166,8 @@ export function regexp_substr(column: ColOrName, pattern: ColOrName): Column {
  * Returns the 1-based position of the first match of the regex pattern, or 0
  * when the pattern does not match. `groupIdx` selects a match group.
  *
- * As in PySpark, a string `pattern` names a column; wrap a literal pattern in
- * `lit()`.
+ * As in PySpark, a string `pattern` names a column, so wrap a literal pattern
+ * in `lit()`.
  */
 export function regexp_instr(
   column: ColOrName,
@@ -217,8 +230,8 @@ export function rpad(column: ColOrName, len: number, pad: string): Column {
 }
 
 /** Repeats a string column n times. */
-export function repeat(column: ColOrName, n: number): Column {
-  return new Column(fnExpr("repeat", toExpr(column), _lit(n)._expr));
+export function repeat(column: ColOrName, n: ColOrName | number): Column {
+  return new Column(fnExpr("repeat", toExpr(column), toNumberOrExpr(n)));
 }
 
 /** Reverses the string column. */
@@ -277,20 +290,25 @@ export function levenshtein(left: ColOrName, right: ColOrName): Column {
 }
 
 /** Overlays the specified portion of a string with another string. */
-export function overlay(src: ColOrName, replace: ColOrName, pos: number, len = -1): Column {
+export function overlay(
+  src: ColOrName,
+  replace: ColOrName,
+  pos: ColOrName | number,
+  len: ColOrName | number = -1,
+): Column {
   return new Column(
-    fnExpr("overlay", toExpr(src), toExpr(replace), _lit(pos)._expr, _lit(len)._expr),
+    fnExpr("overlay", toExpr(src), toExpr(replace), toNumberOrExpr(pos), toNumberOrExpr(len)),
   );
 }
 
 /** Returns the leftmost len characters from the string column. */
-export function left(column: ColOrName, len: number): Column {
-  return new Column(fnExpr("left", toExpr(column), _lit(len)._expr));
+export function left(column: ColOrName, len: ColOrName | number): Column {
+  return new Column(fnExpr("left", toExpr(column), toNumberOrExpr(len)));
 }
 
 /** Returns the rightmost len characters from the string column. */
-export function right(column: ColOrName, len: number): Column {
-  return new Column(fnExpr("right", toExpr(column), _lit(len)._expr));
+export function right(column: ColOrName, len: ColOrName | number): Column {
+  return new Column(fnExpr("right", toExpr(column), toNumberOrExpr(len)));
 }
 
 /** Computes the first argument into a binary from a string using the provided character set. */

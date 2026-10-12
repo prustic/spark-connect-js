@@ -130,15 +130,28 @@ describe("collection functions", () => {
     }
   });
 
-  it("element_at with a string index treats it as a column name", () => {
-    const result = element_at("arr", "idx_col");
-    if (result._expr.type === "unresolvedFunction") {
-      const idxExpr = result._expr.arguments[1];
-      assert.equal(idxExpr.type, "unresolvedAttribute");
-      if (idxExpr.type === "unresolvedAttribute") {
-        assert.equal(idxExpr.name, "idx_col");
-      }
+  it("reads a string value or key as a literal, as PySpark and Scala do", () => {
+    const cases: [string, Column][] = [
+      ["element_at", element_at("m", "k")],
+      ["array_contains", array_contains("arr", "k")],
+      ["array_position", array_position("arr", "k")],
+      ["array_remove", array_remove("arr", "k")],
+    ];
+    for (const [name, result] of cases) {
+      assert.ok(result._expr.type === "unresolvedFunction", name);
+      assert.deepStrictEqual(result._expr.arguments[1], { type: "literal", value: "k" }, name);
     }
+    // A Column still compares against another column.
+    const byColumn = element_at("m", col("k"));
+    assert.ok(byColumn._expr.type === "unresolvedFunction");
+    assert.deepStrictEqual(byColumn._expr.arguments[1], { type: "unresolvedAttribute", name: "k" });
+  });
+
+  it("accepts a column or column name where PySpark does for counts and positions", () => {
+    const sliced = slice("arr", "from", 2)._expr;
+    assert.ok(sliced.type === "unresolvedFunction");
+    assert.deepStrictEqual(sliced.arguments[1], { type: "unresolvedAttribute", name: "from" });
+    assert.deepStrictEqual(sliced.arguments[2], { type: "literal", value: 2 });
   });
 
   it("element_at with a Column index forwards its expression as-is", () => {

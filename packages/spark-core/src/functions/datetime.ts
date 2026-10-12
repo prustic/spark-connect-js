@@ -2,7 +2,7 @@
  * Date / Timestamp functions.
  */
 
-import { Column, fnExpr, toExpr, _lit, type ColOrName, fn } from "./_helpers.js";
+import { Column, fnExpr, toExpr, toNumberOrExpr, _lit, type ColOrName, fn } from "./_helpers.js";
 
 /** Extracts the year as an integer from a given date/timestamp/string. */
 export function year(column: ColOrName): Column {
@@ -70,13 +70,13 @@ export function datediff(end: ColOrName, start: ColOrName): Column {
 }
 
 /** Returns the date that is the given number of days after the start date. */
-export function date_add(column: ColOrName, days: number): Column {
-  return new Column(fnExpr("date_add", toExpr(column), _lit(days)._expr));
+export function date_add(column: ColOrName, days: ColOrName | number): Column {
+  return new Column(fnExpr("date_add", toExpr(column), toNumberOrExpr(days)));
 }
 
 /** Returns the date that is the given number of days before the start date. */
-export function date_sub(column: ColOrName, days: number): Column {
-  return new Column(fnExpr("date_sub", toExpr(column), _lit(days)._expr));
+export function date_sub(column: ColOrName, days: ColOrName | number): Column {
+  return new Column(fnExpr("date_sub", toExpr(column), toNumberOrExpr(days)));
 }
 
 /** Returns number of months between dates end and start. */
@@ -95,8 +95,8 @@ export function last_day(column: ColOrName): Column {
 }
 
 /** Returns the date that is the given number of months after the start date. */
-export function add_months(column: ColOrName, months: number): Column {
-  return new Column(fnExpr("add_months", toExpr(column), _lit(months)._expr));
+export function add_months(column: ColOrName, months: ColOrName | number): Column {
+  return new Column(fnExpr("add_months", toExpr(column), toNumberOrExpr(months)));
 }
 
 /** Converts a date/timestamp/string to a string formatted with the given date time pattern. */
@@ -139,9 +139,15 @@ export function trunc(column: ColOrName, format: string): Column {
   return new Column(fnExpr("trunc", toExpr(column), _lit(format)._expr));
 }
 
-/** Extracts a part of the date/timestamp or interval source (e.g. "year", "month", "day"). */
-export function extract(field: string, column: ColOrName): Column {
-  return new Column(fnExpr("extract", _lit(field)._expr, toExpr(column)));
+/**
+ * Extracts a part of a date, timestamp, or interval, such as `"year"` or
+ * `"day"`. `field` must be a constant, so a string here is a literal. A
+ * `lit("year")` Column, as PySpark and Scala require, works too.
+ */
+export function extract(field: Column | string, column: ColOrName): Column {
+  const fieldExpr = typeof field === "string" ? _lit(field)._expr : field._expr;
+
+  return new Column(fnExpr("extract", fieldExpr, toExpr(column)));
 }
 
 /** Alias for {@link extract}. */

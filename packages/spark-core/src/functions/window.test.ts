@@ -62,3 +62,12 @@ describe("window functions", () => {
     assertFn(ntile(4), "ntile", 1);
   });
 });
+
+describe("lag/lead default values", () => {
+  it("reads a number or string default as a literal, as PySpark does", () => {
+    for (const result of [lag("v", 1, 0), lead("v", 1, "none")]) {
+      assert.ok(result._expr.type === "unresolvedFunction");
+      assert.equal(result._expr.arguments[2].type, "literal");
+    }
+  });
+});
