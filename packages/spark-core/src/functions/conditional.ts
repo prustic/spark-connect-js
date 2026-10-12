@@ -121,6 +121,21 @@ export function nullif(col1: ColOrName, col2: ColOrName): Column {
   return fn("nullif", col1, col2);
 }
 
+/** Returns null where the value is 0, or the value otherwise. */
+export function nullifzero(column: ColOrName): Column {
+  return fn("nullifzero", column);
+}
+
+/** Returns 0 where the value is null, or the value otherwise. */
+export function zeroifnull(column: ColOrName): Column {
+  return fn("zeroifnull", column);
+}
+
+/** Returns whether col1 equals col2, treating two nulls as equal, like `<=>`. */
+export function equal_null(col1: ColOrName, col2: ColOrName): Column {
+  return fn("equal_null", col1, col2);
+}
+
 // Expression / misc predicates
 
 /** Parses a SQL expression string into a Column. */

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { md5, sha1, sha2, hash, xxhash64, crc32 } from "./hash.js";
+import { md5, sha1, sha, sha2, hash, xxhash64, crc32 } from "./hash.js";
 
 import type { Column } from "../column.js";
 
@@ -31,5 +31,11 @@ describe("hash functions", () => {
   it("hash/xxhash64 are variadic", () => {
     assertFn(hash("a", "b", "c"), "hash", 3);
     assertFn(xxhash64("a", "b"), "xxhash64", 2);
+  });
+});
+
+describe("sha", () => {
+  it("sends sha, as PySpark does", () => {
+    assertFn(sha("x"), "sha", 1);
   });
 });
