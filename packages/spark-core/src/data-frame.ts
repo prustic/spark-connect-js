@@ -1300,7 +1300,7 @@ export class DataFrame<R extends Row = Row> {
   }
 
   // A missing field would otherwise read as false, zero, or empty, each a
-  // plausible wrong answer; PySpark asserts on the same condition.
+  // plausible wrong answer. PySpark asserts on the same condition.
   private async _analyzeResult<T>(
     request: { type: string } & Record<string, unknown>,
     isExpected: (v: unknown) => v is T,
