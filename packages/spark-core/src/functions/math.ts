@@ -8,10 +8,19 @@ import {
   toExpr,
   toNumberOrExpr,
   _lit,
-  _liftCol,
+  randomSeed,
   type ColOrName,
   fn,
 } from "./_helpers.js";
+
+function withScale(name: string, column: ColOrName, scale?: Column | number): Column {
+  const args = [toExpr(column)];
+  if (scale !== undefined) {
+    args.push(toNumberOrExpr(scale));
+  }
+
+  return new Column(fnExpr(name, ...args));
+}
 
 /** Computes the absolute value of a numeric value. */
 export function abs(column: ColOrName): Column {
@@ -28,14 +37,19 @@ export function bround(column: ColOrName, scale = 0): Column {
   return new Column(fnExpr("bround", toExpr(column), _lit(scale)._expr));
 }
 
-/** Computes the ceiling of the given value. */
-export function ceil(column: ColOrName): Column {
-  return fn("ceil", column);
+/** Computes the ceiling of the given value, at `scale` decimal places when given. */
+export function ceil(column: ColOrName, scale?: Column | number): Column {
+  return withScale("ceil", column, scale);
 }
 
-/** Computes the floor of the given value. */
-export function floor(column: ColOrName): Column {
-  return fn("floor", column);
+/** Computes the ceiling of the given value, at `scale` decimal places when given. */
+export function ceiling(column: ColOrName, scale?: Column | number): Column {
+  return withScale("ceiling", column, scale);
+}
+
+/** Computes the floor of the given value, at `scale` decimal places when given. */
+export function floor(column: ColOrName, scale?: Column | number): Column {
+  return withScale("floor", column, scale);
 }
 
 /** Computes the square root of the specified float value. */
@@ -56,8 +70,16 @@ export function pow(column: ColOrName, exponent: ColOrName | number): Column {
   return new Column(fnExpr("power", toExpr(column), toNumberOrExpr(exponent)));
 }
 
+/** Alias for {@link pow}. */
+export const power = pow;
+
 /** Computes the natural logarithm of the given value. */
 export function log(column: ColOrName): Column {
+  return fn("ln", column);
+}
+
+/** Computes the natural logarithm of the given value. */
+export function ln(column: ColOrName): Column {
   return fn("ln", column);
 }
 
@@ -121,6 +143,21 @@ export function atan2(y: ColOrName, x: ColOrName): Column {
   return fn("atan2", y, x);
 }
 
+/** Computes the cotangent of the given value. */
+export function cot(column: ColOrName): Column {
+  return fn("cot", column);
+}
+
+/** Computes the cosecant of the given value. */
+export function csc(column: ColOrName): Column {
+  return fn("csc", column);
+}
+
+/** Computes the secant of the given value. */
+export function sec(column: ColOrName): Column {
+  return fn("sec", column);
+}
+
 /** Computes the hyperbolic sine of the given value. */
 export function sinh(column: ColOrName): Column {
   return fn("sinh", column);
@@ -134,6 +171,21 @@ export function cosh(column: ColOrName): Column {
 /** Computes the hyperbolic tangent of the given value. */
 export function tanh(column: ColOrName): Column {
   return fn("tanh", column);
+}
+
+/** Computes the inverse hyperbolic sine of the given value. */
+export function asinh(column: ColOrName): Column {
+  return fn("asinh", column);
+}
+
+/** Computes the inverse hyperbolic cosine of the given value. */
+export function acosh(column: ColOrName): Column {
+  return fn("acosh", column);
+}
+
+/** Computes the inverse hyperbolic tangent of the given value. */
+export function atanh(column: ColOrName): Column {
+  return fn("atanh", column);
 }
 
 /** Computes the signum of the given value. */
@@ -184,18 +236,67 @@ export function bin(column: ColOrName): Column {
   return fn("bin", column);
 }
 
-/** Generates a random column with independent and identically distributed (i.i.d.) samples uniformly distributed in [0.0, 1.0). */
-export function rand(seed?: number): Column {
-  return seed !== undefined
-    ? new Column(fnExpr("rand", _lit(seed)._expr))
-    : new Column(fnExpr("rand"));
+/** Converts a number held as a string from base `fromBase` to base `toBase`. */
+export function conv(column: ColOrName, fromBase: number, toBase: number): Column {
+  return new Column(fnExpr("conv", toExpr(column), _lit(fromBase)._expr, _lit(toBase)._expr));
 }
 
-/** Generates a column with independent and identically distributed (i.i.d.) samples from the standard normal distribution. */
+/**
+ * Returns the 1-based bucket that `v` falls into, out of `numBucket` equal-width
+ * buckets between `min` and `max`.
+ */
+export function width_bucket(
+  v: ColOrName,
+  min: ColOrName,
+  max: ColOrName,
+  numBucket: ColOrName | number,
+): Column {
+  return new Column(
+    fnExpr("width_bucket", toExpr(v), toExpr(min), toExpr(max), toNumberOrExpr(numBucket)),
+  );
+}
+
+/**
+ * Generates a random column with independent and identically distributed (i.i.d.) samples uniformly distributed in [0.0, 1.0).
+ *
+ * Without a `seed`, one is picked on the client, as in PySpark and Scala, so
+ * every action on the same DataFrame sees the same values.
+ */
+export function rand(seed?: number): Column {
+  return new Column(fnExpr("rand", seed !== undefined ? _lit(seed)._expr : randomSeed()));
+}
+
+/** Alias for {@link rand}. */
+export const random = rand;
+
+/**
+ * Generates a column with independent and identically distributed (i.i.d.) samples from the standard normal distribution.
+ *
+ * Without a `seed`, one is picked on the client, as in PySpark and Scala, so
+ * every action on the same DataFrame sees the same values.
+ */
 export function randn(seed?: number): Column {
-  return seed !== undefined
-    ? new Column(fnExpr("randn", _lit(seed)._expr))
-    : new Column(fnExpr("randn"));
+  return new Column(fnExpr("randn", seed !== undefined ? _lit(seed)._expr : randomSeed()));
+}
+
+/**
+ * Generates a random value uniformly distributed in [`min`, `max`), an integer
+ * when both bounds are integers. Without a `seed`, one is picked on the client,
+ * as in PySpark and Scala.
+ */
+export function uniform(
+  min: Column | number,
+  max: Column | number,
+  seed?: Column | number,
+): Column {
+  return new Column(
+    fnExpr(
+      "uniform",
+      toNumberOrExpr(min),
+      toNumberOrExpr(max),
+      seed !== undefined ? toNumberOrExpr(seed) : randomSeed(),
+    ),
+  );
 }
 
 /** Returns the positive value of dividend mod divisor. */
@@ -206,6 +307,31 @@ export function pmod(dividend: ColOrName, divisor: ColOrName): Column {
 /** Returns the double value that is closest in value to the argument and is equal to a mathematical integer. */
 export function rint(column: ColOrName): Column {
   return fn("rint", column);
+}
+
+/** Returns `left + right`, or null where the result overflows. */
+export function try_add(left: ColOrName, right: ColOrName): Column {
+  return fn("try_add", left, right);
+}
+
+/** Returns `left - right`, or null where the result overflows. */
+export function try_subtract(left: ColOrName, right: ColOrName): Column {
+  return fn("try_subtract", left, right);
+}
+
+/** Returns `left * right`, or null where the result overflows. */
+export function try_multiply(left: ColOrName, right: ColOrName): Column {
+  return fn("try_multiply", left, right);
+}
+
+/** Returns `left / right`, or null where `right` is 0. */
+export function try_divide(left: ColOrName, right: ColOrName): Column {
+  return fn("try_divide", left, right);
+}
+
+/** Returns the remainder of `left / right`, or null where `right` is 0. */
+export function try_mod(left: ColOrName, right: ColOrName): Column {
+  return fn("try_mod", left, right);
 }
 
 /** Computes sqrt(a^2 + b^2) without intermediate overflow or underflow. */

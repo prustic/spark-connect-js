@@ -15,6 +15,11 @@ export function sha1(column: ColOrName): Column {
   return fn("sha1", column);
 }
 
+/** Returns the hex string result of SHA-1, like {@link sha1}. */
+export function sha(column: ColOrName): Column {
+  return fn("sha", column);
+}
+
 /** Returns the hex string result of SHA-2 family of hash functions (SHA-224, SHA-256, SHA-384, and SHA-512). */
 export function sha2(column: ColOrName, numBits: number): Column {
   return new Column(fnExpr("sha2", toExpr(column), _lit(numBits)._expr));

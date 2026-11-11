@@ -26,6 +26,19 @@ export function toNumberOrExpr(v: ColOrName | number): Expression {
   return typeof v === "number" ? _lit(v)._expr : toExpr(v);
 }
 
+/**
+ * A seed for a random function called without one. Picked on the client, as
+ * PySpark and Scala do, so every execution of the plan draws the same values.
+ *
+ * @internal
+ */
+export function randomSeed(): Expression {
+  const high = BigInt(Math.floor(Math.random() * 2 ** 31));
+  const low = BigInt(Math.floor(Math.random() * 2 ** 32));
+
+  return _lit((high << 32n) | low)._expr;
+}
+
 export function fnExpr(name: string, ...args: Expression[]): Expression {
   return { type: "unresolvedFunction", name, arguments: args };
 }

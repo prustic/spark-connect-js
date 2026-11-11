@@ -20,6 +20,9 @@ import {
   typeof_,
   uuid,
   broadcast,
+  nullifzero,
+  zeroifnull,
+  equal_null,
 } from "./conditional.js";
 
 function assertFn(c: Column, name: string, argCount?: number) {
@@ -207,5 +210,20 @@ describe("utility functions", () => {
     const result = broadcast(col("x"));
     // broadcast is a pass-through, not an unresolvedFunction
     assert.equal(result._expr.type, "unresolvedAttribute");
+  });
+});
+
+describe("null-handling functions added for PySpark parity", () => {
+  it("send the function name PySpark sends", () => {
+    const cases: [Column, string, number][] = [
+      [nullifzero("x"), "nullifzero", 1],
+      [zeroifnull("x"), "zeroifnull", 1],
+      [equal_null("a", "b"), "equal_null", 2],
+    ];
+    for (const [result, name, argCount] of cases) {
+      assert.ok(result._expr.type === "unresolvedFunction", name);
+      assert.equal(result._expr.name, name);
+      assert.equal(result._expr.arguments.length, argCount, name);
+    }
   });
 });
